@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { z } from "zod";
-import { planIdSchema, SUBSCRIPTION_SUMMARY_COLUMNS, type PlanId, type SubscriptionSummary } from "@shared/billing";
+import { SUBSCRIPTION_SUMMARY_COLUMNS, type SubscriptionSummary } from "@shared/billing";
 import { getUserId, requireAdmin } from "../lib/auth";
 import { asyncRoute, HttpError, parseInput } from "../lib/http";
 import { logger } from "../lib/logger";
@@ -13,33 +13,31 @@ const sessionParamsSchema = userParamsSchema.extend({ sessionId: z.string().uuid
 const updateUserBodySchema = z
   .object({
     role: z.enum(["user", "admin"]).optional(),
-    // Manual grant or removal of a plan (null = no subscription). Does not touch the Whop billing:
+    // Manual grant (true) or removal (false) of the subscription. Does not touch the Whop billing:
     // a later webhook of a paying member applies their membership again.
-    plan: planIdSchema.nullable().optional(),
+    subscribed: z.boolean().optional(),
   })
   .strict()
-  .refine((body) => body.role !== undefined || body.plan !== undefined, {
+  .refine((body) => body.role !== undefined || body.subscribed !== undefined, {
     message: "Aucune modification fournie",
   });
 
 const PROFILE_COLUMNS = "id,email,full_name,avatar_url,role,created_at,last_active_at,signup_source";
 
 /**
- * Admin plan change: null removes the subscription row; a plan updates the existing row (a Whop
- * one keeps its billing data) or creates a manual one.
+ * Admin access change: a grant activates the existing row (a Whop one keeps its billing data) or
+ * creates a manual one; a removal deletes the row.
  */
-async function setManualPlan(userId: string, plan: PlanId | null) {
+async function setManualSubscription(userId: string, subscribed: boolean) {
   const db = supabaseAdmin!;
-  const now = new Date().toISOString();
-  const { error } =
-    plan === null
-      ? await db.from("subscriptions").delete().eq("user_id", userId)
-      : await db
-          .from("subscriptions")
-          .upsert({ user_id: userId, plan, status: "active", updated_at: now }, { onConflict: "user_id" });
+  const { error } = subscribed
+    ? await db
+        .from("subscriptions")
+        .upsert({ user_id: userId, status: "active", updated_at: new Date().toISOString() }, { onConflict: "user_id" })
+    : await db.from("subscriptions").delete().eq("user_id", userId);
 
   if (error) {
-    logger.error({ err: error, userId, plan }, "Failed to update subscription");
+    logger.error({ err: error, userId, subscribed }, "Failed to update subscription");
     throw new HttpError(500, "Impossible de mettre à jour l'abonnement.");
   }
 }
@@ -130,7 +128,7 @@ export function registerAdminRoutes(app: Express) {
       }
       if (!data?.length) throw new HttpError(404, "Utilisateur introuvable.");
 
-      if (updates.plan !== undefined) await setManualPlan(userId, updates.plan);
+      if (updates.subscribed !== undefined) await setManualSubscription(userId, updates.subscribed);
 
       res.status(204).end();
     }),

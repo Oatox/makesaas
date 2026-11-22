@@ -92,7 +92,7 @@ export function Testimonials() {
     <RevealSection id="temoignages" className="px-4 py-24 md:py-32">
       <div className="mx-auto max-w-6xl">
         <RevealItem className="mb-12 space-y-4 text-center">
-          <h2 className="font-display text-3xl md:text-4xl">
+          <h2 className="landing-title font-display text-[32px] md:text-[48px]">
             Ils ont lancé leur SaaS <span className="text-highlight">avec MakeSaaS</span>
           </h2>
           <p className="mx-auto max-w-xl text-lg text-muted-foreground">

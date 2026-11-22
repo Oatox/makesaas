@@ -24,7 +24,7 @@ export function EmptyState({ icon: Icon, title, description, action, size = "def
         strokeWidth={large ? 1.75 : undefined}
       />
       {large ? (
-        <h2 className="mt-2 font-display text-xl font-semibold sm:text-2xl">{title}</h2>
+        <h2 className="mt-2 font-display text-xl font-light sm:text-2xl">{title}</h2>
       ) : (
         <p className="font-medium">{title}</p>
       )}

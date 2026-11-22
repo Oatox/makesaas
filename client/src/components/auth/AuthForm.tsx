@@ -64,7 +64,8 @@ export function AuthForm({
   itemVariants,
 }: {
   mode: AuthMode;
-  onModeChange: (mode: AuthMode) => void;
+  /** Switch between sign-in and sign-up; without it, the form stays in `mode` (onboarding sign-up). */
+  onModeChange?: (mode: AuthMode) => void;
   /** Where Google sends the user back, signed in. */
   oauthRedirectPath: string;
   /** Entrance of each block, driven by the parent's stagger. */
@@ -72,7 +73,6 @@ export function AuthForm({
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const isLogin = mode === "login";
@@ -86,7 +86,6 @@ export function AuthForm({
         await signInWithEmail(email, password);
         toast({ title: "Bon retour !", description: "Connexion réussie." });
       } else {
-        if (password !== confirmPassword) throw new Error("Les mots de passe ne correspondent pas.");
         await registerWithEmail(email, password);
         toast({ title: "Compte créé", description: "Votre compte a été créé avec succès." });
       }
@@ -113,7 +112,7 @@ export function AuthForm({
         <Button
           type="button"
           variant="secondary"
-          className="h-12 w-full rounded-[12px] text-base"
+          className="h-12 w-full text-base"
           onClick={handleGoogle}
           disabled={isLoading}
           data-testid="button-google-auth"
@@ -161,29 +160,8 @@ export function AuthForm({
           {!isLogin && <PasswordStrengthMeter password={password} />}
         </motion.div>
 
-        {!isLogin && (
-          <motion.div variants={itemVariants} className="relative space-y-2">
-            <Label htmlFor="confirm-password" className="text-sm font-medium text-foreground/90">
-              Confirmer le mot de passe
-            </Label>
-            <PasswordInput
-              id="confirm-password"
-              value={confirmPassword}
-              onChange={setConfirmPassword}
-              autoComplete="new-password"
-              testId="input-confirm-password"
-            />
-            {confirmPassword && confirmPassword !== password && (
-              // Laid over the gap under the field, like the strength meter: the form height never changes.
-              <p className="absolute inset-x-0 top-full mt-1.5 text-[11px] leading-none text-destructive">
-                Les mots de passe ne correspondent pas.
-              </p>
-            )}
-          </motion.div>
-        )}
-
         <motion.div variants={itemVariants} className="pt-2">
-          <Button type="submit" className="h-12 w-full rounded-[12px] text-base" disabled={isLoading} data-testid="button-auth-submit">
+          <Button type="submit" className="h-12 w-full text-base" disabled={isLoading} data-testid="button-auth-submit">
             {isLoading && <Loader2 className="animate-spin" />}
             {isLogin ? "Se connecter" : "Créer mon compte"}
           </Button>
@@ -204,16 +182,18 @@ export function AuthForm({
         )}
       </form>
 
-      <motion.div variants={itemVariants} className="mt-8 text-center">
-        <button
-          type="button"
-          onClick={() => onModeChange(isLogin ? "register" : "login")}
-          className="rounded-[10px] px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          {isLogin ? "Pas encore de compte ?" : "Déjà un compte ?"}{" "}
-          <span className="font-semibold text-primary">{isLogin ? "S'inscrire" : "Se connecter"}</span>
-        </button>
-      </motion.div>
+      {onModeChange && (
+        <motion.div variants={itemVariants} className="mt-8 text-center">
+          <button
+            type="button"
+            onClick={() => onModeChange(isLogin ? "register" : "login")}
+            className="rounded-[10px] px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {isLogin ? "Pas encore de compte ?" : "Déjà un compte ?"}{" "}
+            <span className="font-semibold text-primary">{isLogin ? "S'inscrire" : "Se connecter"}</span>
+          </button>
+        </motion.div>
+      )}
     </>
   );
 }

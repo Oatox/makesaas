@@ -1,5 +1,5 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
-import { activePlan, isPlanId, type PlanId } from "@shared/billing";
+import { grantsAccess } from "@shared/billing";
 import { logger } from "./logger";
 import { supabaseAdmin } from "./supabase-admin";
 
@@ -48,40 +48,29 @@ async function requireAdminRole(_req: Request, res: Response, next: NextFunction
 /** requireUser, then the admin role check (requireUser guarantees supabaseAdmin is configured). */
 export const requireAdmin: RequestHandler[] = [requireUser, requireAdminRole];
 
-async function requirePaidPlan(_req: Request, res: Response, next: NextFunction) {
+async function requireAccess(_req: Request, res: Response, next: NextFunction) {
   const userId = getUserId(res);
   const [profile, subscription] = await Promise.all([
     supabaseAdmin!.from("profiles").select("role").eq("id", userId).maybeSingle(),
-    supabaseAdmin!.from("subscriptions").select("plan, status").eq("user_id", userId).maybeSingle(),
+    supabaseAdmin!.from("subscriptions").select("status").eq("user_id", userId).maybeSingle(),
   ]);
 
   const error = profile.error ?? subscription.error;
   if (error) {
-    logger.error({ err: error }, "Failed to verify subscription plan");
+    logger.error({ err: error }, "Failed to verify subscription");
     return res.status(500).json({ message: "Impossible de vérifier votre abonnement." });
   }
 
-  // Admins get the Pro plan; there is no free plan, everyone else needs a subscription granting access.
-  const plan: PlanId | null = profile.data?.role === "admin" ? "pro" : activePlan(subscription.data);
-  if (!plan) {
+  // There is no free plan: admins aside, everyone needs a subscription granting access.
+  if (profile.data?.role !== "admin" && !grantsAccess(subscription.data?.status)) {
     return res.status(402).json({ message: "Un abonnement est nécessaire pour accéder à l'application.", code: "SUBSCRIPTION_REQUIRED" });
   }
 
-  res.locals.plan = plan;
   next();
 }
 
-/** requireUser, then an active paid plan (Starter or Pro; admins count as Pro). Read it with getPlan(res). */
-export const requireSubscriber: RequestHandler[] = [requireUser, requirePaidPlan];
-
-/** Plan of the user checked by requireSubscriber; throws if the middleware was not applied. */
-export function getPlan(res: Response): PlanId {
-  const plan = res.locals.plan;
-  if (!isPlanId(plan)) {
-    throw new Error("getPlan called on a route without requireSubscriber");
-  }
-  return plan;
-}
+/** requireUser, then a subscription granting access (admins always have access). */
+export const requireSubscriber: RequestHandler[] = [requireUser, requireAccess];
 
 /** Id of the user authenticated by requireUser; throws if the middleware was not applied. */
 export function getUserId(res: Response): string {

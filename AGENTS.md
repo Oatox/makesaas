@@ -41,20 +41,26 @@ Set them in `.env` (development) or in the host platform (production):
 - `SUPABASE_SECRET_KEY` — Supabase secret key (`sb_secret_...`, server-only)
 - `WHOP_API_KEY` — Whop account API key (server-only; without it the paywall shows "abonnements indisponibles")
 - `WHOP_WEBHOOK_SECRET` — signing secret of the Whop webhook (`ws_...`, server-only)
-- `WHOP_STARTER_PLAN_ID` / `WHOP_PRO_PLAN_ID` — Whop plan ids (`plan_...`) of the two monthly plans
+- `WHOP_PLAN_ID` — Whop plan id (`plan_...`) of the single monthly plan
 - `WHOP_ENVIRONMENT` — `sandbox` to use sandbox.whop.com, production otherwise
 - `ONESHOT_API_KEY` — OneShotAPI key for the AI pipelines (server-only, optional: without it the AI routes answer 503)
 
 ## User journey
 
 - Landing `/` → onboarding `/onboarding` (questions saved in localStorage, `client/src/components/onboarding/steps.tsx`; adding a step there is all it takes) → sign-up `/register` → paywall `/abonnement` → app `/app`.
-- `ProtectedRoute` (client/src/App.tsx) sends visitors to the onboarding and signed-in users without a plan to the paywall.
+- `ProtectedRoute` (client/src/App.tsx) sends visitors to the onboarding and signed-in users without a subscription to the paywall.
+
+## SaaS (workspaces)
+
+- A user owns one or more "SaaS" (table `saas`, one owner each, no members), shown and switched from the sidebar header (`client/src/components/layout/SaasSwitcher.tsx`, like an organization switcher). The active one is `profiles.current_saas_id`, read with `useSaas()` (`client/src/hooks/use-saas.ts`); it falls back to the oldest SaaS when unset.
+- A first SaaS "Mon SaaS" is created at signup by `handle_new_user`. Subscribers (and admins) create as many as they want: the `saas` INSERT policy only requires `private.has_access()`. A user can never delete their last SaaS (`prevent_last_saas_delete`).
+- Product data belongs to a SaaS: give new tables a `saas_id UUID REFERENCES public.saas(id) ON DELETE CASCADE` and RLS through `saas.owner_id = auth.uid()`; add `(SELECT private.has_access())` to the write policies of paid features.
 
 ## Subscriptions (Whop)
 
-- No free plan. Subscriptions live in their own table `subscriptions` (one row per user, `provider` `whop` or `manual`), never on `profiles`. Access = a row whose `status` grants access (`grantsAccess`/`activePlan` in `shared/billing.ts`, mirrored by `subscription_grants_access` in SQL); plans `starter` and `pro` (`PLANS` in `shared/billing.ts`). Admins count as Pro.
-- `POST /api/billing/checkout` creates a Whop checkout configuration carrying `metadata.supabase_user_id`. The plan is granted only by the signed webhook `POST /api/billing/whop/webhook` (`server/billing/`), which re-reads the membership from Whop and upserts the user's `subscriptions` row. A Starter → Pro upgrade cancels the old Starter membership and credits its unused days.
-- `requireSubscriber` (server/lib/auth.ts) guards paid API routes; `getPlan(res)` gives the plan.
+- A single paid plan unlocks the whole app (`PLAN` in `shared/billing.ts`: name and description); there is no free plan. Subscriptions live in their own table `subscriptions` (one row per user, `provider` `whop` or `manual`), never on `profiles`. Access = a row whose `status` grants access (`grantsAccess` in `shared/billing.ts`, mirrored by `subscription_grants_access` in SQL), or the admin role: `hasAccess` from `useAuth()` on the client, `private.has_access()` in RLS.
+- `POST /api/billing/checkout` creates a Whop checkout configuration carrying `metadata.supabase_user_id`. Access is granted only by the signed webhook `POST /api/billing/whop/webhook` (`server/billing/`), which re-reads the membership from Whop and upserts the user's `subscriptions` row. A new membership never replaces one still running on Whop: a double payment is logged as an error, to refund from the Whop dashboard.
+- `requireSubscriber` (server/lib/auth.ts) guards paid API routes.
 
 ## AI pipelines
 

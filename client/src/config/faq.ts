@@ -11,7 +11,7 @@ export const FAQS = [
   },
   {
     q: "Y a-t-il une offre gratuite ?",
-    a: "Non : l'accès à l'application passe par un abonnement Starter ou Pro, choisi à la fin de l'onboarding.",
+    a: "Non : l'accès à l'application passe par un abonnement mensuel unique, sans engagement, proposé à la fin de l'onboarding.",
   },
   {
     q: "Puis-je résilier mon abonnement ?",

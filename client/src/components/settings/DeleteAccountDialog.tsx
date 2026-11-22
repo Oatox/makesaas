@@ -21,15 +21,15 @@ import { tallInputClass } from "@/lib/field-styles";
 const DELETE_CONFIRMATION = "SUPPRIMER";
 
 /** GDPR erasure of the account. Blocked while a subscription is active (it must be cancelled first). */
-export function DeleteAccountDialog({ isPro }: { isPro: boolean }) {
+export function DeleteAccountDialog({ hasActiveBilling }: { hasActiveBilling: boolean }) {
   const deleteAccount = useDeleteAccount();
   const [confirmText, setConfirmText] = useState("");
-  const canDelete = !isPro && confirmText === DELETE_CONFIRMATION;
+  const canDelete = !hasActiveBilling && confirmText === DELETE_CONFIRMATION;
 
   return (
     <AlertDialog onOpenChange={(open) => !open && setConfirmText("")}>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" className="h-11 w-full shrink-0 rounded-[12px] px-5 sm:w-auto">
+        <Button variant="destructive" className="h-11 w-full shrink-0 px-5 sm:w-auto">
           Supprimer
         </Button>
       </AlertDialogTrigger>
@@ -41,7 +41,7 @@ export function DeleteAccountDialog({ isPro }: { isPro: boolean }) {
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-4 pt-2">
-              {isPro ? (
+              {hasActiveBilling ? (
                 <div className="rounded-[12px] border border-destructive/20 bg-destructive/10 p-3 text-sm font-medium text-destructive">
                   Vous avez un abonnement actif. Veuillez d'abord le résilier depuis votre abonnement avant de pouvoir supprimer votre compte.
                 </div>
@@ -69,7 +69,7 @@ export function DeleteAccountDialog({ isPro }: { isPro: boolean }) {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Annuler</AlertDialogCancel>
-          {!isPro && (
+          {!hasActiveBilling && (
             <AlertDialogAction
               onClick={(event) => {
                 // Stay open with the spinner: success signs out and leaves the page, an error is toasted here.

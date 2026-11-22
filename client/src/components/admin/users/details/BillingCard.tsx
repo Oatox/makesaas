@@ -1,31 +1,26 @@
-import { useState } from "react";
-import { CreditCard, Loader2, Save } from "lucide-react";
-import { PLANS, activePlan, isPlanId, type PlanId } from "@shared/billing";
+import { CreditCard, Loader2 } from "lucide-react";
+import { grantsAccess } from "@shared/billing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdateAdminUser, type AdminUserDetailsResponse } from "@/hooks/use-admin-profiles";
 import { formatDate } from "@/lib/format";
 
-const selectItemClass =
-  "h-9 cursor-pointer rounded-md pr-2 pl-8 text-sm font-medium data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground";
+function describe(subscription: AdminUserDetailsResponse["profile"]["subscription"]) {
+  if (!subscription) return "Aucun abonnement.";
+  if (subscription.provider === "manual") return `Abonnement offert manuellement (${subscription.status}), sans facturation.`;
 
-// Select values cannot be null: "none" stands for "no subscription".
-const NONE = "none";
+  const period = subscription.current_period_end
+    ? `, ${subscription.cancel_at_period_end ? "se termine le" : "renouvelé le"} ${formatDate(subscription.current_period_end)}`
+    : "";
+  return `Abonnement Whop (${subscription.status})${period}. Le retirer ici n'arrête pas la facturation Whop.`;
+}
 
+/** The user's subscription, with a manual grant or removal (no billing involved). */
 export function BillingCard({ profile }: { profile: AdminUserDetailsResponse["profile"] }) {
   const updateUser = useUpdateAdminUser();
-  // Plan picked but not saved yet; undefined = follow the stored value.
-  const subscription = profile.subscription;
-  const currentPlan = activePlan(subscription);
-  const [draft, setDraft] = useState<PlanId | null | undefined>(undefined);
-  const selected = draft === undefined ? currentPlan : draft;
-  const isDirty = selected !== currentPlan;
-
-  const save = () =>
-    updateUser.mutate({ id: profile.id, updates: { plan: selected } }, { onSuccess: () => setDraft(undefined) });
+  const subscribed = grantsAccess(profile.subscription?.status);
+  const toggle = () => updateUser.mutate({ id: profile.id, updates: { subscribed: !subscribed } });
 
   return (
     <Card className="border-border/60">
@@ -36,57 +31,21 @@ export function BillingCard({ profile }: { profile: AdminUserDetailsResponse["pr
               <CreditCard className="h-5 w-5 text-muted-foreground" />
               Abonnement
             </CardTitle>
-            <CardDescription>
-              {!subscription
-                ? "Aucun abonnement."
-                : subscription.provider === "whop"
-                  ? `Abonnement Whop (${subscription.status})${
-                      subscription.current_period_end
-                        ? `, ${subscription.cancel_at_period_end ? "se termine le" : "renouvelé le"} ${formatDate(subscription.current_period_end)}`
-                        : ""
-                    }. Le retirer ici n'arrête pas la facturation Whop.`
-                  : `Plan attribué manuellement (${subscription.status}), sans facturation.`}
-            </CardDescription>
+            <CardDescription>{describe(profile.subscription)}</CardDescription>
           </div>
-          <Badge variant={selected ? "default" : "secondary"}>{selected ? `Plan ${PLANS[selected].name}` : "Sans abonnement"}</Badge>
+          <Badge variant={subscribed ? "default" : "secondary"}>{subscribed ? "Abonné" : "Sans abonnement"}</Badge>
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="space-y-2">
-            <Label htmlFor="admin-user-plan">Plan</Label>
-            <Select
-              value={selected ?? NONE}
-              onValueChange={(value) => setDraft(isPlanId(value) ? value : null)}
-              disabled={updateUser.isPending}
-            >
-              <SelectTrigger
-                id="admin-user-plan"
-                className="w-full sm:w-[200px] h-10 rounded-md border-sidebar-border bg-sidebar px-3 text-sidebar-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent
-                align="end"
-                className="min-w-[200px] rounded-lg border-sidebar-border bg-sidebar p-1 text-sidebar-foreground"
-              >
-                <SelectItem value={NONE} className={selectItemClass}>
-                  Sans abonnement
-                </SelectItem>
-                {Object.values(PLANS).map((plan) => (
-                  <SelectItem key={plan.id} value={plan.id} className={selectItemClass}>
-                    {plan.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button className="sm:min-w-36" onClick={save} disabled={!isDirty || updateUser.isPending}>
-            {updateUser.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Sauvegarder
-          </Button>
-        </div>
+      <CardContent className="flex pt-0 sm:justify-end">
+        <Button
+          variant={subscribed ? "secondary" : "default"}
+          className="w-full sm:w-auto sm:min-w-36"
+          onClick={toggle}
+          disabled={updateUser.isPending}
+        >
+          {updateUser.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          {subscribed ? "Retirer l'abonnement" : "Offrir l'abonnement"}
+        </Button>
       </CardContent>
     </Card>
   );

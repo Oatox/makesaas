@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
 import { useHistoryState } from "wouter/use-browser-location";
@@ -8,7 +8,6 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -32,9 +31,10 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Logo } from "@/components/brand/Logo";
 import { getInitials } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
+import { SaasSwitcher } from "./SaasSwitcher";
 
 type NavItem = { href: string; label: string; icon: LucideIcon; matchPrefix?: boolean };
 type NavGroup = { label: string; items: NavItem[]; adminOnly?: boolean };
@@ -58,26 +58,52 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-// Bigger items, rounded like the buttons; the active one gets an orange tint, an orange
-// icon and a small orange bar on the left. Collapsed (icon) mode shrinks to a centered square.
-const navItemClass =
-  "relative h-14 gap-3.5 rounded-[12px] px-4 text-base font-medium md:h-12 text-sidebar-foreground/70 transition-colors " +
-  "hover:bg-sidebar-accent hover:text-sidebar-foreground [&>svg]:size-[22px] " +
-  "data-[active=true]:bg-primary/10 data-[active=true]:text-sidebar-foreground data-[active=true]:[&>svg]:text-primary " +
-  "before:absolute before:left-0 before:top-1/2 before:h-6 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full " +
-  "before:bg-primary before:opacity-0 data-[active=true]:before:opacity-100 group-data-[collapsible=icon]:before:hidden " +
-  // Collapsed (icon-only) sidebar: compact centered square, smaller icon
-  "group-data-[collapsible=icon]:!size-9 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center " +
-  "group-data-[collapsible=icon]:rounded-[10px] group-data-[collapsible=icon]:[&>svg]:size-[18px]";
+// Raised blocks grouping the links, as in dropposting; the active link gets an orange tint.
+const navBlockSurfaceClass =
+  "rounded-lg border border-white/[0.09] bg-gradient-to-b from-[#252525] to-[#1e1e1e] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.09),0_4px_14px_-10px_rgba(0,0,0,0.35)]";
+
+const navLinkClass =
+  "rounded-md border border-transparent bg-transparent text-sidebar-foreground shadow-none transition-[background,border-color,box-shadow] " +
+  "hover:border-transparent hover:bg-white/[0.055] hover:shadow-none " +
+  "data-[active=true]:border-primary/35 data-[active=true]:bg-gradient-to-b data-[active=true]:from-primary/[0.22] data-[active=true]:to-primary/[0.08] " +
+  "data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground data-[active=true]:[&_svg]:text-primary " +
+  "data-[active=true]:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.10),0_6px_16px_-10px_hsl(var(--primary)/0.35)] " +
+  "hover:data-[active=true]:border-primary/45 hover:data-[active=true]:bg-transparent";
+
+const blockLabelClass = "mb-1.5 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
+
+function NavBlock({ label, isCollapsed, children }: { label?: string; isCollapsed: boolean; children: ReactNode }) {
+  return (
+    <div className={cn(navBlockSurfaceClass, isCollapsed ? "p-1" : "p-1.5")}>
+      {label && !isCollapsed && <p className={blockLabelClass}>{label}</p>}
+      <SidebarMenu className="gap-1">{children}</SidebarMenu>
+    </div>
+  );
+}
+
+function NavLink({ item, active, isCollapsed }: { item: NavItem; active: boolean; isCollapsed: boolean }) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={active}
+        tooltip={item.label}
+        className={cn(navLinkClass, isCollapsed ? "min-h-9 justify-center px-0" : "min-h-9 px-2 py-1.5")}
+      >
+        <Link href={item.href} className={cn("flex w-full items-center gap-2", isCollapsed && "justify-center")}>
+          <item.icon className="shrink-0" />
+          {!isCollapsed && <span className="truncate">{item.label}</span>}
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
 
 // User dropdown rows mirror the nav items (height, radius, text and 22px icons).
 const menuItemClass =
   "h-14 cursor-pointer gap-3.5 rounded-[12px] px-4 text-base font-medium md:h-12 sm:rounded-[12px] sm:px-4 sm:py-0 " +
   "text-sidebar-foreground/80 [&_svg]:size-[22px] data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-foreground " +
   "focus:bg-sidebar-accent focus:text-sidebar-foreground";
-
-const groupLabelClass =
-  "mb-1 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden";
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -114,33 +140,20 @@ export function AppSidebar() {
 
   return (
     <Sidebar variant="inset" collapsible="icon">
-      <SidebarHeader className="h-16 flex items-center justify-center overflow-hidden transition-[width,height] ease-linear group-data-[collapsible=icon]:h-12">
-        <Link href="/app" className="flex h-full w-full items-center justify-center gap-2 px-2 pt-1 text-sidebar-foreground">
-          {isCollapsed ? (
-            <Logo variant="mark" className="h-7 w-7" />
-          ) : (
-            <Logo className="h-7 animate-in fade-in duration-300" />
-          )}
-        </Link>
+      <SidebarHeader className="flex min-h-16 items-center justify-center overflow-visible px-2 py-2 transition-[width,height] ease-linear group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:py-0">
+        <SaasSwitcher isCollapsed={isCollapsed} />
       </SidebarHeader>
 
       <SidebarContent>
-        {NAV_GROUPS.filter((group) => !group.adminOnly || isAdmin).map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel className={groupLabelClass}>{group.label}</SidebarGroupLabel>
+        {NAV_GROUPS.filter((group) => !group.adminOnly || isAdmin).map((group, index) => (
+          // The first group sits at the top, the following ones (administration) at the bottom.
+          <SidebarGroup key={group.label} className={index > 0 ? "mt-auto" : undefined}>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-2 md:gap-1.5">
+              <NavBlock label={index > 0 ? group.label : undefined} isCollapsed={isCollapsed}>
                 {group.items.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive(item)} tooltip={item.label} className={navItemClass}>
-                      <Link href={item.href}>
-                        <item.icon className="shrink-0" />
-                        {!isCollapsed && <span className="truncate">{item.label}</span>}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <NavLink key={item.href} item={item} active={isActive(item)} isCollapsed={isCollapsed} />
                 ))}
-              </SidebarMenu>
+              </NavBlock>
             </SidebarGroupContent>
           </SidebarGroup>
         ))}

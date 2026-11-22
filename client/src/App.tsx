@@ -27,10 +27,10 @@ import Confidentialite from "@/pages/Confidentialite";
 import { Loader2 } from "lucide-react";
 import { AUTH_CONFIG } from "@/config/auth";
 
-// Protected Route Wrapper: the app is reserved to paid plans (there is no free plan). Visitors go
-// to the onboarding (sign-up is asked during it), signed-in users without a plan to the paywall.
+// Protected Route Wrapper: the app is reserved to subscribers (there is no free plan). Visitors go
+// to the onboarding (sign-up is asked during it), signed-in users without a subscription to the paywall.
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, hasPaidPlan, isLoading, isProfileError, retryProfile } = useAuth();
+  const { user, hasAccess, isLoading, isProfileError, retryProfile } = useAuth();
 
   if (isLoading) {
     return (
@@ -40,7 +40,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
     );
   }
 
-  // Unknown plan (profile not loaded): offer a retry rather than sending a subscriber to the onboarding.
+  // Unknown access (profile not loaded): offer a retry rather than sending a subscriber to the paywall.
   if (isProfileError) {
     return (
       <div className="flex h-screen w-full items-center justify-center p-4">
@@ -53,7 +53,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
     );
   }
 
-  if (!hasPaidPlan) return <Redirect to={user ? AUTH_CONFIG.SUBSCRIBE_PATH : AUTH_CONFIG.ONBOARDING_PATH} />;
+  if (!hasAccess) return <Redirect to={user ? AUTH_CONFIG.SUBSCRIBE_PATH : AUTH_CONFIG.ONBOARDING_PATH} />;
 
   return (
     <AppLayout>

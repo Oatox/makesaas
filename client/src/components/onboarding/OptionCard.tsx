@@ -8,7 +8,7 @@ export function optionCardClass(selected: boolean) {
     "transition-[border-color,background-color,box-shadow] duration-200",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
     selected
-      ? "border-primary/80 bg-primary/[0.07] shadow-[0_10px_32px_-14px_hsl(var(--primary)/0.55)]"
+      ? "border-primary/80 bg-primary/[0.07] shadow-[0_6px_16px_-12px_hsl(var(--primary)/0.35)]"
       : "border-border hover:border-foreground/20 hover:bg-secondary/50",
   );
 }
@@ -19,7 +19,7 @@ export function SelectionWash({ selected }: { selected: boolean }) {
     <span
       aria-hidden
       className={cn(
-        "pointer-events-none absolute inset-0 bg-gradient-to-r from-primary/[0.12] via-transparent to-transparent transition-opacity duration-300",
+        "pointer-events-none absolute inset-0 bg-gradient-to-r from-primary/[0.06] via-transparent to-transparent transition-opacity duration-300",
         selected ? "opacity-100" : "opacity-0",
       )}
     />

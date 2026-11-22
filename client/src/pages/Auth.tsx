@@ -10,7 +10,7 @@ const fadeIn = blurIn();
 function HomeLogoLink() {
   return (
     <Link href="/" className="inline-flex transition-opacity hover:opacity-80">
-      <Logo className="h-7" />
+      <Logo className="h-5" />
     </Link>
   );
 }
@@ -50,7 +50,7 @@ export default function AuthPage() {
           className="mx-auto flex w-full max-w-[400px] flex-1 flex-col justify-center py-10"
         >
           <motion.div variants={fadeIn} className="mb-8 space-y-2">
-            <h1 className="font-display text-[32px] font-semibold leading-tight sm:text-4xl">
+            <h1 className="font-display text-[32px] font-light leading-tight sm:text-4xl">
               {isLogin ? "Bon retour parmi nous" : "Créer un compte"}
             </h1>
             <p className="text-base text-muted-foreground">

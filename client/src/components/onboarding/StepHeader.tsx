@@ -6,7 +6,7 @@ import { TypewriterText } from "./TypewriterText";
 // Same entrance as the landing and auth pages: fade in from a blur, slightly from below.
 export const stepAppear = blurIn({ y: 14, blur: 8, duration: 0.55 });
 
-export const STEP_TITLE_CLASS = "font-display text-[28px] font-semibold leading-tight sm:text-[32px] md:text-[40px]";
+export const STEP_TITLE_CLASS = "font-display text-[28px] font-light leading-tight sm:text-[32px] md:text-[40px]";
 
 /** Question of a step, typed out letter by letter; the hint under it appears once the question is typed. */
 export function StepHeader({ title, subtitle }: { title: string; subtitle?: string }) {

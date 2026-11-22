@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { Link, Redirect } from "wouter";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { CheckoutBackButton, Paywall } from "@/components/billing/Paywall";
 import { cn } from "@/lib/utils";
@@ -8,12 +8,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { AUTH_CONFIG } from "@/config/auth";
 
 /**
- * The paywall on its own page: where signed-in users without a plan land, and where Starter
- * subscribers upgrade. Whop also sends the buyer back here after an off-site payment step.
+ * The paywall on its own page: where signed-in users without a subscription land. Whop also sends
+ * the buyer back here after an off-site payment step.
  */
 export default function SubscribePage() {
-  const { user, plan, isLoading, signOut } = useAuth();
-  // While Whop's checkout is open the header swaps the logo for the "back to the plans" arrow,
+  const { user, hasAccess, isLoading, signOut } = useAuth();
+  // While Whop's checkout is open the header swaps the logo for the "back to the offer" arrow,
   // which moves the checkout up.
   const [closeCheckout, setCloseCheckout] = useState<(() => void) | null>(null);
   const onCheckoutChange = useCallback((close: (() => void) | null) => setCloseCheckout(() => close), []);
@@ -28,28 +28,20 @@ export default function SubscribePage() {
 
   // An account is needed to subscribe (the payment is tied to it).
   if (!user) return <Redirect to={AUTH_CONFIG.REGISTER_PATH} />;
-  // Pro is the top plan; still show the page while activating after a payment (status in the URL).
-  if (plan === "pro" && !window.location.search.includes("status=")) return <Redirect to={AUTH_CONFIG.REDIRECT_PATH} />;
+  // Already subscribed; still show the page while activating after a payment (status in the URL).
+  if (hasAccess && !window.location.search.includes("status=")) return <Redirect to={AUTH_CONFIG.REDIRECT_PATH} />;
 
   return (
     <div className="bg-grain relative flex min-h-[100svh] flex-col bg-background">
       <header className="relative z-10 flex w-full items-center justify-between gap-3 px-5 pb-2 pt-5 sm:px-6 md:px-8 md:pt-7">
         {closeCheckout ? (
           <CheckoutBackButton onClick={closeCheckout} />
-        ) : plan ? (
-          <Link
-            href="/settings"
-            className="-ml-2 flex items-center gap-1 rounded-[10px] px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Retour
-          </Link>
         ) : (
           <Link href="/" aria-label="Accueil" className="transition-opacity hover:opacity-80">
-            <Logo className="h-7" />
+            <Logo className="h-5" />
           </Link>
         )}
-        {!plan && (
+        {!hasAccess && (
           <button
             type="button"
             onClick={() => signOut()}

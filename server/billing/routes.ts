@@ -1,8 +1,8 @@
 import type { Express, Request } from "express";
 import { unwrapWebhook, WebhookVerificationError } from "@whop/sdk/helpers";
-import { billingApi, createCheckoutBodySchema, type CheckoutSession, type PaywallPlansResponse } from "@shared/billing";
+import { billingApi, type CheckoutSession, type PaywallResponse } from "@shared/billing";
 import { getUserId, requireUser } from "../lib/auth";
-import { asyncRoute, HttpError, parseInput } from "../lib/http";
+import { asyncRoute, HttpError } from "../lib/http";
 import { logger } from "../lib/logger";
 import { supabaseAdmin } from "../lib/supabase-admin";
 import { loadWhopConfig } from "./config";
@@ -42,10 +42,10 @@ function membershipIdOf(event: WhopWebhookEvent): string | null {
  * Origin on this POST). Whop only accepts https URLs, so none on http (local dev): Whop then falls
  * back to its own store page.
  */
-function checkoutRedirectUrl(req: Request, plan: string): string | undefined {
+function checkoutRedirectUrl(req: Request): string | undefined {
   try {
     const url = new URL(req.get("origin") ?? "");
-    if (url.protocol === "https:") return `${url.origin}/abonnement?plan=${plan}`;
+    if (url.protocol === "https:") return `${url.origin}/abonnement`;
   } catch {
     // Missing or malformed header.
   }
@@ -61,12 +61,12 @@ export function registerBillingRoutes(app: Express) {
     return billing;
   };
 
-  // Public: the landing page and the onboarding show the plans before sign-up.
+  // Public: the onboarding shows the plan before sign-up.
   app.get(
-    billingApi.plans.path,
+    billingApi.plan.path,
     asyncRoute(async (_req, res) => {
       const billing = requireBilling();
-      const body: PaywallPlansResponse = { plans: await billing.getPaywallPlans(), environment: billing.environment };
+      const body: PaywallResponse = { plan: await billing.getPaywallPlan(), environment: billing.environment };
       res.set("Cache-Control", "public, max-age=300").json(body);
     }),
   );
@@ -75,9 +75,7 @@ export function registerBillingRoutes(app: Express) {
     billingApi.checkout.path,
     requireUser,
     asyncRoute(async (req, res) => {
-      const { plan } = parseInput(createCheckoutBodySchema, req.body);
-      const redirectUrl = checkoutRedirectUrl(req, plan);
-      const session: CheckoutSession = await requireBilling().createCheckout(getUserId(res), plan, redirectUrl);
+      const session: CheckoutSession = await requireBilling().createCheckout(getUserId(res), checkoutRedirectUrl(req));
       res.status(201).json(session);
     }),
   );

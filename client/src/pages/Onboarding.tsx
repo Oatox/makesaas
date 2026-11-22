@@ -1,28 +1,41 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, Redirect, useLocation } from "wouter";
+import { useMemo } from "react";
+import { Link, Redirect } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
-import { ONBOARDING_STEPS, type SingleChoiceStep as SingleChoiceStepConfig } from "@/components/onboarding/steps";
-import { BettingInsightStep } from "@/components/onboarding/BettingInsightStep";
-import { SliderStep } from "@/components/onboarding/SliderStep";
-import { SocialProofStep } from "@/components/onboarding/SocialProofStep";
-import { GoalProjectionStep } from "@/components/onboarding/GoalProjectionStep";
+import { detailKey, ONBOARDING_STEPS, type OnboardingStep } from "@/components/onboarding/steps";
+import { SingleChoiceStep } from "@/components/onboarding/SingleChoiceStep";
 import { MultiChoiceStep } from "@/components/onboarding/MultiChoiceStep";
-import { ProfileSetupStep } from "@/components/onboarding/ProfileSetupStep";
+import { SliderStep } from "@/components/onboarding/SliderStep";
+import { WheelStep } from "@/components/onboarding/WheelStep";
+import { TextStep } from "@/components/onboarding/TextStep";
+import { LoadingStep } from "@/components/onboarding/LoadingStep";
+import { SocialProofStep } from "@/components/onboarding/SocialProofStep";
+import { FounderProfileStep } from "@/components/onboarding/FounderProfileStep";
+import { PotentialStep } from "@/components/onboarding/PotentialStep";
+import { MethodStep } from "@/components/onboarding/MethodStep";
+import { AccountStep } from "@/components/onboarding/AccountStep";
+import { MessageStep } from "@/components/onboarding/MessageStep";
+import { StatementStep } from "@/components/onboarding/StatementStep";
+import { ResultsStep } from "@/components/onboarding/ResultsStep";
+import { FeaturesStep } from "@/components/onboarding/FeaturesStep";
+import { FutureStep } from "@/components/onboarding/FutureStep";
+import { StoriesStep } from "@/components/onboarding/StoriesStep";
+import { CurveStep } from "@/components/onboarding/CurveStep";
+import { OneThingStep } from "@/components/onboarding/OneThingStep";
+import { PactStep } from "@/components/onboarding/PactStep";
+import { CoachChatStep } from "@/components/onboarding/CoachChatStep";
+import { BuildStep } from "@/components/onboarding/BuildStep";
+import { ProjectionStep } from "@/components/onboarding/ProjectionStep";
 import { Paywall } from "@/components/billing/Paywall";
-import { optionCardClass, SelectionWash } from "@/components/onboarding/OptionCard";
-import { StepHeader, STEP_TITLE_CLASS, stepAppear as appear } from "@/components/onboarding/StepHeader";
+import { STEP_TITLE_CLASS, stepAppear as appear } from "@/components/onboarding/StepHeader";
 import { TypewriterText } from "@/components/onboarding/TypewriterText";
 import { useOnboardingProgress } from "@/hooks/use-onboarding";
 import { useAuth } from "@/hooks/use-auth";
 import { AUTH_CONFIG } from "@/config/auth";
-import { cn } from "@/lib/utils";
+import type { OnboardingAnswers } from "@/lib/onboarding-storage";
 import { EASE_OUT } from "@/lib/motion";
-
-// Delay between the tap on an option and the next step, so the selection is visible.
-const ADVANCE_DELAY_MS = 220;
 
 // The step container only handles the exit; its content appears piece by piece (title, then each card).
 const stepMotion = {
@@ -34,6 +47,10 @@ const stepMotion = {
 // Answers are a string (single choice) or a list (multiple choice): read each as the step expects.
 const singleAnswer = (value: string | string[] | undefined) => (typeof value === "string" ? value : undefined);
 const multiAnswer = (value: string | string[] | undefined) => (Array.isArray(value) ? value : []);
+
+/** Steps shown to the visitor: those whose condition holds with the answers given so far. */
+const visibleSteps = (answers: OnboardingAnswers) => ONBOARDING_STEPS.filter((step) => !step.when || step.when(answers));
+const countSteps = (answers: OnboardingAnswers) => visibleSteps(answers).length;
 
 function ProgressBar({ value }: { value: number }) {
   return (
@@ -55,87 +72,22 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
-function SingleChoiceStep({
-  step,
-  onAnswer,
-}: {
-  step: SingleChoiceStepConfig;
-  onAnswer: (value: string) => void;
-}) {
-  // Starts empty even when coming back to an answered step: the highlight only marks the tap.
-  const [selected, setSelected] = useState<string>();
-  const timer = useRef<number>();
-
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-
-  const choose = (value: string) => {
-    if (timer.current) return; // already advancing
-    setSelected(value);
-    timer.current = window.setTimeout(() => onAnswer(value), ADVANCE_DELAY_MS);
-  };
-
-  return (
-    <motion.div className="space-y-7" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.07 } } }}>
-      <StepHeader title={step.title} subtitle={step.subtitle} />
-
-      {/* One column on mobile, a 2-column grid of taller cards on desktop. */}
-      <div className="grid gap-3 md:grid-cols-2 md:gap-4" role="radiogroup" aria-label={step.title}>
-        {step.options.map((option) => {
-          const isSelected = selected === option.value;
-          return (
-            <motion.button
-              key={option.value}
-              variants={appear}
-              whileTap={{ scale: 0.985 }}
-              type="button"
-              role="radio"
-              aria-checked={isSelected}
-              onClick={() => choose(option.value)}
-              className={cn(
-                optionCardClass(isSelected),
-                "flex w-full items-center gap-4 py-3 pl-3 pr-5 text-left md:flex-col md:items-start md:gap-6 md:p-6",
-              )}
-              data-testid={`onboarding-option-${step.id}-${option.value}`}
-            >
-              <SelectionWash selected={isSelected} />
-              {option.icon && (
-                <motion.span
-                  aria-hidden
-                  className={cn(
-                    "relative flex h-10 w-10 shrink-0 items-center justify-center transition-colors duration-200 md:h-auto md:w-auto",
-                    isSelected ? "text-primary" : "text-muted-foreground",
-                  )}
-                  animate={isSelected ? { scale: 1.15, rotate: -8 } : { scale: 1, rotate: 0 }}
-                  transition={{ type: "spring", stiffness: 420, damping: 18 }}
-                >
-                  <option.icon className="h-6 w-6 md:h-8 md:w-8" strokeWidth={1.75} />
-                </motion.span>
-              )}
-              <span className="relative text-base font-semibold md:text-lg">{option.label}</span>
-            </motion.button>
-          );
-        })}
-      </div>
-    </motion.div>
-  );
-}
-
 /** End of the onboarding: the paywall once signed in, otherwise the way to create the account first. */
 function EndStep({ isSignedIn, onReset }: { isSignedIn: boolean; onReset: () => void }) {
-  if (isSignedIn) return <Paywall title="Débloquez vos analyses" />;
+  if (isSignedIn) return <Paywall title="Investis sur toi-même pour atteindre tes objectifs." />;
 
   return (
     <motion.div className="space-y-7" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.07 } } }}>
       <div className="space-y-2">
         <h1 className={STEP_TITLE_CLASS}>
-          <TypewriterText text="Ton profil est prêt !" />
+          <TypewriterText text="Ton plan est prêt !" />
         </h1>
         <motion.p variants={appear} className="text-base text-muted-foreground">
-          Crée ton compte pour choisir ton offre et lancer tes premières analyses.
+          Crée ton compte pour sauvegarder ta progression et débloquer ton plan.
         </motion.p>
       </div>
-      <motion.div variants={appear} className="flex flex-col gap-3 md:w-[320px]">
-        <Button asChild className="h-12 rounded-[12px] text-base">
+      <motion.div variants={appear} className="flex flex-col gap-3">
+        <Button asChild className="h-12 text-base">
           <Link href={AUTH_CONFIG.REGISTER_PATH}>Créer mon compte</Link>
         </Button>
         <Button variant="ghost" className="h-11 text-muted-foreground" onClick={onReset}>
@@ -147,32 +99,110 @@ function EndStep({ isSignedIn, onReset }: { isSignedIn: boolean; onReset: () => 
 }
 
 export default function OnboardingPage() {
-  const { user, hasPaidPlan, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
-  const { progress, answer, next, back, reset } = useOnboardingProgress(ONBOARDING_STEPS.length);
+  const { user, hasAccess, isLoading } = useAuth();
+  // Some steps only show for some answers (why the visitor never launched, gave up...): the saved
+  // index points into the steps shown.
+  const { progress, answer, next, back, reset } = useOnboardingProgress(countSteps);
+  const answers = progress.answers;
+  const steps = useMemo(() => visibleSteps(answers), [answers]);
 
-  // Members with a paid plan have nothing to do here.
-  if (!isLoading && hasPaidPlan) {
+  // Subscribers have nothing to do here.
+  if (!isLoading && hasAccess) {
     return <Redirect to="/app" />;
   }
 
-  const total = ONBOARDING_STEPS.length;
+  const total = steps.length;
   const stepIndex = progress.stepIndex;
-  const step = ONBOARDING_STEPS[stepIndex];
+  const step = steps[stepIndex];
   const isDone = stepIndex >= total;
+  const text = (key: string) => singleAnswer(answers[key]);
+  const moveOn = () => next();
+  // Once signed in, the account step is behind: going back jumps over it.
+  const goBack = () => back(steps[stepIndex - 1]?.type === "account" && user ? 2 : 1);
+
+  const renderStep = (step: OnboardingStep) => {
+    switch (step.type) {
+      case "single-choice":
+        return (
+          <SingleChoiceStep
+            step={step}
+            initial={text(step.id)}
+            initialDetail={text(detailKey(step.id))}
+            onAnswer={(value, detail) => answer(step.id, value, detail === undefined ? undefined : { [detailKey(step.id)]: detail })}
+          />
+        );
+      case "multi-choice":
+        return (
+          <MultiChoiceStep
+            step={step}
+            options={(step.optionsBy && step.optionsBy.options[text(step.optionsBy.step) ?? ""]) || step.options}
+            initial={multiAnswer(answers[step.id])}
+            initialDetail={text(detailKey(step.id))}
+            onAnswer={(values, detail) => answer(step.id, values, { [detailKey(step.id)]: detail })}
+          />
+        );
+      case "slider":
+        return <SliderStep step={step} initial={Number(text(step.id)) || undefined} onAnswer={(value) => answer(step.id, value)} />;
+      case "wheel":
+        return <WheelStep step={step} initial={Number(text(step.id)) || undefined} onAnswer={(value) => answer(step.id, value)} />;
+      case "text":
+        return <TextStep step={step} initial={text(step.id)} onAnswer={(value) => answer(step.id, value)} />;
+      case "loading":
+        return <LoadingStep step={step} answers={answers} onContinue={next} />;
+      case "social-proof":
+        return <SocialProofStep answers={answers} onContinue={moveOn} />;
+      case "founder-profile":
+        return <FounderProfileStep answers={answers} onContinue={moveOn} />;
+      case "potential":
+        return <PotentialStep answers={answers} onContinue={moveOn} />;
+      case "method":
+        return <MethodStep answers={answers} onContinue={moveOn} />;
+      case "account":
+        return <AccountStep onDone={moveOn} />;
+      case "message":
+        return <MessageStep step={step} onContinue={moveOn} />;
+      case "statement":
+        return <StatementStep title={step.title} onContinue={moveOn} />;
+      case "results":
+        return <ResultsStep onContinue={moveOn} />;
+      case "features":
+        return <FeaturesStep step={step} answers={answers} onContinue={moveOn} />;
+      case "future":
+        return <FutureStep answers={answers} onContinue={moveOn} />;
+      case "stories":
+        return <StoriesStep onContinue={moveOn} />;
+      case "curve":
+        return <CurveStep answers={answers} onContinue={moveOn} />;
+      case "one-thing":
+        return <OneThingStep answers={answers} onContinue={moveOn} />;
+      case "pact":
+        return <PactStep answers={answers} onContinue={moveOn} />;
+      case "coach-chat":
+        return <CoachChatStep answers={answers} onContinue={moveOn} />;
+      case "build":
+        return <BuildStep step={step} answers={answers} onContinue={next} />;
+      case "projection":
+        return <ProjectionStep answers={answers} onContinue={moveOn} />;
+    }
+  };
 
   return (
     <div className="bg-grain relative flex min-h-[100svh] flex-col bg-background">
-      {/* Mobile: back + progress, brand mark. Desktop: logo, back + full-width progress, sign-in link. */}
-      <header className="relative z-10 grid w-full grid-cols-[1fr_auto] items-center gap-3 px-5 pb-2 pt-5 sm:px-6 md:grid-cols-[auto_1fr_auto] md:gap-8 md:px-8 md:pt-7">
-        <Link href="/" aria-label="Accueil" className="hidden w-fit transition-opacity hover:opacity-80 md:inline-flex">
-          <Logo className="h-7" />
+      {/* Back + progress on every screen; on computers, the MakeSaaS.app logo sits above them.
+          Members sign in from the landing page. */}
+      <header className="relative z-10 w-full px-5 pb-2 pt-5 sm:px-6 md:px-8 md:pt-7 md:[@media(max-height:820px)]:pt-5">
+        <Link href="/" aria-label="Accueil" className="mx-auto mb-4 hidden w-fit items-baseline transition-opacity hover:opacity-80 sm:flex md:mb-5 md:[@media(max-height:820px)]:mb-3">
+          <Logo className="h-5 md:h-6" />
+          {/* Same color as the wordmark: it reads as one name, MakeSaaS.app. */}
+          <span aria-hidden className="ml-px font-display text-[25px] font-medium leading-none tracking-tight text-foreground md:text-[30px]">
+            .app
+          </span>
         </Link>
         <div className="flex items-center gap-3">
           {stepIndex > 0 ? (
             <button
               type="button"
-              onClick={back}
+              onClick={goBack}
               aria-label="Question précédente"
               className="-ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
               data-testid="button-onboarding-back"
@@ -190,64 +220,16 @@ export default function OnboardingPage() {
           )}
           <ProgressBar value={stepIndex / total} />
         </div>
-        <Logo variant="mark" className="h-7 w-7 md:hidden" />
-        {!user && (
-          <Link
-            href="/login"
-            className="hidden justify-self-end text-sm text-muted-foreground transition-colors hover:text-foreground md:inline"
-          >
-            Déjà un compte ? <span className="font-semibold text-primary">Se connecter</span>
-          </Link>
-        )}
       </header>
 
       {/* Desktop: wider column, still starting at the top. */}
-      <main className="relative z-10 mx-auto flex w-full max-w-[520px] flex-1 flex-col px-5 pb-10 pt-8 sm:px-6 sm:pt-12 md:max-w-[680px] md:pt-16">
+      <main className="relative z-10 mx-auto flex w-full max-w-[520px] flex-1 flex-col px-5 pb-10 pt-5 sm:px-6 sm:pt-6 md:max-w-[680px] md:pt-8 md:[@media(max-height:820px)]:pt-4 [@media(max-height:720px)]:pb-5">
         <AnimatePresence mode="wait">
           <motion.div key={isDone ? "done" : step.id} className="flex flex-1 flex-col" {...stepMotion}>
-            {isDone ? (
-              <EndStep isSignedIn={!!user} onReset={reset} />
-            ) : step.type === "social-proof" ? (
-              <SocialProofStep onContinue={next} />
-            ) : step.type === "betting-insight" ? (
-              <BettingInsightStep frequency={singleAnswer(progress.answers["betting-frequency"])} onContinue={next} />
-            ) : step.type === "profile-setup" ? (
-              <ProfileSetupStep
-                onContinue={() => {
-                  next();
-                  // An account is needed to subscribe: visitors sign up (or sign in) on the auth page.
-                  if (!user) setLocation(AUTH_CONFIG.REGISTER_PATH);
-                }}
-              />
-            ) : step.type === "goal-projection" ? (
-              <GoalProjectionStep goal={Number(singleAnswer(progress.answers["winnings-goal"])) || undefined} onContinue={next} />
-            ) : step.type === "slider" ? (
-              <SliderStep
-                step={step}
-                initial={Number(singleAnswer(progress.answers[step.id])) || undefined}
-                onAnswer={(value) => answer(step.id, value)}
-              />
-            ) : step.type === "multi-choice" ? (
-              <MultiChoiceStep
-                step={step}
-                initial={multiAnswer(progress.answers[step.id])}
-                onAnswer={(values) => answer(step.id, values)}
-              />
-            ) : (
-              <SingleChoiceStep step={step} onAnswer={(value) => answer(step.id, value)} />
-            )}
+            {isDone ? <EndStep isSignedIn={!!user} onReset={reset} /> : renderStep(step)}
           </motion.div>
         </AnimatePresence>
       </main>
-
-      {!user && (
-        <footer className="relative z-10 pb-6 text-center text-sm text-muted-foreground md:hidden">
-          Déjà un compte ?{" "}
-          <Link href="/login" className="font-semibold text-primary transition-opacity hover:opacity-80">
-            Se connecter
-          </Link>
-        </footer>
-      )}
     </div>
   );
 }

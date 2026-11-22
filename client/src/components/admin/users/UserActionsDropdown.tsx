@@ -1,5 +1,5 @@
 import type { Profile } from "@shared/schema";
-import { activePlan, type SubscriptionSummary } from "@shared/billing";
+import { grantsAccess, type SubscriptionSummary } from "@shared/billing";
 import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,7 @@ export function UserActionsDropdown({
   onToggleSubscriber,
   onDelete,
 }: {
-  profile: Pick<Profile, "email"> & { subscription: Pick<SubscriptionSummary, "plan" | "status"> | null };
+  profile: Pick<Profile, "email"> & { subscription: Pick<SubscriptionSummary, "status"> | null };
   onToggleSubscriber: () => void;
   onDelete: () => void;
 }) {
@@ -26,7 +26,7 @@ export function UserActionsDropdown({
         <Button
           variant="ghost"
           size="icon"
-          className="h-11 w-11 rounded-md text-muted-foreground md:h-8 md:w-8 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+          className="h-11 w-11 rounded-full text-muted-foreground md:h-8 md:w-8 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
         >
           <MoreHorizontal className="!size-5 md:!size-4" />
         </Button>
@@ -44,7 +44,7 @@ export function UserActionsDropdown({
           onClick={onToggleSubscriber}
           className="h-9 cursor-pointer rounded-md px-2 text-sm font-medium data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:text-sidebar-accent-foreground"
         >
-          {activePlan(profile.subscription) ? "Retirer l'abonnement" : "Offrir le plan Pro"}
+          {grantsAccess(profile.subscription?.status) ? "Retirer l'abonnement" : "Offrir l'abonnement"}
         </DropdownMenuItem>
         <DeleteUserDialog profile={profile} onDelete={onDelete} />
       </DropdownMenuContent>

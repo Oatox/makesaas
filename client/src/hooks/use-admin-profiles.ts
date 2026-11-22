@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Profile, SignupSource } from "@shared/schema";
-import { ACCESS_STATUSES, type PlanId, type SubscriptionSummary } from "@shared/billing";
+import { ACCESS_STATUSES, type SubscriptionSummary } from "@shared/billing";
 import { profileKeys, useAuth } from "./use-auth";
 import { toast } from "./use-toast";
 import { supabase } from "@/lib/supabase";
@@ -50,11 +50,11 @@ export type AdminUserDetailsResponse = {
 /** Columns shown in the users table. */
 const PROFILE_ROW_COLUMNS = "id, email, full_name, role, created_at";
 /** Embedded subscription (one row per user); "!inner" keeps only users having one. */
-const subscriptionEmbed = (inner: boolean) => `subscription:subscriptions${inner ? "!inner" : ""}(plan, status)`;
+const subscriptionEmbed = (inner: boolean) => `subscription:subscriptions${inner ? "!inner" : ""}(status)`;
 
 export type AdminProfileRow = Pick<Profile, "id" | "email" | "full_name" | "role"> & {
   created_at: string | null;
-  subscription: Pick<SubscriptionSummary, "plan" | "status"> | null;
+  subscription: Pick<SubscriptionSummary, "status"> | null;
 };
 
 export type PaginatedProfilesResponse = {
@@ -126,7 +126,7 @@ export function useAdminUserDetails(userId?: string) {
   });
 }
 
-type AdminUserUpdate = { role?: "user" | "admin"; plan?: PlanId | null };
+type AdminUserUpdate = { role?: "user" | "admin"; subscribed?: boolean };
 
 const roleLabel = (role: "user" | "admin") => (role === "admin" ? "Administrateur" : "Utilisateur");
 
@@ -144,7 +144,9 @@ export function useUpdateAdminUser() {
       toast(
         updates.role
           ? { title: "Rôle mis à jour", description: `L'utilisateur est maintenant ${roleLabel(updates.role)}.` }
-          : { title: "Abonnement mis à jour", description: "Le plan de l'utilisateur a été modifié." },
+          : updates.subscribed
+            ? { title: "Abonnement offert", description: "L'utilisateur a maintenant accès à l'application." }
+            : { title: "Abonnement retiré", description: "L'utilisateur n'a plus accès à l'application." },
       );
     },
     onError: (error) => {

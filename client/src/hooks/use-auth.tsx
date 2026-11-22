@@ -6,7 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { AUTH_CONFIG } from "@/config/auth";
 import { syncSignupSource } from "@/lib/attribution";
-import { activePlan, SUBSCRIPTION_SUMMARY_COLUMNS, type PlanId, type SubscriptionSummary } from "@shared/billing";
+import { grantsAccess, SUBSCRIPTION_SUMMARY_COLUMNS, type SubscriptionSummary } from "@shared/billing";
 import { translateSupabaseError } from "@/lib/error-translator";
 
 export type AuthProfile = {
@@ -15,7 +15,9 @@ export type AuthProfile = {
   full_name: string | null;
   avatar_url: string | null;
   role: "user" | "admin";
-  /** Row of public.subscriptions (null: never subscribed). Access is read with activePlan(). */
+  /** Active SaaS (null: fall back to the oldest one, see useSaas). */
+  current_saas_id: string | null;
+  /** Row of public.subscriptions (null: never subscribed). Access is read with grantsAccess(status). */
   subscription: SubscriptionSummary | null;
 };
 
@@ -24,21 +26,19 @@ export const profileKeys = {
 };
 
 // The subscription is embedded (subscriptions.user_id references profiles.id, one row per user).
-const PROFILE_COLUMNS = `id, email, full_name, avatar_url, role, subscription:subscriptions(${SUBSCRIPTION_SUMMARY_COLUMNS})`;
+const PROFILE_COLUMNS = `id, email, full_name, avatar_url, role, current_saas_id, subscription:subscriptions(${SUBSCRIPTION_SUMMARY_COLUMNS})`;
 
 type AuthContextType = {
   session: Session | null;
   user: User | null;
   profile: AuthProfile | null;
   isLoading: boolean;
-  /** The profile could not be loaded (network, server): the plan is unknown, do not treat the user as free. */
+  /** The profile could not be loaded (network, server): access is unknown, do not treat the user as unsubscribed. */
   isProfileError: boolean;
   retryProfile: () => void;
   isAdmin: boolean;
-  /** Paid plan (or admin): unlocks the app. Everyone else goes through the onboarding and its paywall. */
-  hasPaidPlan: boolean;
-  /** Effective plan: admins count as Pro, null without a subscription. */
-  plan: PlanId | null;
+  /** Subscription granting access (or admin): unlocks the app. Everyone else goes through the paywall. */
+  hasAccess: boolean;
   signOut: () => Promise<void>;
 };
 
@@ -107,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", user.id).maybeSingle();
       if (error) throw error;
 
-      // The row is created by a trigger right after sign-up: until it exists, a user without plan.
+      // The row is created by a trigger right after sign-up: until it exists, a user without subscription.
       return (
         (data as AuthProfile | null) ?? {
           id: user.id,
@@ -115,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           full_name: null,
           avatar_url: null,
           role: "user",
+          current_saas_id: null,
           subscription: null,
         }
       );
@@ -146,8 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isProfileError,
       retryProfile,
       isAdmin: profile?.role === "admin",
-      hasPaidPlan: profile?.role === "admin" || !!activePlan(profile?.subscription),
-      plan: profile?.role === "admin" ? "pro" : activePlan(profile?.subscription),
+      hasAccess: profile?.role === "admin" || grantsAccess(profile?.subscription?.status),
       signOut,
     }),
     [session, user, profile, isLoading, isProfileError, retryProfile, signOut],

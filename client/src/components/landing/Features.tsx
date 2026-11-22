@@ -41,7 +41,7 @@ export function Features() {
     <RevealSection id="features" className="px-4 py-24 md:py-32">
       <div className="mx-auto max-w-6xl">
         <RevealItem className="mb-12 space-y-4 text-center">
-          <h2 className="font-display text-3xl md:text-4xl">
+          <h2 className="landing-title font-display text-[32px] md:text-[48px]">
             Tout le socle, <span className="text-highlight">déjà prêt</span>
           </h2>
           <p className="mx-auto max-w-xl text-lg text-muted-foreground">
@@ -55,7 +55,7 @@ export function Features() {
               <span className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-primary/10 text-primary">
                 <Icon className="h-6 w-6" strokeWidth={1.75} />
               </span>
-              <h3 className="font-display text-lg font-semibold">{title}</h3>
+              <h3 className="font-display text-lg font-normal">{title}</h3>
               <p className="leading-relaxed text-muted-foreground">{detail}</p>
             </RevealItem>
           ))}

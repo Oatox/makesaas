@@ -29,7 +29,7 @@ export default function CGU() {
       <LegalSection title="3. Accès au service">
         <p>
           Le site vitrine et les pages publiques sont accessibles librement. L'accès à l'application est réservé aux
-          utilisateurs disposant d'un compte et d'un abonnement payant en cours (offre Starter ou Pro). Il n'existe
+          utilisateurs disposant d'un compte et d'un abonnement payant en cours. Il n'existe
           pas d'offre gratuite.
         </p>
         <p>

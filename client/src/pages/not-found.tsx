@@ -11,8 +11,8 @@ export default function NotFound() {
           <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-2">
             <FileQuestion className="w-6 h-6 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-display font-bold">404</CardTitle>
-          <h2 className="text-xl font-semibold">Page introuvable</h2>
+          <CardTitle className="text-3xl font-display font-light">404</CardTitle>
+          <h2 className="text-xl font-normal">Page introuvable</h2>
         </CardHeader>
         <CardContent className="text-center space-y-6">
           <p className="text-muted-foreground">

@@ -10,7 +10,7 @@ export function LegalPage({ title, children }: { title: string; children: ReactN
       <div className="mx-auto max-w-3xl space-y-8">
         <Link href="/" className="text-primary hover:underline">← Retour à l'accueil</Link>
         <div className="space-y-2">
-          <h1 className="font-display text-4xl font-bold">{title}</h1>
+          <h1 className="font-display text-4xl font-light">{title}</h1>
           <p className="text-sm text-muted-foreground">Dernière mise à jour : {LEGAL.updatedAt}</p>
         </div>
 
@@ -32,7 +32,7 @@ export function LegalPage({ title, children }: { title: string; children: ReactN
 export function LegalSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-xl font-bold text-foreground">{title}</h2>
+      <h2 className="text-xl font-normal text-foreground">{title}</h2>
       {children}
     </section>
   );

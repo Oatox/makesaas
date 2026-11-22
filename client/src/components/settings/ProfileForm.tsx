@@ -47,7 +47,7 @@ export function ProfileForm({ fullName }: { fullName: string | null | undefined 
         <div className="flex justify-end">
           <Button
             type="submit"
-            className="h-11 w-full rounded-[12px] px-5 text-base sm:w-auto"
+            className="h-11 w-full px-5 text-base sm:w-auto"
             disabled={updateProfile.isPending || !form.formState.isDirty}
           >
             {updateProfile.isPending && <Loader2 className="animate-spin" />}

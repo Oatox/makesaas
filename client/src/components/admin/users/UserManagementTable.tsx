@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { PLANS, activePlan } from "@shared/billing";
+import { grantsAccess } from "@shared/billing";
 import { ChevronLeft, ChevronRight, Clock, Filter, Mail, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,8 +59,8 @@ function UserIdentity({ profile }: { profile: AdminProfileRow }) {
 }
 
 function SubscriberBadge({ profile }: { profile: AdminProfileRow }) {
-  const plan = activePlan(profile.subscription);
-  return <Badge variant={plan ? "default" : "secondary"}>{plan ? PLANS[plan].name : "Non"}</Badge>;
+  const subscribed = grantsAccess(profile.subscription?.status);
+  return <Badge variant={subscribed ? "default" : "secondary"}>{subscribed ? "Oui" : "Non"}</Badge>;
 }
 
 function JoinDate({ profile }: { profile: AdminProfileRow }) {
@@ -172,7 +172,7 @@ export function UserManagementTable({
                   <TableCell className="text-right" onClick={stopRowClick}>
                     <UserActionsDropdown
                       profile={profile}
-                      onToggleSubscriber={() => onToggleSubscriber(profile.id, !!activePlan(profile.subscription))}
+                      onToggleSubscriber={() => onToggleSubscriber(profile.id, grantsAccess(profile.subscription?.status))}
                       onDelete={() => onDelete(profile.id)}
                     />
                   </TableCell>
@@ -206,7 +206,7 @@ export function UserManagementTable({
                 <div className="-mr-2 -mt-1 shrink-0" onClick={stopRowClick}>
                   <UserActionsDropdown
                     profile={profile}
-                    onToggleSubscriber={() => onToggleSubscriber(profile.id, !!activePlan(profile.subscription))}
+                    onToggleSubscriber={() => onToggleSubscriber(profile.id, grantsAccess(profile.subscription?.status))}
                     onDelete={() => onDelete(profile.id)}
                   />
                 </div>

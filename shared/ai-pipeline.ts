@@ -7,7 +7,7 @@ import { z } from "zod";
  * OneShotAPI manages sampling parameters itself (no temperature), so a pipeline only
  * chooses its model.
  *
- * To add a pipeline: add its slug here, its default row in supabase_setup.sql (section 7),
+ * To add a pipeline: add its slug here, its default row in supabase_setup.sql (section 9),
  * its editor config in client/src/components/admin/pipeline/pipeline-steps.ts and a server route
  * that runs it (see server/ai/routes.ts).
  */

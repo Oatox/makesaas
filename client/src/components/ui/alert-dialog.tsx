@@ -125,7 +125,7 @@ const AlertDialogAction = React.forwardRef<
 >(({ className, variant = "default", ...props }, ref) => (
   <DialogPrimitive.Close
     ref={ref}
-    className={cn(buttonVariants({ variant }), "h-11 w-full rounded-[12px] px-5 sm:w-auto", className)}
+    className={cn(buttonVariants({ variant }), "h-11 w-full px-5 sm:w-auto", className)}
     {...props}
   />
 ))
@@ -139,7 +139,7 @@ const AlertDialogCancel = React.forwardRef<
     ref={ref}
     className={cn(
       buttonVariants({ variant: "secondary" }),
-      "h-11 w-full rounded-[12px] px-5 sm:mt-0 sm:w-auto",
+      "h-11 w-full px-5 sm:mt-0 sm:w-auto",
       className
     )}
     {...props}

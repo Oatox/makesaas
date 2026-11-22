@@ -5,7 +5,7 @@
  */
 
 const STORAGE_KEY = "makesaas:onboarding";
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 4;
 
 /** A single answer, or the picks of a multiple-choice step. */
 export type OnboardingAnswers = Record<string, string | string[]>;

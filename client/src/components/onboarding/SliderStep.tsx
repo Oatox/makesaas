@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { animate, motion, type AnimationPlaybackControls } from "framer-motion";
+import { animate, AnimatePresence, motion, type AnimationPlaybackControls } from "framer-motion";
+import { EASE_OUT } from "@/lib/motion";
 import { ContinueButton } from "./ContinueButton";
 import { RollingNumber } from "./RollingNumber";
 import { StepHeader, stepAppear } from "./StepHeader";
@@ -13,9 +14,18 @@ const NBSP = String.fromCharCode(160);
 // Magnetic snap onto the nearest stop when the thumb is released.
 const SNAP = { type: "spring", stiffness: 520, damping: 38 } as const;
 
+const DIGITS_CLASS = "bg-gradient-to-b from-white from-30% to-white/60 bg-clip-text text-transparent";
+
+const swap = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+  transition: { duration: 0.2, ease: EASE_OUT },
+};
+
 /**
- * Amount picked on a big slider. The thumb follows the finger continuously, the amount shows the
- * nearest stop, and on release the thumb glides onto that stop. The last stop reads "et +".
+ * Value picked on a big slider: an amount or one word per stop. The thumb follows the
+ * finger continuously, the display shows the nearest stop, and on release the thumb glides onto it.
  */
 export function SliderStep({
   step,
@@ -23,11 +33,11 @@ export function SliderStep({
   onAnswer,
 }: {
   step: SliderStepConfig;
-  /** Amount saved earlier, so coming back to the step keeps it. */
+  /** Value saved earlier, so coming back to the step keeps it. */
   initial: number | undefined;
   onAnswer: (value: string) => void;
 }) {
-  const { values } = step;
+  const { values, display } = step;
   const startIndex = values.indexOf(initial ?? step.defaultValue);
   // Continuous position between stops (0 = first stop, last = last stop).
   const [position, setPositionState] = useState(startIndex === -1 ? Math.max(0, values.indexOf(step.defaultValue)) : startIndex);
@@ -85,36 +95,48 @@ export function SliderStep({
     event.preventDefault();
     glideTo(Math.min(last, Math.max(0, moves[event.key])));
   };
-  const format = (i: number) => `${euros.format(values[i])}${i === last ? " et +" : ""}`;
+
+  /** Stop as read aloud and shown at the ends of the track. */
+  const label = (i: number) => {
+    if (display.kind === "euros") return euros.format(values[i]);
+    return display.words[i];
+  };
+  const caption = display.kind === "words" ? display.sentences[index] : display.unit;
+  const tier = step.tiers?.find((t) => value <= t.upTo);
 
   return (
     <motion.div
-      className="flex flex-1 flex-col md:flex-none"
+      className="flex flex-1 flex-col"
       initial="hidden"
       animate="visible"
       variants={{ visible: { transition: { staggerChildren: 0.08 } } }}
     >
       <StepHeader title={step.title} subtitle={step.subtitle} />
 
-      <div className="flex flex-1 flex-col justify-center py-10 md:flex-none md:py-14">
-        {/* Slot-machine amount: spins in on arrival, then each reel rolls up or down with the slider.
-            Not inside the blurred entrance below: a filter on a parent of the clipped-gradient
-            digits glitches them. */}
-        <div
-          aria-hidden
-          className="flex h-[1.1em] justify-center font-display text-[56px] font-semibold tracking-[-0.03em] sm:text-[64px] md:text-[80px]"
-        >
-          <RollingNumber
-            value={value}
-            suffix={`${NBSP}€${index === last ? `${NBSP}et${NBSP}+` : ""}`}
-            delay={0.15}
-            digitClassName="bg-gradient-to-b from-white from-30% to-white/60 bg-clip-text text-transparent"
-          />
-        </div>
+      <div className="flex flex-1 flex-col justify-center py-10 md:py-14">
+        {display.kind === "words" ? (
+          <div aria-hidden className="grid h-[1.2em] place-items-center font-display text-[36px] font-light tracking-[-0.03em] sm:text-[44px] md:text-[60px]">
+            <AnimatePresence initial={false}>
+              <motion.span key={index} {...swap} className={`col-start-1 row-start-1 whitespace-nowrap ${DIGITS_CLASS}`}>
+                {display.words[index]}
+              </motion.span>
+            </AnimatePresence>
+          </div>
+        ) : (
+          // Slot-machine figure: spins in on arrival, then each reel rolls up or down with the slider.
+          // Not inside the blurred entrance below: a filter on a parent of the clipped-gradient
+          // digits glitches them.
+          <div
+            aria-hidden
+            className="flex h-[1.1em] justify-center font-display text-[56px] font-light tracking-[-0.03em] sm:text-[64px] md:text-[80px]"
+          >
+            <RollingNumber value={value} suffix={display.kind === "euros" ? `${NBSP}€` : undefined} delay={0.15} digitClassName={DIGITS_CLASS} />
+          </div>
+        )}
 
         <motion.div variants={stepAppear}>
-          <p className="mt-1 text-center text-lg text-muted-foreground" aria-hidden>
-            {step.unit}
+          <p className="mt-1 min-h-[1.75rem] text-center text-lg text-muted-foreground" aria-hidden>
+            {caption}
           </p>
           <input
             type="range"
@@ -130,15 +152,25 @@ export function SliderStep({
             onPointerDown={onPointerDown}
             onKeyDown={onKeyDown}
             aria-label={step.title}
-            aria-valuetext={`${format(index)} ${step.unit}`}
+            aria-valuetext={display.kind === "euros" ? `${label(index)} ${display.unit}` : label(index)}
             className="range-lg mt-10"
             style={{ "--range-progress": position / last } as CSSProperties}
             data-testid={`onboarding-slider-${step.id}`}
           />
           <div className="mt-3 flex justify-between text-sm text-muted-foreground" aria-hidden>
-            <span>{format(0)}</span>
-            <span>{format(last)}</span>
+            <span>{label(0)}</span>
+            <span>{label(last)}</span>
           </div>
+
+          {tier && (
+            <div className="mt-6 min-h-[3.5rem] text-center" aria-live="polite">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.p key={tier.word} {...swap} className="text-[15px] leading-relaxed text-muted-foreground">
+                  <span className="font-semibold text-primary">{tier.word}</span> · {tier.note}
+                </motion.p>
+              </AnimatePresence>
+            </div>
+          )}
         </motion.div>
       </div>
 

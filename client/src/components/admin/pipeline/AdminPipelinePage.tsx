@@ -136,7 +136,7 @@ function PipelineEditor({ pipeline, config }: { pipeline: AiPipeline; config: Pi
               <Bot className="size-5 text-primary" />
             </div>
             <div className="min-w-0">
-              <h2 className="truncate font-display text-lg font-semibold">{pipeline.name}</h2>
+              <h2 className="truncate font-display text-lg font-normal">{pipeline.name}</h2>
               <p className="truncate text-xs text-muted-foreground">
                 OneShotAPI · modifié le <span className="capitalize">{formatKickoff(pipeline.updated_at)}</span>
               </p>
@@ -208,7 +208,7 @@ function PipelineEditor({ pipeline, config }: { pipeline: AiPipeline; config: Pi
               <section className="card-3d flex flex-col gap-4 p-4 sm:p-6">
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-display text-lg font-semibold">
+                    <h3 className="font-display text-lg font-normal">
                       Étape {index + 1} · {step.label}
                     </h3>
                     <RoleBadge role={step.role} />

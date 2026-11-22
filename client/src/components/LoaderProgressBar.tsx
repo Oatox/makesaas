@@ -30,7 +30,7 @@ export function LoaderProgressBar({ value, done }: { value: number; done: boolea
           )}
         </motion.div>
       </div>
-      <span className="w-12 whitespace-nowrap text-right font-display text-sm font-semibold tabular-nums">{formatPercent(value)}</span>
+      <span className="w-12 whitespace-nowrap text-right font-display text-sm font-normal tabular-nums">{formatPercent(value)}</span>
     </div>
   );
 }

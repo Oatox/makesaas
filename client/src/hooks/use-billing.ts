@@ -1,29 +1,28 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { billingApi, type CheckoutSession, type PaywallPlansResponse, type PlanId } from "@shared/billing";
+import { billingApi, type CheckoutSession, type PaywallResponse } from "@shared/billing";
 import { apiRequest, ApiError } from "@/lib/api-client";
 
 export const billingKeys = {
-  plans: ["billing", "plans"] as const,
+  plan: ["billing", "plan"] as const,
 };
 
-/** Plans and prices shown on the paywall (public route: works before sign-up). */
-export function usePaywallPlans() {
-  return useQuery<PaywallPlansResponse>({
-    queryKey: billingKeys.plans,
+/** The plan and its price shown on the paywall (public route: works before sign-up). */
+export function usePaywallPlan() {
+  return useQuery<PaywallResponse>({
+    queryKey: billingKeys.plan,
     queryFn: async () => {
-      const response = await fetch(billingApi.plans.path);
+      const response = await fetch(billingApi.plan.path);
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new ApiError(response.status, payload?.message ?? "Offres indisponibles, réessayez.");
-      return payload as PaywallPlansResponse;
+      if (!response.ok) throw new ApiError(response.status, payload?.message ?? "Offre indisponible, réessayez.");
+      return payload as PaywallResponse;
     },
     staleTime: 5 * 60 * 1000,
   });
 }
 
-/** A Whop checkout session for the signed-in user and the chosen plan. */
+/** A Whop checkout session for the signed-in user. */
 export function useCreateCheckout() {
   return useMutation({
-    mutationFn: (plan: PlanId) =>
-      apiRequest<CheckoutSession>(billingApi.checkout.path, { method: "POST", body: { plan } }),
+    mutationFn: () => apiRequest<CheckoutSession>(billingApi.checkout.path, { method: "POST" }),
   });
 }

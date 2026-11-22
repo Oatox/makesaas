@@ -50,7 +50,7 @@ export function AdminUsersPage() {
 
   // Toasts and cache invalidation are handled by the mutations.
   const handleToggleSubscriber = (id: string, current: boolean) =>
-    updateUser.mutate({ id, updates: { plan: current ? null : "pro" } });
+    updateUser.mutate({ id, updates: { subscribed: !current } });
 
   const handleToggleRole = (id: string, currentRole: "user" | "admin") =>
     updateUser.mutate({ id, updates: { role: currentRole === "admin" ? "user" : "admin" } });

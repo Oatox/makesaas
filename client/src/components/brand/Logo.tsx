@@ -1,54 +1,37 @@
 import { cn } from "@/lib/utils";
 
-/** The mark alone: an orange rounded square with an "M" (same drawing as /brand/favicon.svg). */
-function Mark({ x = 0, size = 48 }: { x?: number; size?: number }) {
-  const scale = size / 512;
-  return (
-    <g transform={`translate(${x} 0) scale(${scale})`}>
-      <rect width="512" height="512" rx="112" fill="hsl(var(--primary))" />
-      <path
-        d="M136 368V160l120 128 120-128v208"
-        fill="none"
-        stroke="hsl(var(--primary-foreground))"
-        strokeWidth="56"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </g>
-  );
-}
+/**
+ * MakeSaaS logo, on a transparent background.
+ * The orange slanted M is also the "M" of the wordmark: orange M + "akeSaaS" (Unbounded Medium,
+ * converted to outlines so the logo never depends on the web font loading).
+ */
+
+/** The slanted M (same drawing as /brand/favicon.svg). */
+const M_PATH =
+  "M40.3 1.7Q41.3 0 43.1 0L69.4 0Q71.3 0 71.3 1.9L71.3 19.4Q71.3 21.3 70.4 22.9L49 61.9L49 37.6L29.3 73.3Q28.4 75 26.5 75L1.9 75Q0 75 0.9 73.3ZM87.5 1.7Q88.4 0 90.3 0L119.3 0Q121.1 0 120.8 1.9L109.4 73.1Q109.1 75 107.3 75L98 75Q96.2 75 96.2 73.1L96.2 37.6L76.5 73.3Q75.6 75 73.7 75L49.1 75Q47.2 75 48.1 73.3Z";
+
+/** "akeSaaS", positioned right after the M (full logo coordinates). */
+const TEXT_PATH =
+  "M172.6 77 170.2 56.2 172.9 48.6 170.2 41.1 172.6 20.1H189.9L186.6 48.6L189.9 77ZM177 48.6Q175.3 57.6 171.1 64.3Q166.8 71.1 160.4 74.8Q154 78.5 146 78.5Q137.6 78.5 131.3 74.8Q124.9 71 121.3 64.2Q117.7 57.5 117.7 48.6Q117.7 39.6 121.3 32.9Q124.9 26.1 131.3 22.4Q137.6 18.6 146 18.6Q154 18.6 160.4 22.3Q166.8 26 171.1 32.8Q175.4 39.5 177 48.6ZM134.6 48.6Q134.6 53.6 136.7 57.4Q138.7 61.2 142.3 63.3Q145.9 65.5 150.6 65.5Q155.4 65.5 159.5 63.3Q163.7 61.2 166.9 57.4Q170.1 53.6 171.8 48.6Q170.1 43.6 166.9 39.8Q163.7 35.9 159.5 33.8Q155.4 31.6 150.6 31.6Q145.9 31.6 142.3 33.8Q138.7 35.9 136.7 39.8Q134.6 43.6 134.6 48.6ZM215.7 63.2 211 61.5 244.8 20.1H263.1L214.2 77H199V0H215.7ZM228.6 49.1 240.9 39.6 264.7 77H245.5ZM297.4 78.5Q287.2 78.5 279.3 74.7Q271.4 71 266.8 64.2Q262.3 57.4 262.3 48.4Q262.3 39.5 266.6 32.8Q270.9 26.1 278.5 22.4Q286.1 18.6 295.9 18.6Q305.7 18.6 312.8 23Q319.9 27.3 323.8 35.2Q327.7 43.1 327.7 53.8H275.7V42.7H318.7L312.1 46.7Q311.8 41.7 309.7 38.2Q307.6 34.7 304.1 32.8Q300.7 30.9 295.9 30.9Q290.8 30.9 287.1 33Q283.4 35 281.3 38.7Q279.2 42.3 279.2 47.2Q279.2 53.1 281.8 57.3Q284.5 61.5 289.5 63.7Q294.5 65.9 301.5 65.9Q307.9 65.9 314.5 64.1Q321 62.2 326.1 58.8V70Q320.6 74 313.1 76.3Q305.6 78.5 297.4 78.5ZM332.5 52.5H349.8Q350.3 56.3 353.1 59.2Q355.9 62 360.5 63.6Q365.1 65.1 371.3 65.1Q380.1 65.1 385.3 62.5Q390.4 60 390.4 55.4Q390.4 51.8 387.5 49.9Q384.5 47.9 376.5 47L361.5 45.3Q346.9 43.7 340.3 38.5Q333.8 33.2 333.8 23.8Q333.8 16.4 338.1 11.2Q342.4 6 350.4 3.2Q358.3 0.5 368.9 0.5Q379.4 0.5 387.4 3.5Q395.5 6.6 400.3 12Q405.1 17.5 405.6 24.8H388.3Q387.9 21.5 385.4 19Q382.9 16.6 378.6 15.3Q374.4 13.9 368.5 13.9Q360.4 13.9 355.6 16.3Q350.9 18.7 350.9 23.1Q350.9 26.5 353.7 28.3Q356.5 30.2 363.8 31.1L379.5 33Q389.8 34.1 396 36.6Q402.1 39 404.8 43.1Q407.5 47.2 407.5 53.5Q407.5 61 402.9 66.7Q398.4 72.3 390.2 75.4Q381.9 78.5 371 78.5Q359.8 78.5 351.2 75.3Q342.7 72 337.8 66.1Q332.9 60.3 332.5 52.5ZM467.5 77 465.1 56.2 467.8 48.6 465.1 41.1 467.5 20.1H484.8L481.5 48.6L484.8 77ZM471.9 48.6Q470.2 57.6 466 64.3Q461.7 71.1 455.3 74.8Q448.9 78.5 440.9 78.5Q432.5 78.5 426.2 74.8Q419.8 71 416.2 64.2Q412.6 57.5 412.6 48.6Q412.6 39.6 416.2 32.9Q419.8 26.1 426.2 22.4Q432.5 18.6 440.9 18.6Q448.9 18.6 455.3 22.3Q461.7 26 466 32.8Q470.3 39.5 471.9 48.6ZM429.5 48.6Q429.5 53.6 431.6 57.4Q433.6 61.2 437.2 63.3Q440.8 65.5 445.5 65.5Q450.3 65.5 454.4 63.3Q458.6 61.2 461.8 57.4Q465 53.6 466.7 48.6Q465 43.6 461.8 39.8Q458.6 35.9 454.4 33.8Q450.3 31.6 445.5 31.6Q440.8 31.6 437.2 33.8Q433.6 35.9 431.6 39.8Q429.5 43.6 429.5 48.6ZM545.9 77 543.5 56.2 546.2 48.6 543.5 41.1 545.9 20.1H563.2L559.9 48.6L563.2 77ZM550.3 48.6Q548.6 57.6 544.4 64.3Q540.1 71.1 533.7 74.8Q527.3 78.5 519.3 78.5Q510.9 78.5 504.6 74.8Q498.2 71 494.6 64.2Q491 57.5 491 48.6Q491 39.6 494.6 32.9Q498.2 26.1 504.6 22.4Q510.9 18.6 519.3 18.6Q527.3 18.6 533.7 22.3Q540.1 26 544.4 32.8Q548.7 39.5 550.3 48.6ZM507.9 48.6Q507.9 53.6 510 57.4Q512 61.2 515.6 63.3Q519.2 65.5 523.9 65.5Q528.7 65.5 532.8 63.3Q537 61.2 540.2 57.4Q543.4 53.6 545.1 48.6Q543.4 43.6 540.2 39.8Q537 35.9 532.8 33.8Q528.7 31.6 523.9 31.6Q519.2 31.6 515.6 33.8Q512 35.9 510 39.8Q507.9 43.6 507.9 48.6ZM569.5 52.5H586.8Q587.3 56.3 590.1 59.2Q592.9 62 597.5 63.6Q602.1 65.1 608.3 65.1Q617.1 65.1 622.3 62.5Q627.4 60 627.4 55.4Q627.4 51.8 624.5 49.9Q621.5 47.9 613.5 47L598.5 45.3Q583.9 43.7 577.3 38.5Q570.8 33.2 570.8 23.8Q570.8 16.4 575.1 11.2Q579.4 6 587.4 3.2Q595.3 0.5 605.9 0.5Q616.4 0.5 624.4 3.5Q632.5 6.6 637.3 12Q642.1 17.5 642.6 24.8H625.3Q624.9 21.5 622.4 19Q619.9 16.6 615.6 15.3Q611.4 13.9 605.5 13.9Q597.4 13.9 592.6 16.3Q587.9 18.7 587.9 23.1Q587.9 26.5 590.7 28.3Q593.5 30.2 600.8 31.1L616.5 33Q626.8 34.1 633 36.6Q639.1 39 641.8 43.1Q644.5 47.2 644.5 53.5Q644.5 61 639.9 66.7Q635.4 72.3 627.2 75.4Q618.9 78.5 608 78.5Q596.8 78.5 588.2 75.3Q579.7 72 574.8 66.1Q569.9 60.3 569.5 52.5Z";
 
 /**
- * MakeSaaS brand logo, drawn in SVG so it follows the theme colors.
- * - "full": the mark + "MakeSaaS" wordmark
- * - "mark": the mark alone, for tight spots (collapsed sidebar...)
- * Size it with a height class (`h-7`); the width follows the viewBox ratio.
+ * - "full": orange M + "akeSaaS" in the current text color
+ * - "mark": the orange M alone, for tight spots
+ * Size it with a height class (`h-5`); the width follows the viewBox ratio.
  */
 export function Logo({ variant = "full", className }: { variant?: "full" | "mark"; className?: string }) {
   if (variant === "mark") {
     return (
-      <svg viewBox="0 0 48 48" role="img" aria-label="MakeSaaS" className={cn("h-8 w-8 shrink-0", className)}>
-        <Mark />
+      <svg viewBox="0 0 121.1 75" role="img" aria-label="MakeSaaS" className={cn("h-8 w-8 shrink-0", className)}>
+        <path d={M_PATH} fill="hsl(var(--primary))" />
       </svg>
     );
   }
 
   return (
-    <svg viewBox="0 0 200 48" role="img" aria-label="MakeSaaS" className={cn("h-7 w-auto shrink-0", className)}>
-      <Mark />
-      {/* textLength pins the wordmark width whatever font ends up rendering it. */}
-      <text
-        x="58"
-        y="35"
-        textLength="140"
-        lengthAdjust="spacingAndGlyphs"
-        fontFamily="var(--font-display)"
-        fontSize="32"
-        fontWeight="700"
-        fill="currentColor"
-      >
-        Make<tspan fill="hsl(var(--primary))">SaaS</tspan>
-      </text>
+    <svg viewBox="0 0 644.5 78.5" role="img" aria-label="MakeSaaS" className={cn("h-5 w-auto shrink-0", className)}>
+      <path d={M_PATH} transform="translate(0 2)" fill="hsl(var(--primary))" />
+      <path d={TEXT_PATH} fill="currentColor" />
     </svg>
   );
 }

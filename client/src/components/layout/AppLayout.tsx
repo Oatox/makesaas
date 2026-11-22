@@ -29,7 +29,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {pageTitle && (
             <>
               <div aria-hidden className="h-5 w-px bg-border" />
-              <h1 className="truncate font-display text-lg font-semibold tracking-tight">{pageTitle}</h1>
+              <h1 className="truncate font-display text-lg font-normal tracking-tight">{pageTitle}</h1>
             </>
           )}
           <HeaderActionsSlot />

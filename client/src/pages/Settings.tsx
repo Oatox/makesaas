@@ -5,8 +5,7 @@ import { ProfileForm } from "@/components/settings/ProfileForm";
 import { blurIn } from "@/lib/motion";
 import { motion } from "framer-motion";
 import { AlertTriangle, LogOut, Crown } from "lucide-react";
-import { Link } from "wouter";
-import { PLANS } from "@shared/billing";
+import { PLAN, grantsAccess } from "@shared/billing";
 import { formatDate } from "@/lib/format";
 import type { LucideIcon } from "lucide-react";
 
@@ -30,7 +29,7 @@ function Section({
       className={`card-3d p-5 sm:p-6 ${danger ? "card-3d-danger" : ""}`}
     >
       <div className="mb-5 space-y-1">
-        <h2 className={`font-display text-lg font-semibold ${danger ? "text-destructive" : ""}`}>{title}</h2>
+        <h2 className={`font-display text-lg font-normal ${danger ? "text-destructive" : ""}`}>{title}</h2>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       {children}
@@ -63,10 +62,10 @@ function Row({ icon: Icon, title, hint, iconClass, children }: {
 }
 
 export default function Settings() {
-  const { profile, plan, signOut } = useAuth();
+  const { profile, hasAccess, signOut } = useAuth();
   // A running Whop subscription must be cancelled before the account is deleted (it would keep billing).
   const subscription = profile?.subscription;
-  const isWhop = subscription?.provider === "whop" && !!plan;
+  const isWhop = subscription?.provider === "whop" && grantsAccess(subscription.status);
   const hasActiveBilling = isWhop && !subscription.cancel_at_period_end;
   const renewal = isWhop && subscription.current_period_end ? formatDate(subscription.current_period_end) : null;
 
@@ -84,35 +83,28 @@ export default function Settings() {
       <Section title="Abonnement" description="Votre offre actuelle.">
         <Row
           icon={Crown}
-          title={plan ? `MakeSaaS ${PLANS[plan].name}` : "Aucun abonnement"}
+          title={hasAccess ? PLAN.name : "Aucun abonnement"}
           hint={[
-            plan ? `${PLANS[plan].description}.` : "Choisissez une offre pour accéder à MakeSaaS.",
+            hasAccess ? `${PLAN.description}.` : "Abonnez-vous pour accéder à MakeSaaS.",
             renewal && (subscription?.cancel_at_period_end ? `Se termine le ${renewal}.` : `Renouvellement le ${renewal}.`),
           ]
             .filter(Boolean)
             .join(" ")}
-          iconClass={plan ? "bg-primary/15 text-primary" : undefined}
+          iconClass={hasAccess ? "bg-primary/15 text-primary" : undefined}
         >
-          <div className="flex flex-col gap-2 sm:flex-row">
-            {plan === "starter" && (
-              <Button asChild className="h-11 w-full rounded-[12px] px-5 sm:w-auto">
-                <Link href="/abonnement">Passer à Pro</Link>
-              </Button>
-            )}
-            {isWhop && subscription.manage_url && (
-              <Button asChild variant="secondary" className="h-11 w-full rounded-[12px] px-5 sm:w-auto">
-                <a href={subscription.manage_url} target="_blank" rel="noopener noreferrer">
-                  Gérer mon abonnement
-                </a>
-              </Button>
-            )}
-          </div>
+          {isWhop && subscription.manage_url && (
+            <Button asChild variant="secondary" className="h-11 w-full px-5 sm:w-auto">
+              <a href={subscription.manage_url} target="_blank" rel="noopener noreferrer">
+                Gérer mon abonnement
+              </a>
+            </Button>
+          )}
         </Row>
       </Section>
 
       <Section title="Session" description="Vous êtes connecté sur cet appareil.">
         <Row icon={LogOut} title="Se déconnecter" hint="Vous pourrez vous reconnecter à tout moment.">
-          <Button variant="secondary" className="h-11 w-full rounded-[12px] px-5 sm:w-auto" onClick={() => signOut()}>
+          <Button variant="secondary" className="h-11 w-full px-5 sm:w-auto" onClick={() => signOut()}>
             Déconnexion
           </Button>
         </Row>
@@ -125,7 +117,7 @@ export default function Settings() {
           hint="Droit à l'effacement (RGPD) : toutes vos données personnelles seront supprimées, immédiatement et sans retour possible."
           iconClass="bg-destructive/10 text-destructive"
         >
-          <DeleteAccountDialog isPro={hasActiveBilling} />
+          <DeleteAccountDialog hasActiveBilling={hasActiveBilling} />
         </Row>
       </Section>
     </motion.div>

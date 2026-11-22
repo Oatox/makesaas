@@ -10,7 +10,7 @@ const COLUMNS = [
     links: [
       { label: "Fonctionnalités", href: "#features" },
       { label: "FAQ", href: "#faq" },
-      { label: "Démarrer", href: "/onboarding", route: true },
+      { label: "Commencer", href: "/onboarding", route: true },
     ],
   },
   {
@@ -39,7 +39,7 @@ export function LandingFooter() {
         <div className="grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-[1.6fr_1fr_1fr] md:gap-10">
           <div className="col-span-2 space-y-4 md:col-span-1 md:space-y-5">
             <a href="#hero" className="inline-block transition-opacity hover:opacity-80">
-              <Logo className="h-7 md:h-8" />
+              <Logo className="h-5 md:h-6" />
             </a>
             <p className="max-w-md text-sm leading-relaxed text-muted-foreground md:text-base">
               Tout le socle d'un SaaS déjà prêt : authentification, onboarding, abonnements, administration et IA.
@@ -49,7 +49,7 @@ export function LandingFooter() {
 
           {COLUMNS.map((col) => (
             <nav key={col.title} aria-label={col.title} className="space-y-3 md:space-y-4">
-              <h3 className="font-display text-base text-foreground md:text-lg">{col.title}</h3>
+              <h3 className="font-display font-normal text-base text-foreground md:text-lg">{col.title}</h3>
               <ul className="space-y-2.5 md:space-y-3">
                 {col.links.map((l) => (
                   <li key={l.label}>

@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowLeft, CreditCard, LayoutDashboard, Loader2, ShieldCheck, Sparkles, Wand2, type LucideIcon } from "lucide-react";
-import { PLANS, isPlanId, type CheckoutSession, type PaywallPlan, type PlanId } from "@shared/billing";
+import type { CheckoutSession, PaywallPlan } from "@shared/billing";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/StateCard";
 import { optionCardClass, SelectionWash } from "@/components/onboarding/OptionCard";
@@ -10,22 +10,19 @@ import { STEP_TITLE_CLASS, stepAppear as appear } from "@/components/onboarding/
 import { TESTIMONIALS } from "@/components/landing/Testimonials";
 import { MEMBER_COUNT_SHORT } from "@/config/social-proof";
 import { useAuth } from "@/hooks/use-auth";
-import { useCreateCheckout, usePaywallPlans } from "@/hooks/use-billing";
+import { useCreateCheckout, usePaywallPlan } from "@/hooks/use-billing";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 const WhopCheckout = lazy(() => import("./WhopCheckout"));
 
-/** Included in both plans, listed once under the cards. ⚠️ PLACEHOLDER: list your product's features. */
+/** What the plan includes, listed under its card. ⚠️ PLACEHOLDER: list your product's features. */
 const INCLUDED_FEATURES: { icon: LucideIcon; title: string; detail: string }[] = [
   { icon: LayoutDashboard, title: "Tableau de bord", detail: "Toutes vos données au même endroit" },
   { icon: Sparkles, title: "IA intégrée", detail: "Des résultats générés en quelques secondes" },
   { icon: Wand2, title: "Prise en main rapide", detail: "Opérationnel en quelques minutes" },
   { icon: CreditCard, title: "Sans engagement", detail: "Résiliable à tout moment" },
 ];
-
-/** Pro first: the recommended plan leads. */
-const PLAN_ORDER: PlanId[] = ["pro", "starter"];
 
 /** How long to wait for the Whop webhook after the payment before suggesting a reload. */
 const ACTIVATION_TIMEOUT_MS = 60_000;
@@ -42,71 +39,42 @@ function formatPrice(plan: PaywallPlan) {
   }).format(plan.price);
 }
 
-function PlanCard({
-  plan,
-  selected,
-  current,
-  onSelect,
-}: {
-  plan: PaywallPlan;
-  selected: boolean;
-  current: boolean;
-  onSelect: () => void;
-}) {
+function PlanCard({ plan }: { plan: PaywallPlan }) {
   const price = formatPrice(plan);
-  const isPro = plan.id === "pro";
 
   return (
-    <motion.button
+    <motion.div
       variants={appear}
-      whileTap={current ? undefined : { scale: 0.985 }}
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      disabled={current}
-      onClick={onSelect}
-      className={cn(
-        optionCardClass(selected),
-        "flex w-full items-center justify-between gap-4 px-5 py-4 text-left disabled:cursor-not-allowed disabled:opacity-60",
-      )}
-      data-testid={`paywall-plan-${plan.id}`}
+      className={cn(optionCardClass(true), "flex w-full items-center justify-between gap-4 px-5 py-4")}
+      data-testid="paywall-plan"
     >
-      <SelectionWash selected={selected} />
+      <SelectionWash selected />
       <div className="relative min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-display text-lg font-semibold">MakeSaaS {plan.name}</p>
-          {current ? (
-            <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">Votre plan</span>
-          ) : (
-            isPro && <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">Recommandé</span>
-          )}
-        </div>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {plan.description}
-        </p>
+        <p className="font-display text-lg font-normal">{plan.name}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">{plan.description}</p>
       </div>
       <p className="relative shrink-0 text-right">
         {price ? (
           <>
-            <span className="font-display text-2xl font-semibold">{price}</span>
+            <span className="font-display text-2xl font-light">{price}</span>
             <span className="text-sm text-muted-foreground"> / mois</span>
           </>
         ) : (
           <span className="text-sm text-muted-foreground">Prix au paiement</span>
         )}
       </p>
-    </motion.button>
+    </motion.div>
   );
 }
 
-/** Back from the checkout to the plan choice: the same arrow as the app header (AppLayout). */
+/** Back from the checkout to the offer: the same arrow as the app header (AppLayout). */
 export function CheckoutBackButton({ onClick, className }: { onClick: () => void; className?: string }) {
   return (
     <Button
       variant="ghost"
       size="icon"
       onClick={onClick}
-      aria-label="Changer d'offre"
+      aria-label="Revenir à l'offre"
       className={cn("-ml-2 h-12 w-12 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:h-8 md:w-8", className)}
     >
       <ArrowLeft className="!size-7 md:!size-5" />
@@ -114,15 +82,14 @@ export function CheckoutBackButton({ onClick, className }: { onClick: () => void
   );
 }
 
-/** Waits for the webhook to grant the plan, then opens the app. */
-function Activating({ target }: { target: PlanId | null }) {
-  const { plan, retryProfile } = useAuth();
+/** Waits for the webhook to grant access, then opens the app. */
+function Activating() {
+  const { hasAccess, retryProfile } = useAuth();
   const [, navigate] = useLocation();
   const [timedOut, setTimedOut] = useState(false);
-  const granted = target ? plan === target : !!plan;
 
   useEffect(() => {
-    if (granted) {
+    if (hasAccess) {
       navigate("/app", { replace: true });
       return;
     }
@@ -132,26 +99,26 @@ function Activating({ target }: { target: PlanId | null }) {
       window.clearInterval(poll);
       window.clearTimeout(timeout);
     };
-  }, [granted, navigate, retryProfile]);
+  }, [hasAccess, navigate, retryProfile]);
 
   return (
     <div className="flex flex-col items-center gap-4 py-16 text-center">
       {timedOut ? (
         <>
           <ShieldCheck className="h-10 w-10 text-primary" />
-          <p className="font-display text-xl font-semibold">Paiement reçu, activation en cours</p>
+          <p className="font-display text-xl font-normal">Paiement reçu, activation en cours</p>
           <p className="max-w-sm text-sm text-muted-foreground">
             L'activation prend plus de temps que prévu. Rechargez la page dans un instant ; si votre accès n'apparaît
             toujours pas, contactez-nous avec l'email utilisé pour le paiement.
           </p>
-          <Button variant="secondary" className="h-11 rounded-[12px]" onClick={() => window.location.reload()}>
+          <Button variant="secondary" className="h-11" onClick={() => window.location.reload()}>
             Recharger
           </Button>
         </>
       ) : (
         <>
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="font-display text-xl font-semibold">Activation de votre abonnement…</p>
+          <p className="font-display text-xl font-normal">Activation de votre abonnement…</p>
           <p className="text-sm text-muted-foreground">Encore quelques secondes.</p>
         </>
       )}
@@ -160,34 +127,29 @@ function Activating({ target }: { target: PlanId | null }) {
 }
 
 /**
- * Plan choice, then Whop's embedded checkout. There is no free plan: this is the only way into
- * the app. A Starter subscriber sees it to upgrade to Pro.
+ * The plan, then Whop's embedded checkout. There is no free plan: this is the only way into the app.
  *
- * With `onCheckoutChange`, the page draws the "back to the plans" arrow itself (in its header, so
+ * With `onCheckoutChange`, the page draws the "back to the offer" arrow itself (in its header, so
  * the checkout sits higher): it receives the function closing the checkout, or null once closed.
  */
 export function Paywall({
-  title = "Choisissez votre offre",
+  title = "Débloquez MakeSaaS",
   onCheckoutChange,
 }: {
   title?: string;
   onCheckoutChange?: (closeCheckout: (() => void) | null) => void;
 }) {
-  const { user, plan: currentPlan, retryProfile } = useAuth();
+  const { user, hasAccess, retryProfile } = useAuth();
   const { toast } = useToast();
-  const plansQuery = usePaywallPlans();
+  const planQuery = usePaywallPlan();
   const createCheckout = useCreateCheckout();
 
   // Back from Whop (redirect_url after payment, or an off-site step like 3-D Secure / PayPal): Whop
   // appends status=success|succeeded|failed|canceled.
-  const params = new URLSearchParams(window.location.search);
-  const returnedPlan = params.get("plan");
-  const [activating, setActivating] = useState<{ target: PlanId | null } | null>(() =>
-    SUCCESS_STATUSES.has(params.get("status") ?? "") ? { target: isPlanId(returnedPlan) ? returnedPlan : null } : null,
+  const [activating, setActivating] = useState(() =>
+    SUCCESS_STATUSES.has(new URLSearchParams(window.location.search).get("status") ?? ""),
   );
-
-  const [selected, setSelected] = useState<PlanId>("pro");
-  const [session, setSession] = useState<(CheckoutSession & { plan: PlanId }) | null>(null);
+  const [session, setSession] = useState<CheckoutSession | null>(null);
   const closeCheckout = useCallback(() => setSession(null), []);
 
   const checkoutOpen = !!session && !activating;
@@ -201,13 +163,13 @@ export function Paywall({
   // Whop account) without calling onComplete: watch the subscription itself while the checkout is open.
   useEffect(() => {
     if (!session) return;
-    if (currentPlan === session.plan) {
-      setActivating({ target: session.plan });
+    if (hasAccess) {
+      setActivating(true);
       return;
     }
     const poll = window.setInterval(retryProfile, ACTIVATION_POLL_MS * 2);
     return () => window.clearInterval(poll);
-  }, [session, currentPlan, retryProfile]);
+  }, [session, hasAccess, retryProfile]);
 
   useEffect(() => {
     const status = new URLSearchParams(window.location.search).get("status");
@@ -216,19 +178,19 @@ export function Paywall({
     }
   }, [toast]);
 
-  if (activating) return <Activating target={activating.target} />;
+  if (activating) return <Activating />;
 
-  if (plansQuery.isError) {
+  if (planQuery.isError) {
     return (
       <ErrorState
-        title="Offres indisponibles"
-        message={plansQuery.error.message}
-        action={<Button onClick={() => plansQuery.refetch()}>Réessayer</Button>}
+        title="Offre indisponible"
+        message={planQuery.error.message}
+        action={<Button onClick={() => planQuery.refetch()}>Réessayer</Button>}
       />
     );
   }
 
-  if (session && plansQuery.data) {
+  if (session && planQuery.data) {
     return (
       <div className="space-y-5">
         {!onCheckoutChange && <CheckoutBackButton onClick={closeCheckout} />}
@@ -236,10 +198,9 @@ export function Paywall({
           <Suspense fallback={<div className="flex min-h-[420px] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}>
             <WhopCheckout
               sessionId={session.sessionId}
-              environment={plansQuery.data.environment}
+              environment={planQuery.data.environment}
               email={user?.email}
-              plan={session.plan}
-              onComplete={() => setActivating({ target: session.plan })}
+              onComplete={() => setActivating(true)}
             />
           </Suspense>
         </div>
@@ -251,10 +212,10 @@ export function Paywall({
     );
   }
 
-  const plans = plansQuery.data?.plans;
+  const plan = planQuery.data?.plan;
   const startCheckout = () =>
-    createCheckout.mutate(selected, {
-      onSuccess: (checkout) => setSession({ ...checkout, plan: selected }),
+    createCheckout.mutate(undefined, {
+      onSuccess: setSession,
       onError: (error) => toast({ variant: "destructive", title: "Paiement indisponible", description: error.message }),
     });
 
@@ -262,36 +223,24 @@ export function Paywall({
     <motion.div className="flex flex-1 flex-col gap-7" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.07 } } }}>
       <div className="space-y-2">
         <motion.h1 variants={appear} className={STEP_TITLE_CLASS}>
-          {currentPlan === "starter" ? "Passez à MakeSaaS Pro" : title}
+          {title}
         </motion.h1>
         <motion.p variants={appear} className="text-base text-muted-foreground md:text-lg">
-          {currentPlan === "starter"
-            ? "Vos jours Starter restants sont convertis en jours Pro offerts."
-            : "Abonnement mensuel, sans engagement."}
+          Abonnement mensuel, sans engagement.
         </motion.p>
       </div>
 
-      {plans ? (
-        <div className="flex flex-col gap-3" role="radiogroup" aria-label="Offres MakeSaaS">
-          {[...plans].sort((a, b) => PLAN_ORDER.indexOf(a.id) - PLAN_ORDER.indexOf(b.id)).map((plan) => (
-            <PlanCard
-              key={plan.id}
-              plan={plan}
-              current={plan.id === currentPlan}
-              selected={plan.id === selected}
-              onSelect={() => setSelected(plan.id)}
-            />
-          ))}
-        </div>
+      {plan ? (
+        <PlanCard plan={plan} />
       ) : (
-        <div className="flex min-h-[160px] items-center justify-center">
+        <div className="flex min-h-[88px] items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       )}
 
       {/* Same raised card as the app's main panels, with a soft orange glow behind it. */}
       <motion.div variants={appear}>
-        <ul className="divide-y divide-border/60" aria-label="Inclus dans les deux offres">
+        <ul className="divide-y divide-border/60" aria-label="Inclus dans l'abonnement">
           {INCLUDED_FEATURES.map(({ icon: Icon, title, detail }) => (
             <li key={title} className="flex items-start gap-3.5 py-4 first:pt-0 last:pb-0">
               <Icon aria-hidden className="mt-0.5 h-6 w-6 shrink-0 text-primary" strokeWidth={1.8} />
@@ -329,13 +278,13 @@ export function Paywall({
         </div>
         <div className="md:mx-auto md:w-[320px]">
           <Button
-            className="h-12 w-full rounded-[12px] text-base"
+            className="h-12 w-full text-base"
             onClick={startCheckout}
-            disabled={!plans || createCheckout.isPending || selected === currentPlan}
+            disabled={!plan || createCheckout.isPending}
             data-testid="button-paywall-continue"
           >
             {createCheckout.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Continuer avec {PLANS[selected].name}
+            Continuer
           </Button>
           <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
             <ShieldCheck className="h-3.5 w-3.5" />

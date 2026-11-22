@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { LegalPage, LegalSection, SupportEmail } from "@/components/legal/LegalPage";
 import { LEGAL } from "@/config/legal";
+import { PLAN } from "@shared/billing";
 
 const link = "text-foreground underline underline-offset-2 hover:text-primary";
 
@@ -19,18 +20,13 @@ export default function CGV() {
         </p>
       </LegalSection>
 
-      <LegalSection title="2. Offres">
-        {/* ⚠️ PLACEHOLDER: describe what each plan gives (same wording as PLANS in shared/billing.ts). */}
-        <p>{LEGAL.siteName} propose deux abonnements mensuels, sans offre gratuite :</p>
-        <ul className="list-disc space-y-1 pl-5">
-          <li>
-            <span className="text-foreground">Starter</span> : l'essentiel pour démarrer.
-          </li>
-          <li>
-            <span className="text-foreground">Pro</span> : toutes les fonctionnalités, sans limite.
-          </li>
-        </ul>
-        <p>Le contenu de chaque offre est celui décrit sur la page d'abonnement au moment de la souscription.</p>
+      <LegalSection title="2. Offre">
+        {/* ⚠️ PLACEHOLDER: describe what the plan gives (same wording as PLAN in shared/billing.ts). */}
+        <p>
+          {LEGAL.siteName} propose un abonnement mensuel unique, <span className="text-foreground">{PLAN.name}</span>,
+          qui donne accès à l'ensemble du service. Il n'existe pas d'offre gratuite.
+        </p>
+        <p>Le contenu de l'offre est celui décrit sur la page d'abonnement au moment de la souscription.</p>
       </LegalSection>
 
       <LegalSection title="3. Prix">
@@ -57,20 +53,7 @@ export default function CGV() {
         </p>
       </LegalSection>
 
-      <LegalSection title="5. Changement d'offre">
-        <p>
-          Vous pouvez passer de l'offre Starter à l'offre Pro à tout moment depuis la page d'abonnement. L'abonnement
-          Pro démarre immédiatement, au prix de l'offre Pro, et l'abonnement Starter en cours est résilié.
-        </p>
-        <p>
-          La part déjà payée et non utilisée de votre abonnement Starter n'est pas perdue : sa valeur est convertie en
-          jours Pro offerts, ajoutés à votre première période Pro (ce qui décale d'autant votre prochain
-          prélèvement). Par exemple, s'il reste la moitié d'un mois Starter et que l'offre Pro coûte deux fois plus cher,
-          environ une semaine de Pro vous est offerte.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="6. Droit de rétractation">
+      <LegalSection title="5. Droit de rétractation">
         <p>
           Conformément à l'article L.221-18 du Code de la consommation, vous disposez d'un délai de 14 jours à compter
           de la souscription pour exercer votre droit de rétractation, sans avoir à vous justifier, en écrivant à{" "}
@@ -85,7 +68,7 @@ export default function CGV() {
         </p>
       </LegalSection>
 
-      <LegalSection title="7. Résiliation">
+      <LegalSection title="6. Résiliation">
         <p>
           L'abonnement est sans engagement. Vous pouvez le résilier à tout moment depuis la page Paramètres (« Gérer mon
           abonnement ») ou en écrivant à <SupportEmail />.
@@ -97,28 +80,28 @@ export default function CGV() {
         </p>
       </LegalSection>
 
-      <LegalSection title="8. Remboursements">
+      <LegalSection title="7. Remboursements">
         <p>
           En dehors du droit de rétractation, toute demande de remboursement peut être adressée à <SupportEmail />.
           Chaque demande est étudiée au cas par cas, notamment en cas d'indisponibilité prolongée du service.
         </p>
       </LegalSection>
 
-      <LegalSection title="9. Responsabilité">
+      <LegalSection title="8. Responsabilité">
         <p>
           L'éditeur fournit le service avec diligence, sans garantir une disponibilité continue et sans interruption.
           En cas d'indisponibilité prolongée de son fait, une compensation au prorata peut être accordée sur demande.
         </p>
       </LegalSection>
 
-      <LegalSection title="10. Service client">
+      <LegalSection title="9. Service client">
         <p>
           Pour toute question sur votre abonnement, la facturation ou un remboursement, écrivez à <SupportEmail />.
           Nous nous engageons à répondre sous 48 heures ouvrées.
         </p>
       </LegalSection>
 
-      <LegalSection title="11. Droit applicable et litiges">
+      <LegalSection title="10. Droit applicable et litiges">
         <p>Les présentes CGV sont soumises au droit français.</p>
         <p>
           En cas de litige, adressez d'abord une réclamation écrite au service client. À défaut de solution amiable,
