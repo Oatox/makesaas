@@ -1,0 +1,14 @@
+{
+  "name": "MakeSaaS",
+  "short_name": "MakeSaaS",
+  "description": "Le boilerplate pour lancer ton SaaS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0E0D",
+  "theme_color": "#0B0E0D",
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/brand/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
