@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { OnboardingAnswers } from "@/lib/onboarding-storage";
 import { cn } from "@/lib/utils";
-import { COACH_NAME, CoachAvatar } from "./Coach";
+import { COACH_NAME, CoachAvatar } from "@/components/brand/Coach";
 import { ContinueButton } from "./ContinueButton";
 import { fillTemplate } from "./insights";
 import { STEP_TITLE_CLASS, stepAppear } from "./StepHeader";
@@ -102,7 +102,7 @@ export function CoachChatStep({ answers, onContinue }: { answers: OnboardingAnsw
         </AnimatePresence>
       </div>
 
-      <ContinueButton onClick={onContinue} variants={stepAppear} disabled={shown < MESSAGES.length} label="Construire mon SaaS" />
+      <ContinueButton onClick={onContinue} variants={stepAppear} disabled={shown < MESSAGES.length} label="Construire mon business" />
     </motion.div>
   );
 }

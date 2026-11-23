@@ -3,45 +3,77 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { OnboardingAnswers } from "@/lib/onboarding-storage";
 import { cn } from "@/lib/utils";
 import { EASE_OUT } from "@/lib/motion";
+import { COACH_NAME, CoachAvatar } from "@/components/brand/Coach";
 import { ContinueButton } from "./ContinueButton";
 import { fillTemplate } from "./insights";
 import { RichText } from "./RichText";
 import { STEP_TITLE_CLASS, stepAppear } from "./StepHeader";
+import { TypewriterText } from "./TypewriterText";
 import type { FeaturesStep as FeaturesStepConfig } from "./steps";
 
-/** What the product does, one slide at a time ("Suivant"), dots underneath. */
+const TITLE_CLASS = `${STEP_TITLE_CLASS} max-w-[560px] text-balance`;
+const BODY_CLASS = "mt-4 max-w-[460px] text-lg leading-relaxed text-muted-foreground";
+
+const avatarPop = {
+  hidden: { opacity: 0, scale: 0.7 },
+  visible: { opacity: 1, scale: 1, transition: { type: "spring", stiffness: 260, damping: 18 } },
+};
+
+/**
+ * What the product does, said by the coach: his face stays on top while his slides change ("Suivant"),
+ * each title typed out as he writes it, then its text; dots underneath.
+ */
 export function FeaturesStep({ step, answers, onContinue }: { step: FeaturesStepConfig; answers: OnboardingAnswers; onContinue: () => void }) {
   const [index, setIndex] = useState(0);
+  // Slide whose title is typed: tied to the slide, so a slide leaving mid-typing cannot show the next one's text.
+  const [typedSlide, setTypedSlide] = useState(-1);
   const slide = step.slides[index];
   const last = index === step.slides.length - 1;
 
   return (
     <motion.div className="flex flex-1 flex-col" initial="hidden" animate="visible">
-      <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={index}
-            className="flex flex-col items-center"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.3, ease: EASE_OUT }}
-          >
-            <motion.span
-              aria-hidden
-              initial={{ scale: 0.7, rotate: -8 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 18 }}
-              className="flex h-24 w-24 items-center justify-center rounded-[28px] border border-primary/30 bg-primary/10 text-primary shadow-[0_0_48px_-8px_hsl(var(--primary)/0.55)] md:h-28 md:w-28"
+      {/* overflow-x-clip: the slides come in from the side; clipped, they never widen the page (no scrollbar). */}
+      <div className="flex flex-1 flex-col items-center justify-center overflow-x-clip text-center">
+        <motion.div variants={avatarPop} className="mb-7 flex flex-col items-center gap-2.5">
+          <CoachAvatar online className="h-20 w-20 md:h-24 md:w-24" />
+          <span className="text-sm font-semibold text-primary">{COACH_NAME}</span>
+        </motion.div>
+
+        {/* Every slide's text, invisible, in the same grid cell as the shown one: the area keeps the
+            tallest slide's height at any width, so the coach and the dots never move between slides. */}
+        <div className="grid w-full">
+          {step.slides.map((s) => (
+            <div key={s.title} aria-hidden className="invisible col-start-1 row-start-1 flex flex-col items-center">
+              <p className={TITLE_CLASS}>{fillTemplate(s.title, answers)}</p>
+              <p className={BODY_CLASS}>
+                <RichText text={fillTemplate(s.body, answers)} />
+              </p>
+            </div>
+          ))}
+
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={index}
+              className="col-start-1 row-start-1 flex flex-col items-center self-start"
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.3, ease: EASE_OUT }}
             >
-              <slide.icon className="h-11 w-11 md:h-12 md:w-12" strokeWidth={1.6} />
-            </motion.span>
-            <h1 className={`${STEP_TITLE_CLASS} mt-8 max-w-[560px] text-balance`}>{slide.title}</h1>
-            <p className="mt-4 max-w-[460px] text-lg leading-relaxed text-muted-foreground">
-              <RichText text={fillTemplate(slide.body, answers)} boldClassName="font-semibold text-primary" />
-            </p>
-          </motion.div>
-        </AnimatePresence>
+              <h1 className={TITLE_CLASS}>
+                <TypewriterText text={fillTemplate(slide.title, answers)} startDelayMs={index === 0 ? 400 : 150} onDone={() => setTypedSlide(index)} />
+              </h1>
+              <motion.p
+                className={BODY_CLASS}
+                initial={{ opacity: 0, y: 8 }}
+                animate={typedSlide === index ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+                transition={{ duration: 0.4, ease: EASE_OUT }}
+              >
+                <RichText text={fillTemplate(slide.body, answers)} boldClassName="font-semibold text-primary" />
+              </motion.p>
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
         <div className="mt-8 flex gap-1.5" aria-hidden>
           {step.slides.map((s, i) => (

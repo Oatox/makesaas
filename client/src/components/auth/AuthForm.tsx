@@ -62,6 +62,7 @@ export function AuthForm({
   onModeChange,
   oauthRedirectPath,
   itemVariants,
+  quietSignUp = false,
 }: {
   mode: AuthMode;
   /** Switch between sign-in and sign-up; without it, the form stays in `mode` (onboarding sign-up). */
@@ -70,6 +71,8 @@ export function AuthForm({
   oauthRedirectPath: string;
   /** Entrance of each block, driven by the parent's stagger. */
   itemVariants?: Variants;
+  /** No "Compte créé" toast after sign-up (the onboarding moves on by itself). */
+  quietSignUp?: boolean;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -87,7 +90,7 @@ export function AuthForm({
         toast({ title: "Bon retour !", description: "Connexion réussie." });
       } else {
         await registerWithEmail(email, password);
-        toast({ title: "Compte créé", description: "Votre compte a été créé avec succès." });
+        if (!quietSignUp) toast({ title: "Compte créé", description: "Votre compte a été créé avec succès." });
       }
     } catch (error) {
       toast({ variant: "destructive", ...translateSupabaseError(error) });

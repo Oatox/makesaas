@@ -265,49 +265,23 @@ export const roadmapSteps = (answers: OnboardingAnswers) => [
   { title: `${euros.format(goalOf(answers))} par mois`, detail: `${timeLabel(answers).replace(/^./, (c) => c.toUpperCase())} par semaine, étape par étape` },
 ];
 
-export type RevenueSource = { label: string; detail: string; color: string; low: number; high: number };
-
 /** Rounded to the hundred, 100 at least. */
 const hundreds = (value: number) => Math.max(100, Math.round(value / 100) * 100);
 
 /**
- * Monthly range the visitor could reach, from the goal and the potential score, split by
- * revenue source. An indicative estimate, said as such on the screen.
+ * Monthly range the visitor could reach, from the goal and the potential score. An indicative
+ * estimate, said as such on the screen.
  */
 export function projection(answers: OnboardingAnswers) {
   const goal = goalOf(answers);
   const score = potential(answers) / 100;
   const low = hundreds(goal * (0.55 + 0.35 * score));
   const high = hundreds(goal * (1.05 + 0.45 * score));
-  const sources: RevenueSource[] = [
-    {
-      label: "Abonnements mensuels",
-      detail:
-        "Le cœur du modèle : chaque utilisateur paie ton app tous les mois, par carte, tant qu'il s'en sert. C'est ce revenu qui revient chaque mois sans que tu revendes quoi que ce soit.",
-      color: "hsl(var(--primary))",
-      share: 0.65,
-    },
-    {
-      label: "Abonnements annuels",
-      detail: "Une partie des utilisateurs préfère payer l'année d'un coup, moins cher par mois. Pour toi, c'est de l'argent encaissé tout de suite.",
-      color: "hsl(var(--success))",
-      share: 0.2,
-    },
-    {
-      label: "Offre premium",
-      detail: "Une version plus complète, plus chère, pour ceux qui en veulent plus. Peu de clients, mais chacun rapporte davantage.",
-      color: "#7cc4ff",
-      share: 0.15,
-    },
-  ].map(({ share, ...source }) => ({ ...source, low: hundreds(low * share), high: hundreds(high * share) }));
 
   return {
     goal,
     low,
     high,
-    sources,
-    // ⚠️ Repris de FirstMRR : à vérifier avant la mise en ligne.
-    resale:
-      "Une app qui rapporte chaque mois se revend, souvent plusieurs années de revenus d'un coup. Base44 a été rachetée 80 M$ six mois après son lancement, par Wix.",
+    resale: "Ton app se revend, souvent plusieurs années de revenus d'un coup.",
   };
 }

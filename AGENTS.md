@@ -50,11 +50,9 @@ Set them in `.env` (development) or in the host platform (production):
 - Landing `/` → onboarding `/onboarding` (questions saved in localStorage, `client/src/components/onboarding/steps.tsx`; adding a step there is all it takes) → sign-up `/register` → paywall `/abonnement` → app `/app`.
 - `ProtectedRoute` (client/src/App.tsx) sends visitors to the onboarding and signed-in users without a subscription to the paywall.
 
-## SaaS (workspaces)
+## Product data
 
-- A user owns one or more "SaaS" (table `saas`, one owner each, no members), shown and switched from the sidebar header (`client/src/components/layout/SaasSwitcher.tsx`, like an organization switcher). The active one is `profiles.current_saas_id`, read with `useSaas()` (`client/src/hooks/use-saas.ts`); it falls back to the oldest SaaS when unset.
-- A first SaaS "Mon SaaS" is created at signup by `handle_new_user`. Subscribers (and admins) create as many as they want: the `saas` INSERT policy only requires `private.has_access()`. A user can never delete their last SaaS (`prevent_last_saas_delete`).
-- Product data belongs to a SaaS: give new tables a `saas_id UUID REFERENCES public.saas(id) ON DELETE CASCADE` and RLS through `saas.owner_id = auth.uid()`; add `(SELECT private.has_access())` to the write policies of paid features.
+- Product data belongs to a user: give new tables a `user_id UUID NOT NULL DEFAULT auth.uid() REFERENCES public.profiles(id) ON DELETE CASCADE` and RLS through `user_id = (SELECT auth.uid())`; add `(SELECT private.has_access())` to the write policies of paid features.
 
 ## Subscriptions (Whop)
 

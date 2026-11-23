@@ -39,7 +39,7 @@ export function AccountStep({ onDone }: { onDone: () => void }) {
       </div>
 
       <div className="mt-8 w-full">
-        <AuthForm mode="register" oauthRedirectPath={AUTH_CONFIG.ONBOARDING_PATH} itemVariants={stepAppear} />
+        <AuthForm mode="register" oauthRedirectPath={AUTH_CONFIG.ONBOARDING_PATH} itemVariants={stepAppear} quietSignUp />
       </div>
     </motion.div>
   );

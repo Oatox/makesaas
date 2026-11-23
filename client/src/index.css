@@ -358,6 +358,38 @@
     animation-name: hero-beam-y;
   }
 
+  /* Landing steps (Features.tsx): one outline around the three steps, with thin glints running
+     along it like the hero beams. The paths use pathLength="1000", so dash lengths and offsets
+     are in thousandths of the whole outline; a 500 period puts two glints on it, half a loop apart.
+     Plain values in the keyframes: a var() there makes Chrome jump instead of interpolating. */
+  .steps-path {
+    fill: none;
+    stroke: hsl(var(--white) / 0.12);
+    stroke-width: 1;
+  }
+  .steps-glint {
+    fill: none;
+    stroke: hsl(var(--pumpkin));
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-dasharray: 45 455;
+    animation: steps-glint 12s linear infinite;
+  }
+  /* Phones: one glint going round each step (Features.tsx), a single one per loop. */
+  .steps-glint-loop {
+    stroke-dasharray: 60 940;
+    animation-duration: 8s;
+  }
+
+}
+
+@keyframes steps-glint {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -1000px;
+  }
 }
 
 @keyframes hero-beam-x {
@@ -382,6 +414,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .hero-beam {
+    display: none;
+  }
+  /* Steps: the path alone, no glint. */
+  .steps-glint {
     display: none;
   }
 }

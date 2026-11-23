@@ -26,18 +26,18 @@ const TOOLS: { name: string; Icon?: IconType }[] = [
 ];
 
 /**
- * Landing strip under the hero: a short caption over the tools (logo and name) scrolling in a loop,
- * faded at both ends. Reuses the testimonials marquee (pauses on hover, plain scroll with reduced motion).
+ * Strip at the bottom of the landing hero: a short caption over the tools (logo and name) scrolling
+ * in a loop, faded at both ends. Reuses the testimonials marquee (pauses on hover, plain scroll with
+ * reduced motion). No padding: the hero places it.
  */
 export function StackMarquee() {
   return (
-    // No bottom padding: the next section (features) brings its own top spacing.
-    <RevealSection aria-label="Outils utilisés" className="px-4 pt-10 md:pt-14">
+    <RevealSection aria-label="Outils utilisés" className="shrink-0">
       <RevealItem>
         <p className="text-center text-sm text-muted-foreground">Construit avec les meilleurs outils</p>
       </RevealItem>
 
-      <RevealItem className="marquee mx-auto mt-6 max-w-3xl [mask-image:linear-gradient(to_right,transparent,#000_18%,#000_82%,transparent)]">
+      <RevealItem className="marquee mx-auto mt-4 max-w-3xl md:mt-5 [mask-image:linear-gradient(to_right,transparent,#000_18%,#000_82%,transparent)]">
         {/* Rendered twice: the track slides by half its width, so the loop is seamless. Spacing as
             padding (not gap) so half the track is exactly one full set of tools. */}
         <ul className="marquee-track flex w-max items-center [--marquee-duration:35s]">

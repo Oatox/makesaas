@@ -1,106 +1,40 @@
 import { buzz } from "./haptics";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, Loader2 } from "lucide-react";
-import { LEGAL } from "@/config/legal";
+import { useEffect, useMemo, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Check, Loader2, Target } from "lucide-react";
 import type { OnboardingAnswers } from "@/lib/onboarding-storage";
-import { EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { COACH_NAME, CoachAvatar } from "@/components/brand/Coach";
 import { ContinueButton } from "./ContinueButton";
-import { dreamWords, euros, fillTemplate, firstName, goalOf, roadmapSteps, timeLabel } from "./insights";
+import { euros, fillTemplate, goalOf, roadmapSteps } from "./insights";
+import { OnboardingDialog, OnboardingDialogHeader } from "./OnboardingDialog";
 import { QuickQuestionDialog } from "./QuickQuestionDialog";
 import { STEP_TITLE_CLASS } from "./StepHeader";
 import type { BuildStep as BuildStepConfig } from "./steps";
 
-type Part = { think: string; done: string; file: string; lines: string[] };
-type Beat = { part: number; kind: "think" } | { part: number; kind: "line"; line: number };
+/** Time spent on each task of the list. */
+const TASK_MS = 2200;
 
-const THINK_MS = 1450;
-const LINE_MS = 230;
-const BLANK_MS = 115;
-
-/** The plan as code, written file by file, built on the answers (nothing is computed: it is a show). */
-function buildParts(answers: OnboardingAnswers): Part[] {
-  const name = firstName(answers);
-  // Accents split off (NFD), then everything that cannot be in a variable name dropped.
-  const slug = name.normalize("NFD").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const id = /^[a-z]/.test(slug) ? slug.slice(0, 16) : "toi";
-  const goal = goalOf(answers);
-  const perMonth = `${euros.format(goal)} par mois`;
-  const dream = dreamWords(answers)[0];
-  const quote = (value: string) => `"${value.replace(/"/g, "'")}"`;
-  const lib = LEGAL.siteName.toLowerCase();
-
+/** What the coach does for the plan, in order (nothing is computed: it is a show). */
+function buildTasks(answers: OnboardingAnswers) {
   return [
-    {
-      think: "Je lis tes réponses",
-      done: "J'ai lu tes réponses",
-      file: `plan-${id}.ts`,
-      lines: [
-        `// Le plan de ${name} : ${perMonth}`,
-        `import { coach } from "${lib}";`,
-        "",
-        `const ${id} = {`,
-        `  temps: ${quote(timeLabel(answers))},`,
-        `  objectif: ${goal},`,
-        ...(dream ? [`  reve: ${quote(dream.charAt(0).toLowerCase() + dream.slice(1))},`] : []),
-        "};",
-      ],
-    },
-    {
-      think: "Je cherche les 3 idées faites pour toi",
-      done: "J'ai choisi tes 3 idées",
-      file: "idees.ts",
-      lines: ["", `const idees = await coach.idees(${id}, { nombre: 3 });`, "// de la plus simple à la plus ambitieuse"],
-    },
-    {
-      think: "J'écris le prompt de ton site",
-      done: "J'ai écrit le prompt de ton site",
-      file: "site.ts",
-      lines: ["", "const site = coach.site(idees[0], {", '  logiciel: "sans code",', '  pages: ["accueil", "paiement"],', "});"],
-    },
-    {
-      think: "Je cherche où trouver tes premiers clients",
-      done: "J'ai trouvé où chercher tes clients",
-      file: "clients.ts",
-      lines: ["", 'const clients = coach.canaux(site, ["TikTok", "Instagram"]);'],
-    },
-    {
-      think: "Je découpe ton objectif en étapes",
-      done: "J'ai découpé ton objectif en étapes",
-      file: "roadmap.ts",
-      lines: ["", "export const roadmap = coach.etapes({", "  depart: 0,", `  arrivee: ${id}.objectif, // ${perMonth}`, "});"],
-    },
+    { doing: "Je lis tes réponses", done: "J'ai lu tes réponses" },
+    { doing: "Je choisis les 3 idées faites pour toi", done: "J'ai choisi tes 3 idées" },
+    { doing: "J'écris le prompt de ton site", done: "J'ai écrit le prompt de ton site" },
+    { doing: "Je cherche où sont tes premiers clients", done: "J'ai trouvé où chercher tes clients" },
+    { doing: `Je découpe tes ${euros.format(goalOf(answers))} par mois en étapes`, done: "Ton objectif est découpé en étapes" },
   ];
 }
 
-const TOKENS = /(\/\/.*$)|("[^"]*")|(\b\d[\d\s]*\b)|\b(const|await|export|import|from)\b|(\b[a-z]+)(?=:)/g;
-const TOKEN_CLASS = ["text-muted-foreground", "text-success", "text-primary", "text-[#c792ea]", "text-[#7cc4ff]"];
-
-/** A line of code with its comments, strings, numbers, keywords and keys colored. */
-function Code({ text }: { text: string }) {
-  const out: React.ReactNode[] = [];
-  const tokens = new RegExp(TOKENS.source, "g");
-  let at = 0;
-  let match: RegExpExecArray | null;
-  while ((match = tokens.exec(text))) {
-    const index = match.index;
-    if (index > at) out.push(text.slice(at, index));
-    const group = match.slice(1).findIndex((g: string | undefined) => g !== undefined);
-    out.push(
-      <span key={index} className={TOKEN_CLASS[group]}>
-        {match[0]}
-      </span>,
-    );
-    at = index + match[0].length;
-  }
-  if (at < text.length) out.push(text.slice(at));
-  return <>{out}</>;
-}
+// Progress ring around the coach's face.
+const RING = { size: 168, stroke: 6 };
+const RADIUS = (RING.size - RING.stroke) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 /**
- * "On construit ton plan": the plan written live like an agent writing code, paused by two quick
- * questions. Once done, the plan sheet slides up with the roadmap and "Voir mon plan".
+ * "On construit ton plan": the coach at work, his face in a ring filling up, and the list of what
+ * he does, task by task, paused by two quick questions. Once done, the plan opens in the same
+ * dialog, with the roadmap and "Voir mon plan".
  */
 export function BuildStep({
   step,
@@ -112,24 +46,13 @@ export function BuildStep({
   onContinue: (quickAnswers: OnboardingAnswers) => void;
 }) {
   const reduceMotion = useReducedMotion();
-  const parts = useMemo(() => buildParts(answers), [answers]);
-  const beats = useMemo<Beat[]>(
-    () => parts.flatMap((p, part) => [{ part, kind: "think" as const }, ...p.lines.map((_, line) => ({ part, kind: "line" as const, line }))]),
-    [parts],
-  );
-  const durationOf = (beat: Beat) => (beat.kind === "think" ? THINK_MS : parts[beat.part].lines[beat.line] ? LINE_MS : BLANK_MS);
-  const starts = useMemo(() => {
-    const out: number[] = [];
-    beats.reduce((at, beat) => (out.push(at), at + durationOf(beat)), 0);
-    return out;
-    // durationOf only reads `parts`.
-  }, [beats, parts]);
-  const total = starts[starts.length - 1] + durationOf(beats[beats.length - 1]);
+  const tasks = useMemo(() => buildTasks(answers), [answers]);
+  const milestones = roadmapSteps(answers);
+  const total = tasks.length * TASK_MS;
 
   const [elapsed, setElapsed] = useState(0);
   const [quick, setQuick] = useState<Record<string, string>>({});
   const [sheet, setSheet] = useState(false);
-  const body = useRef<HTMLDivElement>(null);
 
   const nextQuestion = step.questions.find((q) => !(q.id in quick));
   const limit = (nextQuestion ? nextQuestion.at : 1) * total;
@@ -165,122 +88,120 @@ export function BuildStep({
     return () => window.clearTimeout(timer);
   }, [done]);
 
-  // Index of the beat being written (all of them once done).
-  let current = beats.length;
-  if (!done) for (let i = beats.length - 1; i >= 0; i--) if (starts[i] <= elapsed) { current = i; break; }
-
-  useEffect(() => {
-    body.current?.scrollTo({ top: body.current.scrollHeight, behavior: "smooth" });
-  }, [current]);
-
-  const now = beats[current];
-  const status = done ? "Ton plan est prêt" : now?.kind === "think" ? `${parts[now.part].think}…` : `J'écris ${parts[now?.part ?? 0].file}`;
+  // Task being done, and how far into it.
+  const current = done ? tasks.length : Math.min(tasks.length - 1, Math.floor(elapsed / TASK_MS));
+  const taskProgress = done ? 1 : (elapsed - current * TASK_MS) / TASK_MS;
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="flex items-start justify-between gap-4">
-        <h1 className={STEP_TITLE_CLASS}>{fillTemplate("On construit ton plan, {prenom}.", answers)}</h1>
-        <span className="mt-2 font-display text-lg tabular-nums text-primary" aria-live="polite">
-          {Math.round(progress * 100)} %
-        </span>
+      <h1 className={STEP_TITLE_CLASS}>{fillTemplate("On construit ton plan, {prenom}.", answers)}</h1>
+
+      {/* The coach at work: his face in a ring that fills up, the percentage under it. */}
+      <div className="mt-6 flex flex-col items-center">
+        <div className="relative" style={{ width: RING.size, height: RING.size }}>
+          <svg viewBox={`0 0 ${RING.size} ${RING.size}`} className="absolute inset-0 -rotate-90" aria-hidden>
+            <circle cx={RING.size / 2} cy={RING.size / 2} r={RADIUS} fill="none" stroke="hsl(0 0% 100% / 0.08)" strokeWidth={RING.stroke} />
+            <circle
+              cx={RING.size / 2}
+              cy={RING.size / 2}
+              r={RADIUS}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth={RING.stroke}
+              strokeLinecap="round"
+              strokeDasharray={CIRCUMFERENCE}
+              strokeDashoffset={CIRCUMFERENCE * (1 - progress)}
+            />
+          </svg>
+          <span className="absolute inset-[18px] flex items-center justify-center">
+            {/* Without the photo's own ring: the progress ring is the only one. */}
+            <CoachAvatar className="h-full w-full [&_img]:ring-0" />
+          </span>
+        </div>
+        <p className="mt-4 whitespace-nowrap font-display text-[34px] font-light leading-none tabular-nums" aria-live="polite">
+          {Math.round(progress * 100)}
+          <span className="ml-1 text-xl text-muted-foreground">%</span>
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">{done ? `${COACH_NAME} a fini ton plan` : `${COACH_NAME} prépare ton plan…`}</p>
       </div>
 
-      <div aria-hidden className="card-3d mt-6 overflow-hidden">
-        <div ref={body} className="h-[300px] space-y-3 overflow-y-auto p-4 font-mono text-[12px] leading-relaxed [scrollbar-width:none] md:h-[340px] [&::-webkit-scrollbar]:hidden">
-          {parts.map((part, p) => {
-            const first = beats.findIndex((b) => b.part === p);
-            if (first > current) return null;
-            const nextFirst = beats.findIndex((b) => b.part === p + 1);
-            const partDone = done || (nextFirst !== -1 && current >= nextFirst);
-            const thinking = current === first && !done;
-            const written = beats.slice(0, current + 1).filter((b) => b.part === p && b.kind === "line").length;
-            const lines = part.lines.slice(0, written).filter(Boolean);
-
-            return (
-              <motion.div key={part.file} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-1.5">
-                <p className={cn("flex items-center gap-2", thinking ? "text-foreground" : "text-muted-foreground")}>
-                  <span className={cn("text-primary", thinking && "animate-pulse")}>◆</span>
-                  {thinking ? `${part.think}…` : "Réflexion"}
-                </p>
-                {written > 0 && (
-                  <p className="flex items-center gap-2">
-                    {partDone ? <Check className="h-3.5 w-3.5 text-success" strokeWidth={3} /> : <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
-                    <b className="font-semibold text-foreground">{partDone ? part.done : `J'écris ${part.file}`}</b>
-                    <em className="not-italic text-success">+{lines.length}</em>
-                  </p>
-                )}
-                {lines.length > 0 && (
-                  <div className="rounded-lg border border-border bg-background/60 px-3 py-2">
-                    {lines.slice(-3).map((line, i) => (
-                      <code key={`${i}-${line}`} className="block whitespace-pre-wrap break-all">
-                        <span className="mr-2 text-success">+</span>
-                        <Code text={line.trim()} />
-                      </code>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </div>
-
-        <div className="border-t border-border px-4 py-3">
-          <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-            <div className={cn("h-full rounded-full", done ? "bg-success" : "bg-primary")} style={{ width: `${progress * 100}%` }} />
-          </div>
-          <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-            {done ? <Check className="h-4 w-4 text-success" strokeWidth={3} /> : <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-            {status}
-          </p>
-        </div>
-      </div>
+      {/* What he does, task by task: done ones checked, the current one spinning, the next ones waiting. */}
+      <ol className="card-3d mt-6 space-y-1 p-2">
+        {tasks.map((task, i) => {
+          const state = i < current ? "done" : i === current ? "doing" : "todo";
+          return (
+            <li key={task.done} className={cn("rounded-xl px-3 py-2.5", state === "doing" && "bg-white/[0.04]")}>
+              <div className="flex items-center gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                  {state === "done" ? (
+                    <motion.span
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 420, damping: 18 }}
+                      className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                    >
+                      <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
+                    </motion.span>
+                  ) : state === "doing" ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  ) : (
+                    <span className="h-5 w-5 rounded-full border-2 border-white/15" />
+                  )}
+                </span>
+                <span className={cn("text-[15px] leading-snug", state === "todo" ? "text-muted-foreground/60" : "text-foreground", state === "done" && "text-foreground/80")}>
+                  {state === "done" ? task.done : state === "doing" ? `${task.doing}…` : task.doing}
+                </span>
+              </div>
+              {state === "doing" && (
+                <div className="ml-9 mt-2 h-1 overflow-hidden rounded-full bg-white/[0.08]">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${taskProgress * 100}%` }} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
 
       <QuickQuestionDialog question={pending} onAnswer={(id, value) => setQuick((current) => ({ ...current, [id]: value }))} />
 
-      <AnimatePresence>
-        {sheet && (
-          <motion.div
-            className="fixed inset-0 z-40 flex items-end justify-center bg-background/60 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="onboarding-plan-ready"
-              className="card-3d w-full max-w-[520px] rounded-b-none px-6 pb-8 pt-3"
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              transition={{ duration: 0.45, ease: EASE_OUT }}
-            >
-              <span aria-hidden className="mx-auto block h-1 w-10 rounded-full bg-muted-foreground/30" />
-              <span aria-hidden className="mx-auto mt-5 flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success">
-                <Check className="h-6 w-6" strokeWidth={3} />
-              </span>
-              <h2 id="onboarding-plan-ready" className="mt-4 text-center font-display text-2xl leading-tight">
-                Ton plan personnalisé est prêt.
-              </h2>
-              <p className="mt-1 text-center text-muted-foreground">{fillTemplate("Maintenant, il est temps de passer à l'action, {prenom}.", answers)}</p>
+      {/* The plan is ready, in the same dialog as the quick questions: the roadmap as a timeline
+          (first step done, the goal at the end), then "Voir mon plan". */}
+      <OnboardingDialog open={sheet}>
+        <OnboardingDialogHeader
+          className="text-center"
+          title="Ton plan personnalisé est prêt."
+          description={fillTemplate("Maintenant, il est temps de passer à l'action, {prenom}.", answers)}
+        />
 
-              <ol className="mt-5 space-y-2">
-                {roadmapSteps(answers).map((milestone, i) => (
-                  <li key={milestone.title} className="flex items-center gap-3 rounded-xl border border-border bg-background/40 px-3 py-2.5">
-                    <i className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold not-italic text-primary">{i + 1}</i>
-                    <div className="min-w-0 flex-1">
-                      <b className="block text-sm font-semibold">{milestone.title}</b>
-                      <small className="text-xs text-muted-foreground">{milestone.detail}</small>
-                    </div>
-                    {i === 0 && <Check className="h-4 w-4 text-success" strokeWidth={3} />}
-                  </li>
-                ))}
-              </ol>
+        <ol className="rounded-2xl border border-border/70 bg-background/40 p-4">
+          {milestones.map((milestone, i) => {
+            const first = i === 0;
+            const goal = i === milestones.length - 1;
+            return (
+              <li key={milestone.title} className="relative flex gap-3.5 pb-5 last:pb-0">
+                {/* The line down to the next step: orange from the step already done. */}
+                {!goal && <span aria-hidden className={cn("absolute bottom-0.5 left-[13px] top-[31px] w-0.5 rounded-full", first ? "bg-primary" : "bg-white/10")} />}
+                <span
+                  className={cn(
+                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                    first && "bg-primary text-primary-foreground",
+                    goal && "border-2 border-primary text-primary",
+                    !first && !goal && "border-2 border-white/15 text-muted-foreground",
+                  )}
+                >
+                  {first ? <Check className="h-4 w-4" strokeWidth={3.5} /> : goal ? <Target className="h-3.5 w-3.5" strokeWidth={2.5} /> : i + 1}
+                </span>
+                <div className="min-w-0 pt-0.5">
+                  <b className={cn("block text-[15px] font-semibold leading-tight", goal && "text-primary")}>{milestone.title}</b>
+                  <small className="mt-1 block text-[13px] leading-snug text-muted-foreground">{milestone.detail}</small>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
 
-              <ContinueButton onClick={() => onContinue(quick)} label="Voir mon plan" />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        <ContinueButton onClick={() => onContinue(quick)} label="Voir mon plan" className="pt-1" />
+      </OnboardingDialog>
     </div>
   );
 }

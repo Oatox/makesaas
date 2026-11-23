@@ -5,7 +5,7 @@ import { FAQS } from "./faq";
 
 export const SITE = {
   name: "MakeSaaS",
-  url: "https://makesaas.io",
+  url: "https://makesaas.app",
   locale: "fr_FR",
   ogImage: "/brand/og-image.png",
   logo: "/brand/icon-512.png",
@@ -29,7 +29,7 @@ export const PUBLIC_PAGES: SeoPage[] = [
   {
     path: "/",
     file: "index.html",
-    title: "MakeSaaS · Lance ton SaaS en quelques jours",
+    title: "MakeSaaS · Lance ton business",
     description: SITE.description,
     changefreq: "weekly",
     priority: 1,

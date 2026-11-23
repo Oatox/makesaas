@@ -1,11 +1,11 @@
 import { buzz } from "./haptics";
-import { useEffect, useRef, useState } from "react";
+import { playMessageSound } from "./sounds";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Fingerprint } from "lucide-react";
 import type { OnboardingAnswers } from "@/lib/onboarding-storage";
-import { cn } from "@/lib/utils";
-import { COACH_NAME, CoachAvatar } from "./Coach";
+import { COACH_NAME, CoachAvatar } from "@/components/brand/Coach";
 import { firstName } from "./insights";
 import { STEP_TITLE_CLASS, stepAppear } from "./StepHeader";
 
@@ -16,12 +16,28 @@ const TICKS = Array.from({ length: 72 }, (_, i) => {
 });
 
 /**
+ * The fingerprint as a raised 3D button, same recipe as the buttons (.btn-3d in index.css): lighter
+ * top, light rim, darker edge underneath for the thickness (no glow around it). Held down, it sinks
+ * by most of its edge, like a key.
+ */
+const pressable = (color: string, pressed: boolean): CSSProperties => ({
+  backgroundImage: `linear-gradient(to bottom, color-mix(in oklab, ${color}, white 22%), ${color})`,
+  boxShadow: [
+    "inset 0 1px 0 hsl(0 0% 100% / 0.45)",
+    `inset 0 -3px 0 color-mix(in oklab, ${color}, black 30%)`,
+    `0 ${pressed ? 2 : 6}px 0 color-mix(in oklab, ${color}, black 52%)`,
+  ].join(", "),
+  transform: pressed ? "translateY(4px)" : undefined,
+});
+
+/**
  * "Fais une promesse à toi-même": the coach asks for a promise, signed by holding a finger on the
  * ring (or Space / Enter) for 1.5 s. Once signed, the coach cheers in a notification and the
  * onboarding moves on.
  */
 export function PactStep({ answers, onContinue }: { answers: OnboardingAnswers; onContinue: () => void }) {
   const [hold, setHold] = useState(0);
+  const [pressed, setPressed] = useState(false);
   const [cheer, setCheer] = useState(false);
   const frame = useRef(0);
   const timers = useRef<number[]>([]);
@@ -37,6 +53,7 @@ export function PactStep({ answers, onContinue }: { answers: OnboardingAnswers; 
 
   const start = () => {
     if (signed) return;
+    setPressed(true);
     cancelAnimationFrame(frame.current);
     const from = performance.now() - HOLD_MS * hold;
     const tick = () => {
@@ -47,7 +64,14 @@ export function PactStep({ answers, onContinue }: { answers: OnboardingAnswers; 
         return;
       }
       buzz(30);
-      timers.current.push(window.setTimeout(() => setCheer(true), 450), window.setTimeout(onContinue, 2050));
+      setPressed(false);
+      timers.current.push(
+        window.setTimeout(() => {
+          setCheer(true);
+          playMessageSound();
+        }, 450),
+        window.setTimeout(onContinue, 2050),
+      );
     };
     frame.current = requestAnimationFrame(tick);
   };
@@ -55,6 +79,7 @@ export function PactStep({ answers, onContinue }: { answers: OnboardingAnswers; 
   // Letting go before the end starts over.
   const stop = () => {
     cancelAnimationFrame(frame.current);
+    setPressed(false);
     if (!signed) setHold(0);
   };
 
@@ -99,7 +124,7 @@ export function PactStep({ answers, onContinue }: { answers: OnboardingAnswers; 
           onKeyUp={stop}
           onContextMenu={(event) => event.preventDefault()}
           aria-label="Maintiens pour signer"
-          className="relative h-48 w-48 touch-none select-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          className="relative h-48 w-48 cursor-pointer touch-none select-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           data-testid="button-onboarding-sign"
         >
           <svg viewBox="0 0 200 200" className="absolute inset-0" aria-hidden>
@@ -117,12 +142,16 @@ export function PactStep({ answers, onContinue }: { answers: OnboardingAnswers; 
             ))}
           </svg>
           <span
-            className={cn(
-              "absolute inset-8 flex items-center justify-center rounded-full border transition-colors duration-300",
-              signed ? "border-success/40 bg-success/15 text-success" : "border-primary/30 bg-primary/10 text-primary",
-            )}
+            className="absolute inset-8 flex items-center justify-center overflow-hidden rounded-full text-white transition-[transform,box-shadow,background-image] duration-150 hover:brightness-110"
+            style={pressable(signed ? "hsl(var(--success))" : "hsl(var(--primary))", pressed && !signed)}
           >
-            {signed ? <Check className="h-9 w-9" strokeWidth={2.5} /> : <Fingerprint className="h-14 w-14" strokeWidth={1.3} />}
+            {/* Gloss on the upper half. */}
+            <span aria-hidden className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent" />
+            {signed ? (
+              <Check className="relative h-11 w-11 drop-shadow-[0_1px_1px_rgb(0_0_0/0.25)]" strokeWidth={2.75} />
+            ) : (
+              <Fingerprint className="relative h-14 w-14 drop-shadow-[0_1px_1px_rgb(0_0_0/0.25)]" strokeWidth={1.75} />
+            )}
           </span>
         </button>
         <p className="mt-3 text-center">

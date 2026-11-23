@@ -32,9 +32,10 @@ export function CurveStep({ answers, onContinue }: { answers: OnboardingAnswers;
       <motion.div variants={stepAppear} className="card-3d mt-6 p-4">
         <svg viewBox="0 0 320 200" className="w-full" aria-hidden>
           <defs>
+            {/* Orange all the way, brighter as it climbs. */}
             <linearGradient id="curve-plan" x1="0" x2="1">
-              <stop offset="0" stopColor="hsl(var(--primary))" />
-              <stop offset="1" stopColor="hsl(var(--success))" />
+              <stop offset="0" stopColor="hsl(var(--primary) / 0.6)" />
+              <stop offset="1" stopColor="hsl(var(--primary))" />
             </linearGradient>
           </defs>
           {[50, 100, 150].map((y) => (
@@ -81,7 +82,7 @@ export function CurveStep({ answers, onContinue }: { answers: OnboardingAnswers;
             cx="300"
             cy="30"
             r="5"
-            fill="hsl(var(--success))"
+            fill="hsl(var(--primary))"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 2.6, type: "spring", stiffness: 400, damping: 14 }}
@@ -95,7 +96,7 @@ export function CurveStep({ answers, onContinue }: { answers: OnboardingAnswers;
 
         <div className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <i className="h-2 w-2 rounded-full bg-success" />
+            <i className="h-2 w-2 rounded-full bg-primary" />
             Avec {LEGAL.siteName}
           </span>
           <span className="flex items-center gap-1.5">

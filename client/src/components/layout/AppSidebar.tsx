@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
 import { useHistoryState } from "wouter/use-browser-location";
@@ -8,6 +8,7 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -16,13 +17,14 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
-  LayoutDashboard,
+  House,
   ShieldCheck,
   Users,
   LogOut,
   ChevronRight,
   Settings as SettingsIcon,
   Workflow,
+  Megaphone,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -32,9 +34,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
-import { SaasSwitcher } from "./SaasSwitcher";
+import { Logo } from "@/components/brand/Logo";
 
 type NavItem = { href: string; label: string; icon: LucideIcon; matchPrefix?: boolean };
 type NavGroup = { label: string; items: NavItem[]; adminOnly?: boolean };
@@ -44,7 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Application",
     items: [
-      { href: "/app", label: "Tableau de bord", icon: LayoutDashboard, matchPrefix: true },
+      { href: "/app", label: "Accueil", icon: House, matchPrefix: true },
     ],
   },
   {
@@ -54,45 +55,31 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/admin", label: "Aperçu Admin", icon: ShieldCheck },
       { href: "/admin/users", label: "Utilisateurs", icon: Users, matchPrefix: true },
       { href: "/admin/pipeline", label: "Pipeline", icon: Workflow },
+      { href: "/admin/marketing", label: "Marketing", icon: Megaphone, matchPrefix: true },
     ],
   },
 ];
 
-// Raised blocks grouping the links, as in dropposting; the active link gets an orange tint.
-const navBlockSurfaceClass =
-  "rounded-lg border border-white/[0.09] bg-gradient-to-b from-[#252525] to-[#1e1e1e] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.09),0_4px_14px_-10px_rgba(0,0,0,0.35)]";
-
+// Links listed flat under their category label: muted at rest, a light wash on hover. The active one
+// gets a soft fill with a thin border and a top highlight, white text and an orange icon. Collapsed to
+// icons, each link is a 40px square with the same active style. Tailwind 3 applies stacked variants
+// right to left:
+// [&>svg]:hover: styles the icon when the link is hovered.
 const navLinkClass =
-  "rounded-md border border-transparent bg-transparent text-sidebar-foreground shadow-none transition-[background,border-color,box-shadow] " +
-  "hover:border-transparent hover:bg-white/[0.055] hover:shadow-none " +
-  "data-[active=true]:border-primary/35 data-[active=true]:bg-gradient-to-b data-[active=true]:from-primary/[0.22] data-[active=true]:to-primary/[0.08] " +
-  "data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground data-[active=true]:[&_svg]:text-primary " +
-  "data-[active=true]:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.10),0_6px_16px_-10px_hsl(var(--primary)/0.35)] " +
-  "hover:data-[active=true]:border-primary/45 hover:data-[active=true]:bg-transparent";
-
-const blockLabelClass = "mb-1.5 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
-
-function NavBlock({ label, isCollapsed, children }: { label?: string; isCollapsed: boolean; children: ReactNode }) {
-  return (
-    <div className={cn(navBlockSurfaceClass, isCollapsed ? "p-1" : "p-1.5")}>
-      {label && !isCollapsed && <p className={blockLabelClass}>{label}</p>}
-      <SidebarMenu className="gap-1">{children}</SidebarMenu>
-    </div>
-  );
-}
+  "h-11 gap-3 rounded-[10px] border border-transparent px-3 text-[15px] font-medium text-sidebar-foreground/65 transition-colors duration-150 " +
+  "[&>svg]:size-5 [&>svg]:text-sidebar-foreground/45 [&>svg]:transition-colors " +
+  "hover:bg-white/[0.045] hover:text-sidebar-foreground [&>svg]:hover:text-sidebar-foreground/80 " +
+  "data-[active=true]:border-white/[0.09] data-[active=true]:bg-white/[0.07] data-[active=true]:font-medium data-[active=true]:text-sidebar-foreground " +
+  "data-[active=true]:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] [&>svg]:data-[active=true]:text-primary hover:data-[active=true]:bg-white/[0.07] " +
+  "group-data-[collapsible=icon]:!h-10 group-data-[collapsible=icon]:!w-10 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center";
 
 function NavLink({ item, active, isCollapsed }: { item: NavItem; active: boolean; isCollapsed: boolean }) {
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        isActive={active}
-        tooltip={item.label}
-        className={cn(navLinkClass, isCollapsed ? "min-h-9 justify-center px-0" : "min-h-9 px-2 py-1.5")}
-      >
-        <Link href={item.href} className={cn("flex w-full items-center gap-2", isCollapsed && "justify-center")}>
-          <item.icon className="shrink-0" />
-          {!isCollapsed && <span className="truncate">{item.label}</span>}
+      <SidebarMenuButton asChild isActive={active} tooltip={item.label} className={navLinkClass}>
+        <Link href={item.href}>
+          <item.icon />
+          {!isCollapsed && <span>{item.label}</span>}
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -140,20 +127,30 @@ export function AppSidebar() {
 
   return (
     <Sidebar variant="inset" collapsible="icon">
-      <SidebarHeader className="flex min-h-16 items-center justify-center overflow-visible px-2 py-2 transition-[width,height] ease-linear group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:py-0">
-        <SaasSwitcher isCollapsed={isCollapsed} />
+      <SidebarHeader className="h-16 flex items-center justify-center overflow-hidden transition-[width,height] ease-linear group-data-[collapsible=icon]:h-12">
+        <Link href="/app" aria-label="MakeSaaS" className="flex h-full w-full items-center justify-center px-2 pt-1 text-sidebar-foreground">
+          {isCollapsed ? (
+            <Logo variant="mark" className="h-7 w-7" />
+          ) : (
+            <Logo className="h-5 animate-in fade-in duration-300" />
+          )}
+        </Link>
       </SidebarHeader>
 
       <SidebarContent>
-        {NAV_GROUPS.filter((group) => !group.adminOnly || isAdmin).map((group, index) => (
-          // The first group sits at the top, the following ones (administration) at the bottom.
-          <SidebarGroup key={group.label} className={index > 0 ? "mt-auto" : undefined}>
+        {/* One category per group, stacked from the top: a small label (hidden when the sidebar is
+            collapsed to icons), then its links. */}
+        {NAV_GROUPS.filter((group) => !group.adminOnly || isAdmin).map((group) => (
+          <SidebarGroup key={group.label} className="py-1">
+            <SidebarGroupLabel className="text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground/60">
+              {group.label}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
-              <NavBlock label={index > 0 ? group.label : undefined} isCollapsed={isCollapsed}>
+              <SidebarMenu className="gap-1">
                 {group.items.map((item) => (
                   <NavLink key={item.href} item={item} active={isActive(item)} isCollapsed={isCollapsed} />
                 ))}
-              </NavBlock>
+              </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         ))}

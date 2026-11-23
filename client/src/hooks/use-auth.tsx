@@ -15,8 +15,6 @@ export type AuthProfile = {
   full_name: string | null;
   avatar_url: string | null;
   role: "user" | "admin";
-  /** Active SaaS (null: fall back to the oldest one, see useSaas). */
-  current_saas_id: string | null;
   /** Row of public.subscriptions (null: never subscribed). Access is read with grantsAccess(status). */
   subscription: SubscriptionSummary | null;
 };
@@ -26,7 +24,7 @@ export const profileKeys = {
 };
 
 // The subscription is embedded (subscriptions.user_id references profiles.id, one row per user).
-const PROFILE_COLUMNS = `id, email, full_name, avatar_url, role, current_saas_id, subscription:subscriptions(${SUBSCRIPTION_SUMMARY_COLUMNS})`;
+const PROFILE_COLUMNS = `id, email, full_name, avatar_url, role, subscription:subscriptions(${SUBSCRIPTION_SUMMARY_COLUMNS})`;
 
 type AuthContextType = {
   session: Session | null;
@@ -115,7 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           full_name: null,
           avatar_url: null,
           role: "user",
-          current_saas_id: null,
           subscription: null,
         }
       );

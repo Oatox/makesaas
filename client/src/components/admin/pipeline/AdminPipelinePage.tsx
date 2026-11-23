@@ -80,7 +80,7 @@ function PipelineLoader({ config }: { config: PipelineConfig }) {
         message={
           <>
             La table <code>ai_pipelines</code> n'existe pas encore ou ne contient pas le pipeline « {config.slug} ». Exécutez la
-            section 14 de <code>supabase_setup.sql</code>.
+            section 7 de <code>supabase_setup.sql</code>.
           </>
         }
         className="p-6"

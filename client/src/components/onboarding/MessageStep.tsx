@@ -1,53 +1,73 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { ContinueButton } from "./ContinueButton";
+import { IconTile } from "./IconTile";
+import { MESSAGE_VISUALS } from "./MessageVisuals";
 import { RichText } from "./RichText";
 import { STEP_TITLE_CLASS, stepAppear } from "./StepHeader";
+import { TypewriterText } from "./TypewriterText";
 import type { MessageStep as MessageStepConfig } from "./steps";
 
-/** Explainer screen (what a SaaS is, the market, the model, the timing): illustration, kicker, title, text. */
+const iconPop = {
+  hidden: { opacity: 0, scale: 0.7, rotate: -8 },
+  visible: { opacity: 1, scale: 1, rotate: 0, transition: { type: "spring", stiffness: 260, damping: 18 } },
+};
+
+/**
+ * Explainer screen (the market, the model, the timing), centered: the kicker, the title typed out,
+ * then, once it is typed, the illustration and the text. A screen without illustration has its icon
+ * above the kicker instead, and sits in the middle of the page.
+ */
 export function MessageStep({ step, onContinue }: { step: MessageStepConfig; onContinue: () => void }) {
+  const Visual = step.visual && MESSAGE_VISUALS[step.visual];
+  const Icon = !Visual && step.icon;
+  const [typed, setTyped] = useState(false);
+  // Own animate on what follows the title: it waits for the typing instead of the step's stagger.
+  const afterTyping = { variants: stepAppear, initial: "hidden", animate: typed ? "visible" : "hidden" } as const;
+
   return (
     <motion.div
-      className="flex flex-1 flex-col"
+      className="flex flex-1 flex-col text-center"
       initial="hidden"
       animate="visible"
       variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
     >
-      <div className="flex flex-1 flex-col items-center justify-center text-center">
-        <motion.span
-          variants={{
-            hidden: { opacity: 0, scale: 0.7, rotate: -8 },
-            visible: { opacity: 1, scale: 1, rotate: 0, transition: { type: "spring", stiffness: 260, damping: 18 } },
-          }}
-          aria-hidden
-          className="flex h-24 w-24 items-center justify-center rounded-[28px] border border-primary/30 bg-primary/10 text-primary shadow-[0_0_48px_-8px_hsl(var(--primary)/0.55)] md:h-28 md:w-28"
-        >
-          <step.icon className="h-11 w-11 md:h-12 md:w-12" strokeWidth={1.6} />
-        </motion.span>
+      <div className={cn("flex flex-col", !Visual && "flex-1 justify-center")}>
+        {Icon && (
+          <motion.span variants={iconPop} className="mx-auto mb-9">
+            <IconTile icon={Icon} />
+          </motion.span>
+        )}
 
-        <motion.p variants={stepAppear} className="mt-8 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+        <motion.p variants={stepAppear} className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
           {step.kicker}
         </motion.p>
-        <motion.h1 variants={stepAppear} className={`${STEP_TITLE_CLASS} mt-2 max-w-[560px] text-balance`}>
-          {step.title}
-        </motion.h1>
+        <h1 className={cn(STEP_TITLE_CLASS, "mx-auto mt-2 max-w-[560px] text-balance")}>
+          <TypewriterText text={step.title} startDelayMs={350} onDone={() => setTyped(true)} />
+        </h1>
+
+        {Visual && (
+          <motion.div {...afterTyping} className="card-3d mt-6 p-5 text-left">
+            {/* Mounted once the title is typed, so its animation plays in view. */}
+            {typed && <Visual />}
+          </motion.div>
+        )}
 
         {step.body && (
-          <motion.p variants={stepAppear} className="mt-4 max-w-[460px] text-lg leading-relaxed text-muted-foreground">
+          <motion.p {...afterTyping} className="mx-auto mt-5 max-w-[480px] text-base leading-relaxed text-muted-foreground md:text-lg">
             <RichText text={step.body} />
           </motion.p>
         )}
 
         {step.points && (
-          <motion.ul variants={stepAppear} className="card-3d mt-6 w-full max-w-[420px] space-y-3 p-5 text-left">
-            {step.points.map((point) => (
-              <li key={point} className="flex items-start gap-3 text-base text-muted-foreground">
-                <span aria-hidden className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                  <Check className="h-3 w-3" strokeWidth={3} />
-                </span>
+          // Two per row.
+          <motion.ul {...afterTyping} className="mt-6 grid grid-cols-2 gap-x-5 gap-y-4 text-left sm:gap-x-8">
+            {step.points.map(({ icon: PointIcon, text }) => (
+              <li key={text} className="flex items-start gap-2.5 text-sm leading-snug text-muted-foreground md:text-base">
+                <PointIcon aria-hidden className="h-5 w-5 shrink-0 text-primary" strokeWidth={2} />
                 <span>
-                  <RichText text={point} />
+                  <RichText text={text} />
                 </span>
               </li>
             ))}

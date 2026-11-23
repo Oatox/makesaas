@@ -1,55 +1,31 @@
-import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { motion } from "framer-motion";
+import { Handshake, Target } from "lucide-react";
 import type { OnboardingAnswers } from "@/lib/onboarding-storage";
-import { cn } from "@/lib/utils";
+import { EASE_OUT } from "@/lib/motion";
 import { ContinueButton } from "./ContinueButton";
 import { euros, firstName, projection } from "./insights";
 import { STEP_TITLE_CLASS, stepAppear } from "./StepHeader";
 
-/** 950 → "950 €", 6 300 → "6,3 k€", 13 000 → "13 k€". */
-function short(value: number, unit = true) {
-  if (value < 1000) return unit ? euros.format(value) : String(value);
-  const thousands = value / 1000;
-  const text = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: thousands < 10 ? 1 : 0 }).format(thousands);
-  return unit ? `${text} k€` : text;
+/** Where the goal sits against the estimate, said plainly and short (one line). */
+function verdict(goal: number, low: number, high: number) {
+  const target = euros.format(goal);
+  if (goal < low) return `Au-dessus de ton objectif de ${target}`;
+  if (goal > high) return `Un premier cap vers ${target}`;
+  return `Objectif de ${target} atteignable`;
 }
 
-const range = (low: number, high: number) => (high < 1000 ? `${euros.format(low)} – ${euros.format(high)}` : `${short(low, false)}–${short(high, false)} k€`);
-
-/** Row that unfolds its explanation. */
-function Unfold({ open, onToggle, head, children }: { open: boolean; onToggle: () => void; head: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <li>
-      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3 py-3 text-left text-sm">
-        {head}
-        <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
-      </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.p
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden pb-3 text-sm leading-relaxed text-muted-foreground"
-          >
-            {children}
-          </motion.p>
-        )}
-      </AnimatePresence>
-    </li>
-  );
-}
-
-/** "Voici ce que tu pourrais générer chaque mois": an indicative monthly range, split by revenue source. */
+/**
+ * "Voici ce que tu pourrais gagner chaque mois": an indicative monthly range with the goal on a
+ * single gauge, then what the app is worth one day.
+ */
 export function ProjectionStep({ answers, onContinue }: { answers: OnboardingAnswers; onContinue: () => void }) {
-  const { goal, low, high, sources, resale } = projection(answers);
-  const [open, setOpen] = useState<string | null>(null);
-  const toggle = (key: string) => setOpen(open === key ? null : key);
+  const { goal, low, high, resale } = projection(answers);
 
-  const scaleMax = 1000 * Math.ceil((1.3 * Math.max(high, goal)) / 1000);
-  const at = (value: number) => `${Math.min(100, (value / scaleMax) * 100)}%`;
-  const highTotal = sources.reduce((sum, s) => sum + s.high, 0);
+  // Gauge from 0 to a bit beyond the range or the goal, whichever is higher.
+  const scaleMax = 1000 * Math.ceil((1.25 * Math.max(high, goal)) / 1000);
+  const at = (value: number) => Math.min(100, (value / scaleMax) * 100);
+  // The goal's label stays inside the card near the ends.
+  const goalLabelAlign = at(goal) < 18 ? "left-0" : at(goal) > 82 ? "right-0" : "left-1/2 -translate-x-1/2";
 
   return (
     <motion.div
@@ -59,87 +35,49 @@ export function ProjectionStep({ answers, onContinue }: { answers: OnboardingAns
       variants={{ visible: { transition: { staggerChildren: 0.12 } } }}
     >
       <motion.h1 variants={stepAppear} className={STEP_TITLE_CLASS}>
-        Voici ce que tu pourrais générer chaque mois.
+        Voici ce que tu pourrais gagner chaque mois.
       </motion.h1>
 
       <motion.section variants={stepAppear} className="card-3d mt-6 p-5">
         <p className="text-sm text-muted-foreground">Estimation pour {firstName(answers)}</p>
-        <p className="mt-1 font-display text-[34px] leading-tight tracking-[-0.02em] md:text-[40px]">
-          {short(low)} <span className="text-muted-foreground">–</span> {short(high)}
-          <small className="ml-2 font-sans text-base text-muted-foreground">par mois</small>
+        <p className="mt-1 whitespace-nowrap font-display text-[26px] font-light leading-tight sm:text-[32px]">
+          {euros.format(low)} <span className="text-muted-foreground">–</span> {euros.format(high)}
+        </p>
+        <p className="text-sm text-muted-foreground">par mois</p>
+
+        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[13px] font-medium text-primary">
+          <Target className="h-3.5 w-3.5" strokeWidth={2.5} />
+          {verdict(goal, low, high)}
         </p>
 
-        {/* Scale from 0: the estimated band, and the goal on it. */}
-        <div aria-hidden className="relative mt-8 h-2 rounded-full bg-secondary">
-          <motion.i
-            className="absolute inset-y-0 rounded-full bg-gradient-to-r from-primary/70 to-success"
-            style={{ left: at(low) }}
-            initial={{ width: 0 }}
-            animate={{ width: `calc(${at(high)} - ${at(low)})` }}
-            transition={{ delay: 0.8, duration: 0.8 }}
-          />
-          <span className="absolute -top-2 h-6 w-0.5 bg-foreground" style={{ left: at(goal) }}>
-            <em className="absolute bottom-full left-1/2 mb-1 -translate-x-1/2 whitespace-nowrap text-xs not-italic text-muted-foreground">
-              Ton objectif · {short(goal)}
-            </em>
+        {/* One gauge from 0: the estimate in orange, the goal as a mark with its label under it. */}
+        <div aria-hidden className="relative mb-6 mt-4">
+          <div className="relative h-2.5 rounded-full bg-white/[0.07]">
+            <motion.div
+              className="absolute inset-y-0 rounded-full bg-primary"
+              style={{ left: `${at(low)}%` }}
+              initial={{ width: 0 }}
+              animate={{ width: `${at(high) - at(low)}%` }}
+              transition={{ delay: 0.6, duration: 0.8, ease: EASE_OUT }}
+            />
+            <span className="absolute -top-1.5 h-[22px] w-[3px] -translate-x-1/2 rounded-full bg-foreground" style={{ left: `${at(goal)}%` }} />
+          </div>
+          <span className="absolute top-full mt-2 whitespace-nowrap text-xs text-muted-foreground" style={{ left: `${at(goal)}%` }}>
+            <span className={`absolute top-0 ${goalLabelAlign}`}>Ton objectif</span>
           </span>
         </div>
-        <div aria-hidden className="mt-2 flex justify-between text-xs text-muted-foreground">
-          <span>0</span>
-          <span>{short(scaleMax)}</span>
-        </div>
 
-        {/* Split of the estimate between the revenue sources. */}
-        <div aria-hidden className="mt-5 flex h-2 gap-1 overflow-hidden rounded-full">
-          {sources.map((source, i) => (
-            <motion.i
-              key={source.label}
-              style={{ flexGrow: source.high / highTotal, background: source.color }}
-              initial={{ opacity: 0, scaleX: 0 }}
-              animate={{ opacity: 1, scaleX: 1 }}
-              transition={{ delay: 1.2 + 0.12 * i, duration: 0.4 }}
-              className="origin-left"
-            />
-          ))}
-        </div>
-
-        <ul className="mt-2 divide-y divide-border">
-          {sources.map((source) => (
-            <Unfold
-              key={source.label}
-              open={open === source.label}
-              onToggle={() => toggle(source.label)}
-              head={
-                <>
-                  <i aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: source.color }} />
-                  <span className="flex-1">{source.label}</span>
-                  <b className="font-semibold">{range(source.low, source.high)}</b>
-                </>
-              }
-            >
-              {source.detail}
-            </Unfold>
-          ))}
-        </ul>
       </motion.section>
 
-      <motion.ul variants={stepAppear} className="card-3d mt-3 px-5">
-        <Unfold
-          open={open === "resale"}
-          onToggle={() => toggle("resale")}
-          head={
-            <>
-              <span className="flex-1">Et si tu le revends un jour</span>
-              <b className="font-semibold text-primary">en une fois</b>
-            </>
-          }
-        >
-          {resale}
-        </Unfold>
-      </motion.ul>
-
       <motion.p variants={stepAppear} className="mt-3 text-center text-xs text-muted-foreground">
-        Estimation indicative à partir de ton profil et de ton objectif. Tes résultats dépendent de ton travail et de ton marché.
+        Estimation indicative, selon ton travail et ton marché.
+      </motion.p>
+
+      <motion.p variants={stepAppear} className="mt-4 flex items-start gap-2.5 text-[13px] leading-relaxed text-muted-foreground">
+        <Handshake className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={2} />
+        <span>
+          <b className="font-semibold text-foreground">Et plus tard ?</b> {resale}
+        </span>
       </motion.p>
 
       <ContinueButton onClick={onContinue} variants={stepAppear} label="Débloquer mon plan" />

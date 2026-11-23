@@ -1,8 +1,10 @@
 User-agent: *
 Allow: /
 Disallow: /app
+Disallow: /abonnement
 Disallow: /settings
 Disallow: /admin
 Disallow: /api/
+Disallow: /tools/
 
-Sitemap: https://makesaas.io/sitemap.xml
+Sitemap: https://makesaas.app/sitemap.xml

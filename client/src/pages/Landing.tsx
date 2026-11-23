@@ -1,15 +1,12 @@
 import * as React from "react";
 import { Link } from "wouter";
 import { Logo } from "@/components/brand/Logo";
-import { FAQS } from "@/config/faq";
 import { Button } from "@/components/ui/button";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { motion } from "framer-motion";
+import { Faq } from "@/components/landing/Faq";
 import { Features } from "@/components/landing/Features";
-import { Testimonials } from "@/components/landing/Testimonials";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingCta } from "@/components/landing/LandingCta";
-import { HeroVideo } from "@/components/landing/HeroVideo";
 import { StackMarquee } from "@/components/landing/StackMarquee";
 import { RevealItem, RevealSection } from "@/components/landing/SectionReveal";
 import { useAuth } from "@/hooks/use-auth";
@@ -55,8 +52,12 @@ function Header() {
 const blurIn = blurInVariants({ duration: 0.8 });
 
 // Value promise: two parallel sentences, the second in a dimmer white. If you change them, update
-// the divisor of the h1 size (see the comment on the h1).
+// the divisors of the h1 size (see the comment on the h1).
 const HERO_TITLE = ["Lance ton business.", "Trouve tes premiers clients."];
+// The promise, picked out of the second sentence in the brand orange (must appear in HERO_TITLE[1]).
+const HERO_HIGHLIGHT = "premiers clients";
+// Pill above the title.
+const HERO_BADGE = "Avec ou sans idée";
 
 // Light beams sliding along the grid: `line` is a row (from the top) for "x", a column (from the
 // center) for "y". Staggered so one or two are in flight at a time.
@@ -89,20 +90,32 @@ function HeroBackdrop() {
 
 function Hero() {
   return (
-    // Exactly one screen tall (down to a minimum for very short screens): the text, then the sales
-    // video. The next section starts below the fold.
-    <section id="hero" className="relative isolate flex h-[100svh] min-h-[620px] flex-col px-4 pt-28 md:pt-32">
+    // Exactly one screen tall (down to a minimum for very short screens): the text centered between
+    // the navbar (76px, in the top padding) and the tools strip pinned at the bottom. The next section
+    // starts below the fold.
+    <section id="hero" className="relative isolate flex h-[100svh] min-h-[580px] flex-col px-4 pb-8 pt-24 md:pb-10">
       <motion.div
         initial="hidden"
         animate="visible"
         transition={{ staggerChildren: 0.08 }}
-        className="relative mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col justify-center md:justify-start"
+        className="relative mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col justify-center"
       >
         <div className="flex w-full flex-col items-center gap-6 text-center [container-type:inline-size]">
-          {/* One line per sentence at every width: the size follows the width of this column (cqw, so the
-              scrollbar never counts) so the longest line ("Trouve tes premiers clients.", about 14.3 times
-              the font size wide in Unbounded Light) fits, with a little margin. */}
-          <h1 className="landing-title whitespace-nowrap font-display text-[length:clamp(16px,calc(100cqw/14.7),76px)]">
+          {/* Pill above the title: a glowing green dot, then the reassurance. */}
+          <motion.p
+            variants={blurIn}
+            className="-mb-1 inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-3.5 py-1.5 text-sm text-foreground/85 backdrop-blur-sm md:-mb-2"
+          >
+            <span aria-hidden className="h-2 w-2 rounded-full bg-success shadow-[0_0_8px_1px_hsl(var(--success)/0.7)]" />
+            {HERO_BADGE}
+          </motion.p>
+
+          {/* The size follows the width of this column (cqw, so the scrollbar never counts), with a
+              little margin (widths in Unbounded Light, in times the font size):
+              - from sm, one line per sentence: "Trouve tes premiers clients." (14.3) fits;
+              - on phones that would be too small, so the second sentence wraps before "premiers
+                clients." (kept together, 8.6) and the size is set by "Lance ton business." (10.5). */}
+          <h1 className="landing-title font-display text-[length:clamp(16px,calc(100cqw/10.9),44px)] sm:whitespace-nowrap sm:text-[length:clamp(16px,calc(100cqw/14.7),76px)]">
             {/* First line appears word by word */}
             <span className="block text-balance">
               {HERO_TITLE[0].split(" ").map((word, i, words) => (
@@ -112,34 +125,34 @@ function Hero() {
                 </motion.span>
               ))}
             </span>
-            {/* Second line in a slightly dimmer white */}
+            {/* Second line in a slightly dimmer white, its promise in orange: lighter at the top,
+                with a soft glow around the letters (a filter, so it follows the clipped gradient). */}
             <motion.span variants={blurIn} className="block text-balance text-foreground/70">
-              {HERO_TITLE[1]}
+              {HERO_TITLE[1].split(HERO_HIGHLIGHT)[0]}
+              {/* Never split: on phones the promise gets a line of its own. */}
+              <span className="whitespace-nowrap">
+                <span className="bg-gradient-to-b from-[hsl(30_100%_72%)] to-primary bg-clip-text text-transparent [filter:drop-shadow(0_0_0.35em_hsl(var(--primary)/0.35))]">
+                  {HERO_HIGHLIGHT}
+                </span>
+                {HERO_TITLE[1].split(HERO_HIGHLIGHT)[1]}
+              </span>
             </motion.span>
           </h1>
 
-          {/* Smaller on phones, where the one-line-per-sentence title is small too, so the title still leads */}
+          {/* What the member gets, its three parts in white so the line reads at a glance. Small on
+              phones, so the title leads. */}
           <motion.p variants={blurIn} className="max-w-xl text-balance text-[15px] leading-relaxed text-muted-foreground sm:text-lg md:text-xl lg:max-w-2xl lg:text-[22px]">
-            Un plan simple. Avec un coach à chaque étape.
+            Une <span className="text-foreground">idée faite pour toi</span>, un <span className="text-foreground">plan clair jour après jour</span> et
+            un <span className="text-foreground">coach à chaque étape</span>, de ton site à tes premiers clients.
           </motion.p>
 
           <motion.div variants={blurIn} className="pt-2">
             <LandingCta size="lg" />
           </motion.div>
         </div>
-
-        {/* Phones: the video takes the full width, and text and video are centered together in the screen.
-            From md: a stage filling the rest of the screen, as a size container (cqw / cqh are its width
-            / height); the video is as large as fits: the stage width, 768px, or 86% of the stage height,
-            whichever is smallest. */}
-        <div className="relative mt-8 min-h-0 md:mt-10 md:flex-1 md:[container-type:size]">
-          <motion.div variants={blurIn} className="relative z-10 mx-auto w-full md:w-[min(100cqw,768px,calc(86cqh*16/9))]">
-            {/* Warm glow behind the video */}
-            <div aria-hidden className="absolute inset-x-[10%] inset-y-[15%] -z-10 rounded-full bg-primary/25 blur-[90px]" />
-            <HeroVideo />
-          </motion.div>
-        </div>
       </motion.div>
+
+      <StackMarquee />
     </section>
   );
 }
@@ -153,36 +166,9 @@ export default function Landing() {
 
       <Hero />
 
-      <StackMarquee />
-
       <Features />
 
-      <Testimonials />
-
-      {/* FAQ Section */}
-      <RevealSection id="faq" className="py-24 md:py-32 px-4">
-        <div className="max-w-3xl mx-auto">
-          <RevealItem className="text-center mb-16 space-y-4">
-            <h2 className="landing-title font-display text-[32px] md:text-[48px]">Questions fréquentes</h2>
-            <p className="text-muted-foreground">Tout ce qu'il faut savoir avant de commencer.</p>
-          </RevealItem>
-
-          <Accordion type="single" collapsible className="w-full space-y-4">
-            {FAQS.map((item, i) => (
-              <RevealItem key={i}>
-              <AccordionItem value={`item-${i}`} className="border rounded-xl px-6 bg-card shadow-sm">
-                <AccordionTrigger className="font-display font-normal text-lg py-6 hover:text-primary transition-colors">
-                  {item.q}
-                </AccordionTrigger>
-                <AccordionContent className="text-muted-foreground pb-6 leading-relaxed">
-                  {item.a}
-                </AccordionContent>
-              </AccordionItem>
-              </RevealItem>
-            ))}
-          </Accordion>
-        </div>
-      </RevealSection>
+      <Faq />
 
       <LandingFooter />
       </main>

@@ -4,8 +4,6 @@ import { motion } from "framer-motion";
 import { Loader2, Sparkles } from "lucide-react";
 import { AI_INPUT_MAX_LENGTH, aiApi, type AiExampleResult } from "@shared/ai-pipeline";
 import { useAuth } from "@/hooks/use-auth";
-import { useSaas } from "@/hooks/use-saas";
-import { getSaasIcon } from "@/components/layout/saas-icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/api-client";
@@ -71,9 +69,7 @@ function AiExampleCard() {
 /** Home of the app once subscribed: the place to build the product itself. */
 export default function Dashboard() {
   const { profile, user } = useAuth();
-  const { currentSaas } = useSaas();
   const firstName = (profile?.full_name || user?.user_metadata?.full_name || "").split(" ")[0];
-  const SaasIcon = getSaasIcon(currentSaas?.icon);
 
   return (
     <motion.div
@@ -84,18 +80,9 @@ export default function Dashboard() {
     >
       <motion.section variants={fadeIn} className="card-3d space-y-3 p-5 sm:p-6">
         <h1 className="font-display text-2xl font-light">{firstName ? `Bienvenue, ${firstName} !` : "Bienvenue !"}</h1>
-        {currentSaas && (
-          <p className="flex items-center gap-2 font-medium">
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/15 text-primary">
-              <SaasIcon className="h-4 w-4" />
-            </span>
-            {currentSaas.name}
-          </p>
-        )}
         <p className="text-muted-foreground">
-          Cette page est le point de départ de ton produit : ses données suivent le SaaS choisi dans la barre
-          latérale. Remplace-la par ta fonctionnalité principale (
-          <code className="text-foreground">client/src/pages/Dashboard.tsx</code>).
+          Cette page est le point de départ de ton produit : remplace-la par ta fonctionnalité principale
+          (<code className="text-foreground">client/src/pages/Dashboard.tsx</code>).
         </p>
       </motion.section>
 

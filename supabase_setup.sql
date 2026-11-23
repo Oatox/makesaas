@@ -5,7 +5,7 @@
 -- =========================================================================================
 
 -- 1. PROFILES
--- One row per auth user, created by the signup trigger (section 4).
+-- One row per auth user, created by the signup trigger (section 3).
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL PRIMARY KEY,
     email TEXT,
@@ -21,33 +21,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     CONSTRAINT profiles_role_check CHECK (role IN ('user', 'admin'))
 );
 
--- 2. SAAS
--- The SaaS a user builds. Each one belongs to a single owner (no members). The user switches
--- between them from the sidebar; profiles.current_saas_id remembers the active one. A first SaaS
--- is created at signup (section 4); creating more needs a subscription (section 8).
-CREATE TABLE IF NOT EXISTS public.saas (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id UUID NOT NULL DEFAULT auth.uid() REFERENCES public.profiles(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    -- Icon key from SAAS_ICONS (shared/saas.ts); unknown keys fall back to the default icon.
-    icon TEXT NOT NULL DEFAULT 'rocket',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-
-    CONSTRAINT saas_name_check CHECK (char_length(btrim(name)) BETWEEN 1 AND 80),
-    CONSTRAINT saas_icon_check CHECK (icon ~ '^[a-z0-9-]{1,32}$')
-);
-
-CREATE INDEX IF NOT EXISTS saas_owner_created_idx ON public.saas (owner_id, created_at);
-
--- Active SaaS of each user (NULL: the client falls back to their oldest one).
-ALTER TABLE public.profiles
-    ADD COLUMN IF NOT EXISTS current_saas_id UUID REFERENCES public.saas(id) ON DELETE SET NULL;
-
--- Covers the ON DELETE SET NULL run when a SaaS is deleted.
-CREATE INDEX IF NOT EXISTS profiles_current_saas_id_idx ON public.profiles (current_saas_id);
-
--- 3. PROFILES: ROW LEVEL SECURITY
+-- 2. PROFILES: ROW LEVEL SECURITY
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Helpers used by RLS policies live in a schema the Data API does not expose, so they cannot be
@@ -109,28 +83,6 @@ CREATE TRIGGER prevent_profile_sensitive_field_update
     FOR EACH ROW
     EXECUTE FUNCTION public.prevent_profile_sensitive_field_update();
 
--- The active SaaS must be one the user owns (switching to someone else's is refused).
-CREATE OR REPLACE FUNCTION public.check_profile_current_saas()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, public
-AS $$
-BEGIN
-    IF NEW.current_saas_id IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM public.saas WHERE id = NEW.current_saas_id AND owner_id = NEW.id) THEN
-        RAISE EXCEPTION 'The current SaaS must belong to the user' USING ERRCODE = '42501';
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS check_profile_current_saas ON public.profiles;
-CREATE TRIGGER check_profile_current_saas
-    BEFORE UPDATE OF current_saas_id ON public.profiles
-    FOR EACH ROW
-    EXECUTE FUNCTION public.check_profile_current_saas();
-
 -- Policy names of earlier versions of this script are dropped too.
 DROP POLICY IF EXISTS "Users can read own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can read all profiles" ON public.profiles;
@@ -147,7 +99,7 @@ CREATE POLICY "Users read own profile, admins read all"
     TO authenticated
     USING ((SELECT auth.uid()) = id OR (SELECT private.is_admin()));
 
--- Column-level grants (section 6) decide which fields can actually be updated.
+-- Column-level grants (section 5) decide which fields can actually be updated.
 CREATE POLICY "Users update own profile, admins update all"
     ON public.profiles
     FOR UPDATE
@@ -155,7 +107,7 @@ CREATE POLICY "Users update own profile, admins update all"
     USING ((SELECT auth.uid()) = id OR (SELECT private.is_admin()))
     WITH CHECK ((SELECT auth.uid()) = id OR (SELECT private.is_admin()));
 
--- 4. SIGNUP: PROFILE AND FIRST SAAS CREATED FOR EVERY NEW AUTH USER
+-- 3. SIGNUP: PROFILE CREATED FOR EVERY NEW AUTH USER
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -165,7 +117,6 @@ AS $$
 DECLARE
     extracted_name TEXT;
     extracted_avatar TEXT;
-    first_saas_id UUID;
 BEGIN
     extracted_name := COALESCE(
         NEW.raw_user_meta_data->>'full_name',
@@ -197,15 +148,6 @@ BEGIN
         signup_source = COALESCE(profiles.signup_source, EXCLUDED.signup_source),
         updated_at = NOW();
 
-    -- First SaaS, active right away (renamed from its settings). Name mirrored by
-    -- DEFAULT_SAAS_NAME in shared/saas.ts. Inserted outside RLS: no subscription needed (section 8).
-    IF NOT EXISTS (SELECT 1 FROM public.saas WHERE owner_id = NEW.id) THEN
-        INSERT INTO public.saas (owner_id, name) VALUES (NEW.id, 'Mon SaaS')
-        RETURNING id INTO first_saas_id;
-
-        UPDATE public.profiles SET current_saas_id = first_saas_id WHERE id = NEW.id;
-    END IF;
-
     RETURN NEW;
 END;
 $$;
@@ -215,7 +157,7 @@ CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- 5. ADMIN SESSION RPCs (least privilege, no auth schema exposure; called by the server only)
+-- 4. ADMIN SESSION RPCs (least privilege, no auth schema exposure; called by the server only)
 CREATE OR REPLACE FUNCTION public.admin_list_user_sessions(p_user_id UUID)
 RETURNS TABLE (
     id UUID,
@@ -270,22 +212,20 @@ BEGIN
 END;
 $$;
 
--- 6. PROFILES: PERMISSIONS
+-- 5. PROFILES: PERMISSIONS
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
 -- REVOKE ALL also drops any column-level privilege, so only the grants below remain.
 REVOKE ALL ON public.profiles FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.profiles TO authenticated;
--- Self-service fields only: role and signup_source stay server-side. current_saas_id is checked
--- by the check_profile_current_saas trigger (the user's own SaaS only).
-GRANT UPDATE (full_name, avatar_url, last_active_at, current_saas_id, updated_at) ON public.profiles TO authenticated;
+-- Self-service fields only: role and signup_source stay server-side.
+GRANT UPDATE (full_name, avatar_url, last_active_at, updated_at) ON public.profiles TO authenticated;
 GRANT ALL ON public.profiles TO service_role;
 
 REVOKE ALL ON FUNCTION private.is_admin() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION private.is_admin() TO authenticated, service_role;
 
 REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.check_profile_current_saas() FROM PUBLIC, anon, authenticated;
 
 REVOKE ALL ON FUNCTION public.admin_list_user_sessions(UUID) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.admin_revoke_user_session(UUID, UUID) FROM PUBLIC, anon, authenticated;
@@ -295,7 +235,7 @@ GRANT EXECUTE ON FUNCTION public.admin_list_user_sessions(UUID) TO service_role;
 GRANT EXECUTE ON FUNCTION public.admin_revoke_user_session(UUID, UUID) TO service_role;
 GRANT EXECUTE ON FUNCTION public.admin_revoke_all_user_sessions(UUID) TO service_role;
 
--- 7. SUBSCRIPTIONS (Whop)
+-- 6. SUBSCRIPTIONS (Whop)
 -- One row per user holding their current subscription. A single plan unlocks the whole app and
 -- there is no free plan: no row, or a row whose status gives no access (canceled, expired...),
 -- means no access to the app. Written by the server only (Whop webhook, admin grants); users read
@@ -367,102 +307,7 @@ GRANT EXECUTE ON FUNCTION public.subscription_grants_access(TEXT) TO authenticat
 REVOKE ALL ON FUNCTION private.has_access() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION private.has_access() TO authenticated, service_role;
 
--- 8. SAAS: ROW LEVEL SECURITY, PERMISSIONS
--- A user always keeps at least one SaaS. Account deletion (cascade run by Supabase) is not affected.
-CREATE OR REPLACE FUNCTION public.prevent_last_saas_delete()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY INVOKER
-SET search_path = pg_catalog, public
-AS $$
-BEGIN
-    IF current_user NOT IN ('authenticated', 'anon') THEN
-        RETURN OLD;
-    END IF;
-
-    -- Serializes the deletions of one owner, so two parallel requests cannot remove the last two.
-    PERFORM pg_advisory_xact_lock(hashtextextended('saas_owner:' || OLD.owner_id::text, 0));
-
-    IF NOT EXISTS (SELECT 1 FROM public.saas WHERE owner_id = OLD.owner_id AND id <> OLD.id) THEN
-        -- Message matched by the client (SAAS_LAST_ONE_ERROR in shared/saas.ts).
-        RAISE EXCEPTION 'saas_last_one' USING ERRCODE = 'P0001';
-    END IF;
-
-    RETURN OLD;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS prevent_last_saas_delete ON public.saas;
-CREATE TRIGGER prevent_last_saas_delete
-    BEFORE DELETE ON public.saas
-    FOR EACH ROW
-    EXECUTE FUNCTION public.prevent_last_saas_delete();
-
-CREATE OR REPLACE FUNCTION public.set_saas_updated_at()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SET search_path = ''
-AS $$
-BEGIN
-    NEW.updated_at := NOW();
-    RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS set_saas_updated_at ON public.saas;
-CREATE TRIGGER set_saas_updated_at
-    BEFORE UPDATE ON public.saas
-    FOR EACH ROW
-    EXECUTE FUNCTION public.set_saas_updated_at();
-
-ALTER TABLE public.saas ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Users can read own saas" ON public.saas;
-DROP POLICY IF EXISTS "Admins can read all saas" ON public.saas;
-DROP POLICY IF EXISTS "Users read own saas, admins read all" ON public.saas;
-DROP POLICY IF EXISTS "Users can create own saas" ON public.saas;
-DROP POLICY IF EXISTS "Subscribers can create own saas" ON public.saas;
-DROP POLICY IF EXISTS "Users can update own saas" ON public.saas;
-DROP POLICY IF EXISTS "Users can delete own saas" ON public.saas;
-
-CREATE POLICY "Users read own saas, admins read all"
-    ON public.saas
-    FOR SELECT
-    TO authenticated
-    USING ((SELECT auth.uid()) = owner_id OR (SELECT private.is_admin()));
-
--- Creating a SaaS needs a subscription (admins excepted), with no limit on their number. The first
--- SaaS comes from the signup trigger, which RLS does not apply to.
-CREATE POLICY "Subscribers can create own saas"
-    ON public.saas
-    FOR INSERT
-    TO authenticated
-    WITH CHECK ((SELECT auth.uid()) = owner_id AND (SELECT private.has_access()));
-
-CREATE POLICY "Users can update own saas"
-    ON public.saas
-    FOR UPDATE
-    TO authenticated
-    USING ((SELECT auth.uid()) = owner_id)
-    WITH CHECK ((SELECT auth.uid()) = owner_id);
-
-CREATE POLICY "Users can delete own saas"
-    ON public.saas
-    FOR DELETE
-    TO authenticated
-    USING ((SELECT auth.uid()) = owner_id);
-
--- The owner is always the caller (column default), never sent by the browser.
-REVOKE ALL ON public.saas FROM PUBLIC, anon, authenticated;
-GRANT SELECT, DELETE ON public.saas TO authenticated;
-GRANT INSERT (name, icon) ON public.saas TO authenticated;
-GRANT UPDATE (name, icon) ON public.saas TO authenticated;
-GRANT ALL ON public.saas TO service_role;
-
-REVOKE ALL ON FUNCTION public.prevent_last_saas_delete() FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.set_saas_updated_at() FROM PUBLIC, anon, authenticated;
-
--- 9. AI PIPELINES
+-- 7. AI PIPELINES
 -- Prompt sets sent to the LLM through OneShotAPI, editable by admins from /admin/pipeline.
 -- Messages are sent in this order: system → user 1 (data, must contain {{input}})
 -- → user 2 (instructions) → user 3 (expected output format). OneShotAPI manages sampling
@@ -560,19 +405,26 @@ Tu écris en français, de façon claire, factuelle et concise.$prompt$,
 )
 ON CONFLICT (slug) DO NOTHING;
 
--- 10. CLEANUP OF EARLIER VERSIONS
+-- 8. CLEANUP OF EARLIER VERSIONS
 -- is_admin() used to live in public, where the Data API exposed it as /rest/v1/rpc/is_admin.
 -- No policy uses it anymore (they were all recreated above with private.is_admin()).
 DROP FUNCTION IF EXISTS public.is_admin();
 
--- Starter and Pro plans were merged into a single plan: no plan column, no SaaS limit per plan
--- (creating a SaaS only needs a subscription, see the saas INSERT policy).
-DROP TRIGGER IF EXISTS enforce_saas_limit ON public.saas;
-DROP FUNCTION IF EXISTS public.enforce_saas_limit();
-DROP FUNCTION IF EXISTS public.saas_limit_for_plan(TEXT);
+-- Starter and Pro plans were merged into a single plan: no plan column anymore.
 ALTER TABLE public.subscriptions DROP COLUMN IF EXISTS plan;
 
--- 11. ADMIN ACCESS
+-- Several SaaS per user (workspaces switched from the sidebar) were removed: the active SaaS column
+-- of profiles first (it references the table), then the saas table with its policies and triggers.
+DROP TRIGGER IF EXISTS check_profile_current_saas ON public.profiles;
+DROP FUNCTION IF EXISTS public.check_profile_current_saas();
+ALTER TABLE public.profiles DROP COLUMN IF EXISTS current_saas_id;
+DROP TABLE IF EXISTS public.saas;
+DROP FUNCTION IF EXISTS public.prevent_last_saas_delete();
+DROP FUNCTION IF EXISTS public.set_saas_updated_at();
+DROP FUNCTION IF EXISTS public.enforce_saas_limit();
+DROP FUNCTION IF EXISTS public.saas_limit_for_plan(TEXT);
+
+-- 9. ADMIN ACCESS
 -- To make a user admin, run in the Supabase SQL Editor (replace the email):
 -- UPDATE public.profiles SET role = 'admin' WHERE email = 'email@example.com';
 

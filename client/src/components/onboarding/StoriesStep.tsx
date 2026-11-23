@@ -8,19 +8,28 @@ import { STEP_TITLE_CLASS, stepAppear } from "./StepHeader";
 
 const STORIES = [...SUCCESS_STORIES, MARKET_STORY];
 
+const slidesOf = (track: HTMLElement) => Array.from(track.querySelectorAll<HTMLElement>("[data-slide]"));
+
 function StorySlide({ story, market }: { story: SuccessStory; market: boolean }) {
   return (
-    <article className="card-3d flex w-[82%] shrink-0 snap-center flex-col p-5 md:w-[70%]">
+    <article data-slide className="card-3d flex w-full shrink-0 snap-center flex-col p-5">
       <div className="flex items-start gap-3">
-        <span
-          aria-hidden
-          className={cn(
-            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-bold",
-            market ? "bg-primary/15 text-primary" : "bg-secondary text-foreground",
-          )}
-        >
-          {market ? <Rocket className="h-5 w-5" /> : story.name.charAt(0)}
-        </span>
+        {story.logo ? (
+          // On a white tile, like an app icon: some logos are a shape on a transparent background.
+          <span className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-white/10">
+            <img src={story.logo} alt="" width={44} height={44} className="h-full w-full object-cover" />
+          </span>
+        ) : (
+          <span
+            aria-hidden
+            className={cn(
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-bold",
+              market ? "bg-primary/15 text-primary" : "bg-secondary text-foreground",
+            )}
+          >
+            {market ? <Rocket className="h-5 w-5" /> : story.name.charAt(0)}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{story.name}</p>
           <p className="text-xs text-muted-foreground">{story.who}</p>
@@ -42,24 +51,25 @@ export function StoriesStep({ onContinue }: { onContinue: () => void }) {
   const track = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
 
-  // The slide closest to the start of the track is the current one.
+  // The slide closest to the middle of the track is the current one.
   useEffect(() => {
     const el = track.current;
     if (!el) return;
     const onScroll = () => {
-      const [first, second] = Array.from(el.children) as HTMLElement[];
-      const step = second ? second.offsetLeft - first.offsetLeft : 1;
-      setIndex(Math.max(0, Math.min(STORIES.length - 1, Math.round(el.scrollLeft / step))));
+      const middle = el.scrollLeft + el.clientWidth / 2;
+      const distances = slidesOf(el).map((slide) => Math.abs(slide.offsetLeft + slide.offsetWidth / 2 - middle));
+      setIndex(distances.indexOf(Math.min(...distances)));
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Scrolls so the slide sits in the middle.
   const go = (target: number) => {
     const el = track.current;
-    const slides = el ? (Array.from(el.children) as HTMLElement[]) : [];
-    if (!el || !slides[target]) return;
-    el.scrollTo({ left: slides[target].offsetLeft - slides[0].offsetLeft, behavior: "smooth" });
+    const slide = el && slidesOf(el)[target];
+    if (!el || !slide) return;
+    el.scrollTo({ left: slide.offsetLeft + slide.offsetWidth / 2 - el.clientWidth / 2, behavior: "smooth" });
   };
 
   return (
@@ -74,7 +84,8 @@ export function StoriesStep({ onContinue }: { onContinue: () => void }) {
       </motion.h1>
 
       <motion.div variants={stepAppear} className="mt-6">
-        <div ref={track} className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden">
+        {/* One slide at a time, the page's full width: always centered, nothing cut on one side only. */}
+        <div ref={track} className="relative flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {STORIES.map((story, i) => (
             <StorySlide key={story.name} story={story} market={i === STORIES.length - 1} />
           ))}

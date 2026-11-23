@@ -1,5 +1,4 @@
 import {
-  AppWindow,
   BatteryLow,
   Bird,
   Brain,
@@ -7,6 +6,7 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarRange,
+  ChartNoAxesCombined,
   CircleHelp,
   Clock,
   Coins,
@@ -21,12 +21,12 @@ import {
   GraduationCap,
   Hammer,
   HandCoins,
+  Handshake,
   Heart,
   Hourglass,
-  InfinityIcon,
   Laptop,
-  LayoutGrid,
   Lightbulb,
+  PackageX,
   PenLine,
   Puzzle,
   Repeat,
@@ -36,24 +36,22 @@ import {
   ShieldAlert,
   Shirt,
   ShoppingBag,
-  Sparkles,
+  Ellipsis,
   Sprout,
-  Star,
   Tag,
   Timer,
   TrendingDown,
-  TrendingUp,
   Trophy,
   Undo2,
   UserRound,
   Users,
   Wallet,
-  WandSparkles,
   Workflow,
   Wrench,
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { COACH_NAME } from "@/components/brand/Coach";
 import { LEGAL } from "@/config/legal";
 import type { OnboardingAnswers } from "@/lib/onboarding-storage";
 
@@ -185,24 +183,40 @@ export type LoadingStep = StepBase & {
   autoAdvance?: boolean;
 };
 
-/** Explainer screen: a kicker, a title, a short text or a few points, an illustration.
- *  `**bold**` is highlighted, `\n` breaks the line. */
+/** Explainer screen: a kicker, a title, an animated illustration (MessageVisuals.tsx) or else an icon
+ *  above the title, then a short text or a few points. `**bold**` is highlighted, `\n` breaks the line. */
 export type MessageStep = StepBase & {
   type: "message";
   kicker: string;
   title: string;
+  visual?: "recurring";
+  /** Shown above the kicker on a screen without illustration. */
+  icon?: LucideIcon;
   body?: string;
-  points?: string[];
-  icon: LucideIcon;
+  /** Key points, each under its icon, two per row. */
+  points?: { icon: LucideIcon; text: string }[];
+};
+
+/** Short exchange with the coach, like the coach's chat at the end, played in order: the visitor's
+ *  lines pop in, the coach's come after typing dots. `**bold**` is highlighted, `{prenom}` and
+ *  `{objectif}` are filled from the answers. */
+export type ChatStep = StepBase & {
+  type: "chat";
+  messages: { from: "you" | "coach"; text: string }[];
+  /** Moves on by itself once the answer had time to be read (the button still lets the visitor skip). */
+  autoAdvance?: boolean;
+  /** Label of the button (default "Suivant"). */
+  cta?: string;
 };
 
 /** One sentence alone on screen, between two parts of the questions. */
 export type StatementStep = StepBase & { type: "statement"; title: string };
 
-/** What the product does, one slide per screen (`{objectif}`, `{reveFin}` filled from the answers). */
+/** What the product does, said by the coach, one slide per screen (`{prenom}`, `{objectif}`, `{reveFin}`
+ *  filled from the answers). */
 export type FeaturesStep = StepBase & {
   type: "features";
-  slides: { icon: LucideIcon; title: string; body: string }[];
+  slides: { title: string; body: string }[];
 };
 
 /** The plan being written live, paused by quick questions, then the plan sheet. */
@@ -216,7 +230,6 @@ export type InfoStep = StepBase & {
     | "founder-profile"
     | "potential"
     | "method"
-    | "results"
     | "future"
     | "stories"
     | "curve"
@@ -234,6 +247,7 @@ export type OnboardingStep =
   | TextStep
   | LoadingStep
   | MessageStep
+  | ChatStep
   | StatementStep
   | FeaturesStep
   | BuildStep
@@ -513,7 +527,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
       {
         value: "autre",
         label: "Autre chose",
-        icon: Sparkles,
+        icon: Ellipsis,
         input: { label: "Dis-nous ce qui te passionne", placeholder: "Ex. la cuisine, la musique, les voitures…", maxLength: 80 },
       },
     ],
@@ -582,40 +596,42 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   // ⚠️ Chiffres et sources repris de FirstMRR (marché 2025, Bpifrance) : à vérifier avant la mise en ligne.
   {
     id: "saas-quoi",
-    type: "message",
-    kicker: "Le business",
-    title: "Un SaaS, c'est quoi ?",
-    body: "Une app ou un site que les gens paient pour l'utiliser. Comme **Spotify, Netflix ou ChatGPT**.",
-    icon: AppWindow,
+    type: "chat",
+    autoAdvance: true,
+    messages: [
+      { from: "you", text: "Mais c'est quoi un SaaS ?" },
+      { from: "coach", text: "Une app ou un site que les gens paient pour l'utiliser." },
+      { from: "coach", text: "Je te montre, {prenom}." },
+    ],
   },
   {
     id: "saas-marche",
     type: "message",
     kicker: "Le marché",
     title: "Plus de 450 milliards de dollars en 2025.",
-    body: "Le monde a dépensé ça en logiciels l'an dernier. **0,00022 %** suffit pour faire\n**1 million de dollars.**",
-    icon: TrendingUp,
+    icon: ChartNoAxesCombined,
+    body: "Le monde a dépensé ça en logiciels l'an dernier. **0,00022 %** suffit pour faire **1 million de dollars.**",
   },
   {
     id: "saas-modele",
     type: "message",
     kicker: "Le modèle",
     title: "Tu le crées une fois, tu le vends sans limite.",
+    visual: "recurring",
     points: [
-      "**Revenus récurrents** par abonnement.",
-      "**Pas de stock**, ni boutique, ni livraison.",
-      "**Business n°1 en 2026** (Bpifrance).",
-      "Tu peux **le revendre** plus tard.",
+      { icon: Repeat, text: "**Revenus récurrents** par abonnement." },
+      { icon: PackageX, text: "**Pas de stock**, ni boutique, ni livraison." },
+      { icon: Trophy, text: "**Business n°1 en 2026** (Bpifrance)." },
+      { icon: Handshake, text: "Tu peux **le revendre** plus tard." },
     ],
-    icon: InfinityIcon,
   },
   {
     id: "saas-maintenant",
     type: "message",
     kicker: "Le bon moment",
     title: "Pourquoi c'est une opportunité en 2026.",
-    body: "Avant, il fallait des mois et des milliers d'euros. Aujourd'hui, grâce à l'IA, tes **premiers revenus arrivent vite**, pour **quelques euros**.",
     icon: Rocket,
+    body: "Avant, il fallait des mois et des milliers d'euros. Aujourd'hui, grâce à l'IA, tes **premiers revenus arrivent vite**, pour **quelques euros**.",
   },
   { id: "finaliser", type: "statement", title: "Pour finaliser ton plan, parle-moi de tes objectifs." },
 
@@ -685,7 +701,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
       ...Array.from({ length: 10 }, (_, i) => 12000 + i * 2000),
       ...Array.from({ length: 7 }, (_, i) => 40000 + i * 10000),
     ],
-    defaultValue: 10000,
+    defaultValue: 5000,
     display: { kind: "euros", unit: "par mois" },
     tiers: [
       {
@@ -726,27 +742,24 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
 
   // --- Ce qui t'attend ---
-  { id: "resultats", type: "results" },
   {
     id: "fonctions",
     type: "features",
+    // Said by the coach, under his face.
     slides: [
       {
-        icon: Star,
-        title: `Bienvenue dans ${LEGAL.siteName}`,
-        body: "Ici, on t'accompagne étape par étape vers ton objectif de **{objectif} par mois**, avec ton coach personnel.",
+        title: `Bienvenue dans ${LEGAL.siteName}, {prenom}.`,
+        body: `Moi, c'est ${COACH_NAME}, ton coach. Je t'accompagne étape par étape vers ton objectif de **{objectif} par mois**.`,
       },
       {
-        icon: LayoutGrid,
-        title: "Tout ce dont tu as besoin, au même endroit",
-        body: "Ton coach te donne les conseils, les outils et ta roadmap pour atteindre\n**{objectif}/mois**.",
+        title: "Tout ce dont tu as besoin, au même endroit.",
+        body: "Je te donne les conseils, les outils et ta roadmap pour atteindre **{objectif}/mois**.",
       },
       {
-        icon: WandSparkles,
-        title: "Regarde l'IA faire le plus dur à ta place",
-        body: "Tu auras accès à une roadmap étape par étape pour **atteindre tes objectifs**, et aux meilleurs logiciels pour créer ton site.",
+        title: "Regarde l'IA faire le plus dur à ta place.",
+        body: "Je te prépare une roadmap étape par étape pour **atteindre tes objectifs**, et les meilleurs logiciels pour créer ton site.",
       },
-      { icon: Trophy, title: "Change ta vie", body: "{reveFin}" },
+      { title: "Change ta vie.", body: "{reveFin}" },
     ],
   },
   { id: "futur", type: "future" },
@@ -769,8 +782,8 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
         question: "Es-tu vraiment prêt à passer à l'action ?",
         detail: "Parce que ton plan commence aujourd'hui, pas lundi prochain.",
         options: [
-          { value: "non", label: "Non" },
           { value: "oui", label: "Oui" },
+          { value: "non", label: "Non" },
         ],
       },
       {
@@ -779,8 +792,8 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
         question: "Es-tu prêt à investir sur toi-même ?",
         detail: "Moins cher qu'un resto par mois, et c'est ton avenir qui en profite.",
         options: [
-          { value: "non", label: "Non" },
           { value: "oui", label: "Oui" },
+          { value: "non", label: "Non" },
         ],
       },
     ],

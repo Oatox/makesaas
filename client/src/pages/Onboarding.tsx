@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Link, Redirect } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
-import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
 import { detailKey, ONBOARDING_STEPS, type OnboardingStep } from "@/components/onboarding/steps";
 import { SingleChoiceStep } from "@/components/onboarding/SingleChoiceStep";
@@ -17,8 +16,8 @@ import { PotentialStep } from "@/components/onboarding/PotentialStep";
 import { MethodStep } from "@/components/onboarding/MethodStep";
 import { AccountStep } from "@/components/onboarding/AccountStep";
 import { MessageStep } from "@/components/onboarding/MessageStep";
+import { ChatStep } from "@/components/onboarding/ChatStep";
 import { StatementStep } from "@/components/onboarding/StatementStep";
-import { ResultsStep } from "@/components/onboarding/ResultsStep";
 import { FeaturesStep } from "@/components/onboarding/FeaturesStep";
 import { FutureStep } from "@/components/onboarding/FutureStep";
 import { StoriesStep } from "@/components/onboarding/StoriesStep";
@@ -161,10 +160,10 @@ export default function OnboardingPage() {
         return <AccountStep onDone={moveOn} />;
       case "message":
         return <MessageStep step={step} onContinue={moveOn} />;
+      case "chat":
+        return <ChatStep step={step} answers={answers} onContinue={moveOn} />;
       case "statement":
         return <StatementStep title={step.title} onContinue={moveOn} />;
-      case "results":
-        return <ResultsStep onContinue={moveOn} />;
       case "features":
         return <FeaturesStep step={step} answers={answers} onContinue={moveOn} />;
       case "future":
@@ -188,16 +187,8 @@ export default function OnboardingPage() {
 
   return (
     <div className="bg-grain relative flex min-h-[100svh] flex-col bg-background">
-      {/* Back + progress on every screen; on computers, the MakeSaaS.app logo sits above them.
-          Members sign in from the landing page. */}
+      {/* Back + progress on every screen, nothing else. Members sign in from the landing page. */}
       <header className="relative z-10 w-full px-5 pb-2 pt-5 sm:px-6 md:px-8 md:pt-7 md:[@media(max-height:820px)]:pt-5">
-        <Link href="/" aria-label="Accueil" className="mx-auto mb-4 hidden w-fit items-baseline transition-opacity hover:opacity-80 sm:flex md:mb-5 md:[@media(max-height:820px)]:mb-3">
-          <Logo className="h-5 md:h-6" />
-          {/* Same color as the wordmark: it reads as one name, MakeSaaS.app. */}
-          <span aria-hidden className="ml-px font-display text-[25px] font-medium leading-none tracking-tight text-foreground md:text-[30px]">
-            .app
-          </span>
-        </Link>
         <div className="flex items-center gap-3">
           {stepIndex > 0 ? (
             <button

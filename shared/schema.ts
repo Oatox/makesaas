@@ -27,13 +27,11 @@ export const profiles = pgTable("profiles", {
   role: text("role", { enum: ["user", "admin"] }).default("user").notNull(),
   last_active_at: timestamp("last_active_at", { withTimezone: true }),
   signup_source: jsonb("signup_source").$type<SignupSource>(),
-  /** Active SaaS (references saas.id, see supabase_setup.sql section 2). */
-  current_saas_id: uuid("current_saas_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-// Current subscription of each user (see supabase_setup.sql, section 7). No row, or a status
+// Current subscription of each user (see supabase_setup.sql, section 6). No row, or a status
 // that grants no access, means no access: there is no free plan. A single plan unlocks everything,
 // so the row only tracks whether the user has access. Written by the server only.
 export const subscriptions = pgTable("subscriptions", {
@@ -52,17 +50,7 @@ export const subscriptions = pgTable("subscriptions", {
 
 export type Subscription = typeof subscriptions.$inferSelect;
 
-// The SaaS each user builds, one owner each (see supabase_setup.sql, sections 2 and 8).
-export const saas = pgTable("saas", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  owner_id: uuid("owner_id").notNull(),
-  name: text("name").notNull(),
-  icon: text("icon").default("rocket").notNull(),
-  created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-// Admin-editable LLM prompt sets (see supabase_setup.sql, section 9).
+// Admin-editable LLM prompt sets (see supabase_setup.sql, section 7).
 export const aiPipelines = pgTable("ai_pipelines", {
   slug: text("slug").primaryKey(),
   name: text("name").notNull(),

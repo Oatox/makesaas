@@ -1,26 +1,9 @@
-// Proof shown at the end of the onboarding (screens "résultats" and "preuves").
+// Proof shown at the end of the onboarding (screen "preuves").
 //
-// ⚠️ PLACEHOLDER: LAUNCH_RESULTS must be replaced by the real figures of an app you launched
-// yourself before going live (same rule as the placeholder testimonials and member count:
-// advertising invented results is a misleading commercial practice).
-// ⚠️ SUCCESS_STORIES and MARKET_STORY repeat public figures quoted by FirstMRR: check each one
-// at its source before going live.
-
-/** Your own app, the day it launched and a few days later: revenue per day, real numbers. */
-export const LAUNCH_RESULTS = {
-  appName: "Ton app",
-  /** Badge next to the chart: only say "Chiffres réels" once the figures are real. */
-  badge: "Exemple",
-  /** Gross revenue per day, from launch day to the best day. */
-  daily: [4, 23, 108, 12, 102, 69, 118, 169, 159, 339],
-  launch: { day: "7 août", payments: 2, signups: 81 },
-  best: { day: "16 août", payments: 15, signups: 525 },
-  review: {
-    quote: "9 jours après le lancement de mon app, j'ai fait 340 € en un jour.",
-    author: "Fondateur de l'app",
-    note: "Résultat personnel, non garanti.",
-  },
-};
+// ⚠️ SUCCESS_STORIES and MARKET_STORY repeat public figures: check each one at its source before
+// going live, and keep them up to date.
+// The logos (client/public/stories) are each app's own icon, taken from its official site; they
+// belong to their owners and only illustrate these public stories.
 
 export type SuccessStory = {
   name: string;
@@ -30,11 +13,14 @@ export type SuccessStory = {
   unit?: string;
   text: string;
   source: string;
+  /** App icon, from client/public (a square image). Without it, the name's first letter. */
+  logo?: string;
 };
 
 export const SUCCESS_STORIES: SuccessStory[] = [
   {
     name: "Cal AI",
+    logo: "/stories/cal-ai.webp",
     who: "Zach, fondateur",
     label: "Revenus",
     amount: "30 M$",
@@ -44,6 +30,7 @@ export const SUCCESS_STORIES: SuccessStory[] = [
   },
   {
     name: "Base44",
+    logo: "/stories/base44.png",
     who: "Maor, fondateur",
     label: "Rachat",
     amount: "80 M$",
@@ -52,12 +39,41 @@ export const SUCCESS_STORIES: SuccessStory[] = [
   },
   {
     name: "Photo AI",
+    logo: "/stories/photo-ai.png",
     who: "Pieter, seul, sans employé",
     label: "Revenus",
     amount: "105 000 $",
     unit: "par mois",
     text: "Après des dizaines de projets ratés.",
     source: "chiffre publié par lui-même",
+  },
+  {
+    name: "Lovable",
+    logo: "/stories/lovable.png",
+    who: "Anton et Fabian, fondateurs",
+    label: "Revenus",
+    amount: "200 M$",
+    unit: "par an",
+    text: "Parti d'un petit projet open source d'Anton. Ce chiffre, moins d'un an après son ouverture au public.",
+    source: "Bloomberg",
+  },
+  {
+    name: "Calendly",
+    logo: "/stories/calendly.png",
+    who: "Tope, fondateur",
+    label: "Valorisation",
+    amount: "3 Md$",
+    text: "Lancé avec ses économies et un petit prêt, parce qu'il perdait trop de temps à caler ses rendez-vous.",
+    source: "Forbes",
+  },
+  {
+    name: "Mailchimp",
+    logo: "/stories/mailchimp.png",
+    who: "Ben et Mark, fondateurs",
+    label: "Rachat",
+    amount: "12 Md$",
+    text: "Lancé en 2001 sans aucun investisseur, et jamais aucun ensuite. Racheté par Intuit en 2021.",
+    source: "Intuit",
   },
 ];
 
