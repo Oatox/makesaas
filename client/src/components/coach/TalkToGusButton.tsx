@@ -46,13 +46,14 @@ const BUTTON_CLASS = "min-h-9 shrink-0 gap-2 py-1 pl-1 pr-1 sm:min-h-9 sm:py-1 s
  * Gus's button, at the top right of every page (AppLayout header). On a page with figures (Accueil,
  * Acquisition, content, roadmap), Gus works on them: the button opens a discussion that asks him to
  * ("Analyser avec Gus"…). Elsewhere, "Discuter avec Gus" starts a blank one. Hidden on the
- * new-discussion page itself; only Gus's face on phones.
+ * new-discussion page itself and on the admin pages; only Gus's face on phones.
  */
 export function TalkToGusButton() {
   const [location] = useLocation();
   const { currentSaas } = useSaas();
   const askGus = useAskGus();
-  if (location === COACH_PATH) return null;
+  // Not on the new-discussion page itself, nor on the admin pages (they are not about the member's SaaS).
+  if (location === COACH_PATH || location === "/admin" || location.startsWith("/admin/")) return null;
 
   const action = currentSaas ? pageAction(location) : null;
   const content = (label: string) => (
