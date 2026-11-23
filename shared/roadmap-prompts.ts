@@ -1,9 +1,9 @@
 /**
- * The prompts a member pastes into Claude (Claude Code, in the desktop app) to build their app, or into
- * ChatGPT for its logo, filled with their project: shown in the roadmap's tutorials
- * (shared/roadmap-missions.ts) and in Gus's
- * first mission (server/roadmap/first-mission.ts). Written here, not by a model: the same for every
- * member, only the project changes, and they must be right the first time.
+ * The prompts a member pastes into Base44 (the AI app builder that builds and hosts their app) or into
+ * ChatGPT for its logo, filled with their project: shown in the roadmap's steps
+ * (shared/roadmap-missions.ts) and in Gus's first mission (server/roadmap/first-mission.ts). Written
+ * here, not by a model: the same for every member, only the project changes, and they must be right
+ * the first time.
  */
 
 /** What the prompts say about the member's project. */
@@ -17,6 +17,8 @@ export type MissionProject = {
   problem: string | null;
   /** Monthly price advised with the idea, in euros. */
   price: number | null;
+  /** Public address of the SaaS's logo (saas.logo_url), once added: Base44 takes it from there. */
+  logoUrl?: string | null;
 };
 
 const euros = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
@@ -32,42 +34,44 @@ const aboutOf = (project: MissionProject) =>
     project.audience && `Pour qui : ${project.audience}`,
   ].filter((line): line is string => !!line);
 
-/** Builds the first version, up to the result screen, in the colors of the logo made in the style stage. */
+/**
+ * For Base44: builds the first version, up to the result screen, with the logo made in the style stage
+ * (its public address, when the SaaS has it) and its colors.
+ */
 export function buildAppPrompt(project: MissionProject): string {
   const about = aboutOf(project);
   const offer = offerOf(project);
+  const logo = project.logoUrl
+    ? `- Mon logo est cette image : ${project.logoUrl}. Mets-le en haut de l'app et en icône de l'app.`
+    : "- Mets le nom de l'app en haut, dans un style simple : j'ajouterai mon logo plus tard.";
 
   return [
-    `Je veux créer une app web appelée ${project.name}. Je ne sais pas coder : explique-moi chaque étape simplement.`,
+    `Crée une app web appelée ${project.name}, pensée d'abord pour le téléphone.`,
     ...(about.length ? ["", ...about] : []),
     "",
-    "Comment elle marche :",
-    "- L'utilisateur répond à quelques questions d'accueil.",
-    "- L'app lui donne un résultat personnalisé.",
-    `- ${offer.charAt(0).toUpperCase()}${offer.slice(1)} débloque la suite.`,
+    "Le parcours :",
+    "1. L'utilisateur répond à quelques questions d'accueil, une par écran.",
+    "2. L'app lui donne un résultat personnalisé, clair et beau.",
+    `3. Plus tard, ${offer} débloquera la suite : n'ajoute pas encore le paiement.`,
     "",
     "Son style :",
-    "- Mon logo est le fichier logo.png de ce dossier : mets-le en haut de l'app, en icône de l'onglet du navigateur, et en icône quand on ajoute l'app à l'écran d'accueil du téléphone.",
-    "- Prends les couleurs de mon logo pour toute l'app, avec une police moderne et bien lisible : elle doit avoir l'air d'une vraie app.",
+    logo,
+    `- Prends les couleurs ${project.logoUrl ? "de mon logo" : "qui parlent à mon public"} pour toute l'app, avec une police moderne et bien lisible : elle doit avoir l'air d'une vraie app.`,
     "",
-    "Ce que je te demande :",
-    "1. Pose-moi d'abord les questions qui te manquent pour bien comprendre l'app, une à la fois.",
-    "2. Écris ensuite le cahier des charges dans un fichier SPEC.md.",
-    "3. Construis une première version qui marche jusqu'à l'écran de résultat, belle sur téléphone et fidèle à mon style, sans le paiement pour l'instant.",
-    "4. Ouvre-la dans l'aperçu et vérifie toi-même tout le parcours avant de me la montrer.",
+    "Pas de connexion obligatoire : tout le monde doit pouvoir faire le parcours jusqu'au résultat.",
   ].join("\n");
 }
 
-/** Adds the subscription screen, its button opening the member's Whop payment page. */
+/** For Base44: adds the subscription screen, its button opening the member's Whop payment page. */
 export function buildPaymentPrompt(project: MissionProject): string {
   return [
     `Ajoute à ${project.name} un écran d'abonnement, juste après l'écran de résultat.`,
-    `Il présente l'offre (${offerOf(project)}) et ce qu'elle débloque, avec un bouton qui ouvre ma page de paiement Whop : [COLLE TON LIEN DE PAIEMENT ICI]`,
-    "Garde le même style que le reste de l'app, vérifie dans l'aperçu que le bouton ouvre bien la page de paiement, puis republie l'app.",
+    `Il présente l'offre (${offerOf(project)}) et ce qu'elle débloque, avec un bouton « S'abonner » qui ouvre ma page de paiement Whop dans un nouvel onglet : [COLLE TON LIEN DE PAIEMENT ICI]`,
+    "Garde le même style que le reste de l'app.",
   ].join("\n");
 }
 
-/** For ChatGPT: the app's logo, made to be an app icon (logo.png for the build, whose colors the app takes). */
+/** For ChatGPT: the app's logo, made to be an app icon (added to the SaaS, then given to Base44, whose app takes its colors). */
 export function buildLogoPrompt(project: MissionProject): string {
   const about = aboutOf(project);
   return [
@@ -83,23 +87,14 @@ export function buildLogoPrompt(project: MissionProject): string {
   ].join("\n");
 }
 
-/** Publishes the app for free and gives back its address (the member then pastes it in its step). */
-export function buildOnlinePrompt(project: MissionProject): string {
-  return [
-    `Mets ${project.name} en ligne gratuitement avec Netlify.`,
-    "Guide-moi étape par étape, je ne sais pas coder. À la fin, donne-moi l'adresse de l'app et vérifie qu'elle s'ouvre bien sur téléphone.",
-  ].join("\n");
-}
-
 /** The prompts of the roadmap's steps (their "chatgpt" and "copy" buttons, shared/roadmap.ts). */
-export type MissionPrompt = "logo" | "app" | "online" | "payment";
+export type MissionPrompt = "logo" | "app" | "payment";
 
 /** Where each prompt gets pasted. */
-export const PROMPT_TARGET: Record<MissionPrompt, "Claude" | "ChatGPT"> = {
+export const PROMPT_TARGET: Record<MissionPrompt, "Base44" | "ChatGPT"> = {
   logo: "ChatGPT",
-  app: "Claude",
-  online: "Claude",
-  payment: "Claude",
+  app: "Base44",
+  payment: "Base44",
 };
 
 export function missionPromptText(prompt: MissionPrompt, project: MissionProject): string {
@@ -108,8 +103,6 @@ export function missionPromptText(prompt: MissionPrompt, project: MissionProject
       return buildLogoPrompt(project);
     case "app":
       return buildAppPrompt(project);
-    case "online":
-      return buildOnlinePrompt(project);
     case "payment":
       return buildPaymentPrompt(project);
   }

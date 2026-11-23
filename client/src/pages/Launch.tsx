@@ -42,7 +42,7 @@ type Stage = "ideas" | "project" | "plan" | "mission";
  * series is usually already being written: the payment webhook started it. "D'autres idées" asks for
  * 3 new ones. Keeping one leads to three last steps with Gus: confirming the project (the SaaS is
  * created then), seeing the plan to the member's goal, and the first mission, a discussion where Gus
- * gives the prompt to build the app with Claude: the member enters the app there.
+ * gives the logo prompt, then the one to build the app with Base44: the member enters the app there.
  */
 export default function Launch() {
   const { profile } = useAuth();
@@ -224,7 +224,7 @@ export default function Launch() {
     void say("you", ["Et maintenant ?"]);
     void say("coach", [
       "Première mission : mettre ton app en ligne.",
-      "Je t'ai tout préparé dans une discussion, étape par étape : on commence par son style et son logo, puis on la construit avec Claude.",
+      "Je t'ai tout préparé dans une discussion, étape par étape : on commence par son style et son logo, puis on la construit avec Base44.",
     ]);
   };
 

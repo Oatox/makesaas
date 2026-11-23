@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Check, Clock, Loader2, Lock, Zap } from "lucide-react";
+import { ArrowRight, Check, Clock, Loader2, Lock, Undo2, Zap } from "lucide-react";
 import {
-  canUntickMission,
   missionBlocker,
   stageProgress,
+  ticksAfter,
   type MissionAt,
   type RoadmapMission,
   type RoadmapStage,
@@ -106,14 +106,14 @@ function FocusedMission({
   const manual = mission.check.kind === "manual";
   // A mission waits for the ones before it: locked, it shows what to finish first instead of its steps.
   const blocker = done ? null : missionBlocker(stages, state.done, mission.key);
-  const canUntick = canUntickMission(stages, state.done, mission.key);
+  // Unticking it also unticks the missions ticked after it: confirmed first when there are some.
+  const later = ticksAfter(stages, state.done, mission.key);
+  const [confirming, setConfirming] = useState(false);
   const time = missionTime(mission);
 
-  const setDone = (value: boolean) =>
-    tick.mutate(
-      { mission: mission.key, done: value },
-      { onError: () => toast({ variant: "destructive", title: "Impossible d'enregistrer", description: "Réessaie dans un instant." }) },
-    );
+  const onError = () => toast({ variant: "destructive", title: "Impossible d'enregistrer", description: "Réessaie dans un instant." });
+  const setDone = (value: boolean) => tick.mutate({ mission: mission.key, done: value }, { onError });
+  const untick = () => tick.mutate({ mission: mission.key, done: false, also: later }, { onError, onSettled: () => setConfirming(false) });
 
   if (blocker) {
     return <LockedMission mission={mission} blocker={blocker} stage={stage} onPickMission={onPickMission} onOpenStage={onOpenStage} />;
@@ -154,15 +154,51 @@ function FocusedMission({
       </ol>
 
       {done ? (
-        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-border pt-4">
-          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
-            <Check className="h-4 w-4" />
-            {done.source === "before" ? "Fait avant MakeSaaS" : `Fait le ${dayFormatter.format(new Date(done.at))}`}
-          </span>
-          {manual && done.source === "declared" && canUntick && (
-            <Button variant="ghost" size="sm" onClick={() => setDone(false)} disabled={tick.isPending}>
-              Annuler
-            </Button>
+        <div className="mt-5 overflow-hidden rounded-xl border border-primary/25 bg-primary/[0.07]">
+          <div className="flex items-center gap-3 py-2.5 pl-2.5 pr-2">
+            <motion.span
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 420, damping: 18 }}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+            >
+              <Check className="h-5 w-5" strokeWidth={3} />
+            </motion.span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">
+                {done.source === "before" ? "Fait avant MakeSaaS" : `Fait le ${dayFormatter.format(new Date(done.at))}`}
+              </p>
+              <p className="text-xs text-muted-foreground">{done.source === "declared" ? "Coché par toi" : "Vu dans tes données"}</p>
+            </div>
+            {manual && done.source === "declared" && !confirming && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => (later.length ? setConfirming(true) : untick())}
+                disabled={tick.isPending}
+                className="shrink-0"
+              >
+                {tick.isPending ? <Loader2 className="animate-spin" /> : <Undo2 />} Annuler
+              </Button>
+            )}
+          </div>
+          {confirming && (
+            <div className="space-y-3 border-t border-primary/20 px-3 py-3">
+              <p className="text-sm text-muted-foreground">
+                {later.length > 1
+                  ? `Tu as coché ${later.length} missions après celle-ci : elles seront annulées aussi.`
+                  : "Tu as coché une mission après celle-ci : elle sera annulée aussi."}
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button variant="destructive" size="sm" onClick={untick} disabled={tick.isPending}>
+                  {tick.isPending ? <Loader2 className="animate-spin" /> : <Undo2 />}
+                  Annuler les {later.length + 1} missions
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={tick.isPending}>
+                  Garder
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       ) : manual ? (

@@ -27,20 +27,26 @@ export function useTickMission(saasId: string | undefined) {
   const key = roadmapKeys.state(saasId);
 
   return useMutation({
-    mutationFn: async ({ mission, done }: { mission: string; done: boolean }) => {
+    // Unticking a mission also unticks `also`: the ones ticked after it (ticksAfter).
+    mutationFn: async ({ mission, done, also = [] }: { mission: string; done: boolean; also?: string[] }) => {
       const { error } = done
         ? await supabase.from("roadmap_missions").insert({ saas_id: saasId!, key: mission })
-        : await supabase.from("roadmap_missions").delete().eq("saas_id", saasId!).eq("key", mission).eq("source", "declared");
+        : await supabase
+            .from("roadmap_missions")
+            .delete()
+            .eq("saas_id", saasId!)
+            .in("key", [mission, ...also])
+            .eq("source", "declared");
       if (error) throw error;
     },
-    onMutate: async ({ mission, done }) => {
+    onMutate: async ({ mission, done, also = [] }) => {
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData<RoadmapState>(key);
       queryClient.setQueryData<RoadmapState>(key, (state) => {
         if (!state) return state;
         const next = { ...state.done };
         if (done) next[mission] = { at: new Date().toISOString(), source: "declared" };
-        else delete next[mission];
+        else for (const key of [mission, ...also]) delete next[key];
         return { ...state, done: next };
       });
       return { previous };

@@ -42,10 +42,11 @@ describe("coach context", () => {
       ),
     });
     expect(text).toContain("2. Donne un style à ton SaaS : terminée");
-    expect(text).toContain("3. Construis ton app : EN COURS (1/3 missions)");
-    expect(text).toContain("- [x] Installe Claude");
+    expect(text).toContain("3. Construis ton SaaS : EN COURS (1/3 missions)");
+    expect(text).toContain("- [x] Crée ton compte Base44");
     expect(text).toContain("Sa prochaine mission : « Construis la première version ».");
-    expect(text).toContain("Je veux créer une app web appelée Fitlo");
+    expect(text).toContain("Le prompt à coller dans Base44 que sa roadmap lui donne :");
+    expect(text).toContain("Crée une app web appelée Fitlo");
   });
 
   test("the logo mission gives Gus its ChatGPT prompt", () => {

@@ -101,6 +101,7 @@ export function projectOf(saas: SaasRow): MissionProject {
     audience: saas.audience,
     problem: typeof idea?.problem === "string" && idea.problem.trim() ? idea.problem.trim() : null,
     price: typeof idea?.price === "number" && idea.price > 0 ? Math.round(idea.price) : null,
+    logoUrl: saas.logo_url,
   };
 }
 

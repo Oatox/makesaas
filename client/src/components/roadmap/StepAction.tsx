@@ -25,7 +25,7 @@ const copyText = async (text: string) => {
 };
 
 /**
- * A message for Claude or ChatGPT: where it goes, a short preview (unfolded on demand) and its copy
+ * A message for Base44 or ChatGPT: where it goes, a short preview (unfolded on demand) and its copy
  * button. `openInChatGpt`: "Ouvrir ChatGPT" opens it with the message already written, and copying
  * it stays possible (ChatGPT signed out, another app).
  */

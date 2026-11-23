@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { currentStageIndex, stageProgress } from "@shared/roadmap";
+import { canUntickMission, currentStageIndex, stageProgress, ticksAfter } from "@shared/roadmap";
 import { missionTime, roadmapStagesFor, stageTimeLeft } from "@shared/roadmap-missions";
 import {
   buildAppPrompt,
   buildLogoPrompt,
-  buildOnlinePrompt,
   buildPaymentPrompt,
   chatGptUrl,
   missionPromptText,
@@ -75,8 +74,8 @@ describe("roadmapStagesFor", () => {
     const stage = (key: string) => STAGES.find((item) => item.key === key)!;
     expect(missionTime(stage("brand").missions[0])).toBe("5 min");
     expect(stageTimeLeft(stage("brand"), {})).toBe("≈ 5 min");
-    expect(stageTimeLeft(stage("build"), {})).toBe("≈ 1 h 25");
-    expect(stageTimeLeft(stage("build"), { "build:claude": { at: NOW, source: "declared" } })).toBe("≈ 1 h 15");
+    expect(stageTimeLeft(stage("build"), {})).toBe("≈ 37 min");
+    expect(stageTimeLeft(stage("build"), { "build:claude": { at: NOW, source: "declared" } })).toBe("≈ 35 min");
     // A mission over days: no total.
     expect(stageTimeLeft(stage("customer"), {})).toBeNull();
     expect(missionTime(stage("customer").missions[0])).toBe("7 jours");
@@ -132,6 +131,17 @@ describe("observedMissions", () => {
 });
 
 describe("stage progress", () => {
+  test("unticking a mission unticks the ones ticked after it", () => {
+    const [first, second, third] = STAGES.flatMap((stage) => stage.missions)
+      .filter((mission) => mission.check.kind === "manual")
+      .map((mission) => mission.key);
+    const done = Object.fromEntries([first, second, third].map((key) => [key, { at: NOW, source: "declared" as const }]));
+    expect(ticksAfter(STAGES, done, first)).toEqual([second, third]);
+    expect(ticksAfter(STAGES, done, third)).toEqual([]);
+    expect(canUntickMission(STAGES, done, first)).toBe(false);
+    expect(canUntickMission(STAGES, done, third)).toBe(true);
+  });
+
   test("a stage is done when all its missions are; the current one is the first not done", () => {
     const done = { "idea:chosen": { at: CREATED, source: "declared" as const }, "build:claude": { at: NOW, source: "declared" as const } };
     expect(stageProgress(STAGES[0], done)).toEqual({ done: 1, total: 1, complete: true });
@@ -144,23 +154,25 @@ describe("stage progress", () => {
 describe("prompts", () => {
   const project = { name: "Fitlo", description: "Ton programme de muscu en 3 questions.", audience: "Étudiants", problem: "Pas de programme clair.", price: 9 };
 
-  test("the build prompt carries the project and the steps for Claude", () => {
-    const prompt = buildAppPrompt(project);
-    expect(prompt).toContain("appelée Fitlo");
+  test("the build prompt for Base44 carries the project, and the logo added in the style stage", () => {
+    const prompt = buildAppPrompt({ ...project, logoUrl: "https://files.example.com/u/s/logo/abc.png" });
+    expect(prompt).toContain("Crée une app web appelée Fitlo");
     expect(prompt).toContain("L'idée : Ton programme de muscu en 3 questions.");
     // Intl puts a narrow no-break space before the euro sign.
-    expect(prompt).toMatch(/Un abonnement à 9\s€ par mois débloque la suite\./);
-    expect(prompt).toContain("SPEC.md");
-    // The style stage comes first: the app takes the logo it made, and its colors.
-    expect(prompt).toContain("logo.png");
+    expect(prompt).toMatch(/Plus tard, un abonnement à 9\s€ par mois débloquera la suite/);
+    expect(prompt).toContain("Mon logo est cette image : https://files.example.com/u/s/logo/abc.png");
     expect(prompt).toContain("les couleurs de mon logo");
+    expect(prompt).toContain("Pas de connexion obligatoire");
     expect(prompt).not.toContain("[COLLE ICI");
+    // No logo yet: the app's name instead.
+    expect(buildAppPrompt(project)).toContain("j'ajouterai mon logo plus tard");
+    expect(buildAppPrompt(project)).not.toContain("Mon logo est cette image");
   });
 
   test("a SaaS created by its name only still gets prompts", () => {
     const bare = { name: "Fitlo", description: null, audience: null, problem: null, price: null };
     expect(buildAppPrompt(bare)).not.toContain("L'idée");
-    expect(buildAppPrompt(bare)).toContain("Un abonnement mensuel débloque la suite.");
+    expect(buildAppPrompt(bare)).toContain("Plus tard, un abonnement mensuel débloquera la suite");
     expect(buildPaymentPrompt(bare)).toContain("un abonnement mensuel");
   });
 
@@ -177,7 +189,6 @@ describe("prompts", () => {
     const url = new URL(chatGptUrl(buildLogoPrompt(project)));
     expect(url.origin).toBe("https://chatgpt.com");
     expect(url.searchParams.get("q")).toBe(buildLogoPrompt(project));
-    expect(buildOnlinePrompt(project)).toContain("Mets Fitlo en ligne");
     for (const stage of STAGES) {
       for (const mission of stage.missions) {
         for (const step of mission.steps) {
@@ -195,6 +206,8 @@ describe("prompts", () => {
     expect(answer).toContain("```\nJe lance une app appelée Fitlo");
     expect(answer).toContain("Génère son logo");
     expect(answer.match(/```/g)).toHaveLength(2);
-    expect(answer).not.toContain("Je veux créer une app web");
+    expect(answer).not.toContain("Crée une app web");
+    // Gus sends the member to Base44 with the sign-up link (the affiliate link, BASE44_URL).
+    expect(answer).toContain("[Base44](https://");
   });
 });

@@ -9,6 +9,12 @@ import { MRR_TIERS, monthlyGoalOf, type MissionDone, type RoadmapMission, type R
 
 const euros = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
+/**
+ * ⚠️ PLACEHOLDER: Base44's sign-up page, where members build their app. Put your affiliate link here:
+ * the "Créer mon compte Base44" button of the roadmap and Gus's first mission open it.
+ */
+export const BASE44_URL = "https://base44.com";
+
 const STATS: StepAction = { kind: "page", label: "Ouvrir mes statistiques", href: "/acquisition" };
 const CONTENT: StepAction = { kind: "page", label: "Créer un carrousel", href: "/acquisition/contenu" };
 const REVENUE: StepAction = { kind: "page", label: "Voir mes revenus", href: "/app" };
@@ -53,20 +59,19 @@ const BASE_STAGES: RoadmapStage[] = [
   },
   {
     key: "build",
-    title: "Construis ton app",
+    title: "Construis ton SaaS",
     label: "App en ligne",
     detail: "Ton app marche et tout le monde peut l'ouvrir, sans que tu aies écrit une ligne de code.",
     missions: [
       {
+        // The key comes from when the app was built with Claude: kept, done missions are saved by key.
         key: "build:claude",
-        title: "Installe Claude",
-        why: "C'est lui qui écrit ton app pendant que tu la décris.",
-        minutes: 10,
+        title: "Crée ton compte Base44",
+        why: "Base44 construit ton app pendant que tu la décris, et l'héberge pour toi.",
+        minutes: 2,
         steps: [
-          { text: "Télécharge l'application Claude sur ton ordinateur.", action: { kind: "open", label: "Télécharger Claude", url: "https://claude.ai/download" } },
-          { text: "Connecte-toi et prends l'abonnement **Pro** : il donne accès à Claude Code." },
-          { text: "Crée un dossier pour ton app, et mets-y ton logo sous le nom **logo.png**." },
-          { text: "Dans Claude, ouvre l'onglet **Code** et choisis ce dossier." },
+          { text: "Crée ton compte Base44 : c'est gratuit pour commencer.", action: { kind: "open", label: "Créer mon compte Base44", url: BASE44_URL } },
+          { text: "Garde l'onglet ouvert : tu y construis ton app juste après." },
         ],
         check: { kind: "manual" },
       },
@@ -74,12 +79,12 @@ const BASE_STAGES: RoadmapStage[] = [
         key: "build:first_version",
         title: "Construis la première version",
         why: "Une app simple qui marche vaut mieux qu'une app parfaite jamais finie.",
-        minutes: 60,
+        minutes: 30,
         steps: [
-          { text: "Copie le message pour Claude.", action: { kind: "copy", prompt: "app" } },
-          { text: "Colle-le dans Claude et envoie." },
-          { text: "Réponds à ses questions, puis laisse-le construire." },
-          { text: "Teste ton app dans son aperçu jusqu'à l'écran de résultat. Un souci ? Décris-le à Claude avec tes mots." },
+          { text: "Copie le message pour Base44.", action: { kind: "copy", prompt: "app" } },
+          { text: "Colle-le dans Base44 et envoie : il construit ton app tout seul." },
+          { text: "Teste ton app dans l'aperçu, jusqu'à l'écran de résultat." },
+          { text: "Un souci ? Décris-le à Base44 avec tes mots : il corrige." },
         ],
         check: { kind: "manual" },
       },
@@ -87,10 +92,10 @@ const BASE_STAGES: RoadmapStage[] = [
         key: "build:online",
         title: "Mets ton app en ligne",
         why: "Sans adresse, personne ne peut l'essayer ni la payer.",
-        minutes: 15,
+        minutes: 5,
         steps: [
-          { text: "Copie ce message et envoie-le à Claude.", action: { kind: "copy", prompt: "online" } },
-          { text: "Suis ses étapes, puis ouvre l'adresse qu'il te donne sur ton téléphone." },
+          { text: "Dans Base44, clique sur **Publish** : ton app reçoit son adresse." },
+          { text: "Ouvre cette adresse sur ton téléphone pour vérifier que tout marche." },
           { text: "Colle l'adresse de ton app ici.", action: { kind: "app_url" } },
         ],
         check: { kind: "app_url" },
@@ -122,9 +127,9 @@ const BASE_STAGES: RoadmapStage[] = [
         why: "Le bouton d'abonnement de ton app doit ouvrir ta page de paiement.",
         minutes: 15,
         steps: [
-          { text: "Copie le message pour Claude.", action: { kind: "copy", prompt: "payment" } },
-          { text: "Colle-le dans Claude, remplace **[COLLE TON LIEN…]** par ton lien Whop, puis envoie." },
-          { text: "Vérifie dans l'aperçu que le bouton ouvre bien ta page de paiement." },
+          { text: "Copie le message pour Base44.", action: { kind: "copy", prompt: "payment" } },
+          { text: "Colle-le dans Base44, remplace **[COLLE TON LIEN…]** par ton lien Whop, puis envoie." },
+          { text: "Vérifie dans l'aperçu que le bouton ouvre ta page de paiement, puis clique sur **Publish**." },
         ],
         check: { kind: "manual" },
       },
@@ -290,7 +295,7 @@ function mrrMissions(key: string, level: number, amount: number): RoadmapMission
               message: "Aide-moi à améliorer l'écran de paiement de mon app pour que plus de gens s'abonnent. Pose-moi les questions dont tu as besoin.",
             },
           },
-          { text: "Demande à Claude d'appliquer ses conseils, puis de republier ton app." },
+          { text: "Demande à Base44 d'appliquer ses conseils, puis clique sur **Publish**." },
         ],
         check: { kind: "manual" },
       },
@@ -337,7 +342,7 @@ function mrrMissions(key: string, level: number, amount: number): RoadmapMission
               message: "Des abonnés quittent mon app chaque mois. Aide-moi à leur donner une raison de rester : un suivi, un rappel, une nouveauté.",
             },
           },
-          { text: "Demande à Claude d'ajouter son idée à ton app." },
+          { text: "Demande à Base44 d'ajouter son idée à ton app, puis clique sur **Publish**." },
         ],
         check: { kind: "manual" },
       },
@@ -367,7 +372,7 @@ function mrrMissions(key: string, level: number, amount: number): RoadmapMission
             minutes: 30,
             steps: [
               { text: "Dans Whop, ajoute un abonnement annuel, moins cher que 12 mois." },
-              { text: "Demande à Claude de l'afficher sur ton écran de paiement, puis de republier ton app." },
+              { text: "Demande à Base44 de l'afficher sur ton écran de paiement, puis clique sur **Publish**." },
             ],
             check: { kind: "manual" as const },
           },

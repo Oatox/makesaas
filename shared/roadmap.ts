@@ -57,7 +57,7 @@ export type StepAction =
   | { kind: "page"; label: string; href: string }
   /** Opens ChatGPT with this prompt already written (a new discussion). */
   | { kind: "chatgpt"; prompt: MissionPrompt }
-  /** Copies this prompt, shown folded, to paste into Claude or into a ChatGPT discussion already open. */
+  /** Copies this prompt, shown folded, to paste into Base44 or into a ChatGPT discussion already open. */
   | { kind: "copy"; prompt: MissionPrompt }
   /** Opens a new discussion with Gus, starting with this message. */
   | { kind: "gus"; label: string; message: string }
@@ -153,15 +153,21 @@ export function missionBlocker(stages: RoadmapStage[], done: Record<string, Miss
 }
 
 /**
- * Whether the member can untick a mission they ticked: not once they ticked one after it, which
- * would then be done before it (they untick from the last one back).
+ * The missions the member ticked after this one, in the roadmap's order. Unticking it unticks them
+ * too ("Annuler", after a confirmation), so that none stays done before it.
  */
-export function canUntickMission(stages: RoadmapStage[], done: Record<string, MissionDone>, key: string): boolean {
+export function ticksAfter(stages: RoadmapStage[], done: Record<string, MissionDone>, key: string): string[] {
   const order = missionsInOrder(stages);
   const index = order.findIndex((entry) => entry.mission.key === key);
   return order
     .slice(index + 1)
-    .every(({ mission }) => !(mission.check.kind === "manual" && done[mission.key]?.source === "declared"));
+    .filter(({ mission }) => mission.check.kind === "manual" && done[mission.key]?.source === "declared")
+    .map(({ mission }) => mission.key);
+}
+
+/** Whether the member can untick a mission alone: no mission ticked after it (ticksAfter). */
+export function canUntickMission(stages: RoadmapStage[], done: Record<string, MissionDone>, key: string): boolean {
+  return ticksAfter(stages, done, key).length === 0;
 }
 
 /** Mirrored by roadmap_missions_key_check in supabase_setup.sql. */
