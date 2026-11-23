@@ -599,7 +599,8 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     type: "chat",
     autoAdvance: true,
     messages: [
-      { from: "you", text: "Mais c'est quoi un SaaS ?" },
+      { from: "you", text: "C'est quoi le business ?" },
+      { from: "coach", text: "On va lancer un SaaS." },
       { from: "coach", text: "Une app ou un site que les gens paient pour l'utiliser." },
       { from: "coach", text: "Je te montre, {prenom}." },
     ],

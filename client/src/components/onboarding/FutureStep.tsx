@@ -13,9 +13,9 @@ import { StripeIcon } from "./StripeIcon";
 
 const PAYERS = ["Julie M.", "Thomas R.", "Inès B.", "Lucas M.", "Emma R.", "Hugo D.", "Léa P.", "Nathan G.", "Chloé T.", "Yanis K."];
 const PRICE = "20,00 €";
-// Payments before the goal is reached, then a few more after the coach's message.
+// Payments until the goal is reached, then the coach's message, and nothing after it.
 const TO_GOAL = 3;
-const LAST_BEAT = 7;
+const LAST_BEAT = TO_GOAL + 1;
 
 const cents = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
 
@@ -81,25 +81,24 @@ export function FutureStep({ answers, onContinue }: { answers: OnboardingAnswers
     const timer = window.setTimeout(
       () => {
         setBeat(beat + 1);
-        if (beat < TO_GOAL) buzz(12);
-        // Every payment notification rings like a sale; the beat after the goal is the coach's message.
-        if (beat === TO_GOAL) playMessageSound();
-        else playCashSound();
+        // Every payment rings like a sale; the last beat is the coach's message.
+        if (beat < TO_GOAL) {
+          buzz(12);
+          playCashSound();
+        } else {
+          playMessageSound();
+        }
       },
-      beat === 0 ? 900 : beat <= TO_GOAL ? 1150 : 1700,
+      beat === 0 ? 900 : 1150,
     );
     return () => window.clearTimeout(timer);
   }, [beat]);
 
   const reached = Math.min(beat, TO_GOAL);
-  const amount = goal - (TO_GOAL - reached) * 20 + 20 * Math.max(0, beat - TO_GOAL - 1);
+  const amount = goal - (TO_GOAL - reached) * 20;
   const coachIn = beat > TO_GOAL;
-  // Payments so far (the beat after the goal is the coach's message), newest first, three at most.
-  const payments = Array.from({ length: beat }, (_, i) => i)
-    .filter((i) => i !== TO_GOAL)
-    .map((i) => (i > TO_GOAL ? i - 1 : i))
-    .slice(-3)
-    .reverse();
+  // Payments so far, newest first.
+  const payments = Array.from({ length: reached }, (_, i) => i).reverse();
 
   return (
     <motion.div
