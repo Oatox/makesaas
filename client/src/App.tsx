@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { useSaas } from "@/hooks/use-saas";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorState } from "@/components/StateCard";
@@ -15,6 +16,10 @@ import AuthPage from "@/pages/Auth";
 import OnboardingPage from "@/pages/Onboarding";
 // Private pages are loaded on demand: visitors of the public pages never download their code.
 const Dashboard = React.lazy(() => import("@/pages/Dashboard"));
+const Acquisition = React.lazy(() => import("@/pages/Acquisition"));
+const Discussions = React.lazy(() => import("@/pages/Discussions"));
+const Launch = React.lazy(() => import("@/pages/Launch"));
+const Roadmap = React.lazy(() => import("@/pages/Roadmap"));
 const AdminPage = React.lazy(() => import("@/pages/Admin"));
 const Settings = React.lazy(() => import("@/pages/Settings"));
 const Subscribe = React.lazy(() => import("@/pages/Subscribe"));
@@ -27,12 +32,24 @@ import Confidentialite from "@/pages/Confidentialite";
 import { Loader2 } from "lucide-react";
 import { AUTH_CONFIG } from "@/config/auth";
 
-// Protected Route Wrapper: the app is reserved to subscribers (there is no free plan). Visitors go
-// to the onboarding (sign-up is asked during it), signed-in users without a subscription to the paywall.
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, hasAccess, isLoading, isProfileError, retryProfile } = useAuth();
+/**
+ * Pages a subscriber reaches without a SaaS yet: the ideas that create it, their account (to manage
+ * the subscription) and, for admins, the admin pages.
+ */
+const isOpenWithoutSaas = (path: string) =>
+  path === AUTH_CONFIG.LAUNCH_PATH || path.startsWith("/settings") || path.startsWith("/admin");
 
-  if (isLoading) {
+// Protected Route Wrapper: the app is reserved to subscribers (there is no free plan). Visitors go
+// to the onboarding (sign-up is asked during it), signed-in users without a subscription to the paywall,
+// and subscribers without a SaaS to Gus's ideas (/lancement): the app starts with a project.
+// `bare`: full screen, without the sidebar and header (the ideas of /lancement).
+function ProtectedRoute({ component: Component, bare = false }: { component: React.ComponentType; bare?: boolean }) {
+  const { user, hasAccess, isLoading, isProfileError, retryProfile } = useAuth();
+  const { saasList, isLoading: saasLoading, isError: saasError } = useSaas();
+  const [location] = useLocation();
+  const gated = hasAccess && !isOpenWithoutSaas(location);
+
+  if (isLoading || (gated && saasLoading)) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -54,6 +71,25 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   }
 
   if (!hasAccess) return <Redirect to={user ? AUTH_CONFIG.SUBSCRIBE_PATH : AUTH_CONFIG.ONBOARDING_PATH} />;
+
+  // No SaaS yet (a list that failed to load does not lock the member out).
+  if (gated && !saasError && saasList.length === 0) return <Redirect to={AUTH_CONFIG.LAUNCH_PATH} />;
+
+  if (bare) {
+    return (
+      <ErrorBoundary>
+        <React.Suspense
+          fallback={
+            <div className="flex h-screen w-full items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          }
+        >
+          <Component />
+        </React.Suspense>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <AppLayout>
@@ -116,6 +152,31 @@ function Router() {
         <ProtectedRoute component={Dashboard} />
       </Route>
 
+      <Route path={AUTH_CONFIG.LAUNCH_PATH}>
+        <ProtectedRoute component={Launch} bare />
+      </Route>
+
+      <Route path="/roadmap">
+        <ProtectedRoute component={Roadmap} />
+      </Route>
+
+      <Route path="/acquisition">
+        <ProtectedRoute component={Acquisition} />
+      </Route>
+      <Route path="/acquisition/contenu">
+        <ProtectedRoute component={Acquisition} />
+      </Route>
+      <Route path="/acquisition/contenu/:carouselId">
+        <ProtectedRoute component={Acquisition} />
+      </Route>
+
+      <Route path="/discussions">
+        <ProtectedRoute component={Discussions} />
+      </Route>
+      <Route path="/discussions/:id">
+        <ProtectedRoute component={Discussions} />
+      </Route>
+
       <Route path="/settings">
         <ProtectedRoute component={Settings} />
       </Route>
@@ -129,6 +190,9 @@ function Router() {
         <ProtectedRoute component={AdminPage} />
       </Route>
       <Route path="/admin/pipeline">
+        <ProtectedRoute component={AdminPage} />
+      </Route>
+      <Route path="/admin/pipeline/:slug">
         <ProtectedRoute component={AdminPage} />
       </Route>
       <Route path="/admin/marketing">

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { animate, motion, useReducedMotion, type AnimationPlaybackControls } from "framer-motion";
 import { ChevronLeft, ChevronRight, Rocket } from "lucide-react";
 import { MARKET_STORY, SUCCESS_STORIES, type SuccessStory } from "@/config/onboarding-proof";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,9 @@ import { ContinueButton } from "./ContinueButton";
 import { STEP_TITLE_CLASS, stepAppear } from "./StepHeader";
 
 const STORIES = [...SUCCESS_STORIES, MARKET_STORY];
+
+/** How long each story stays before the next one comes on its own. */
+const AUTOPLAY_SECONDS = 2;
 
 const slidesOf = (track: HTMLElement) => Array.from(track.querySelectorAll<HTMLElement>("[data-slide]"));
 
@@ -46,10 +49,22 @@ function StorySlide({ story, market }: { story: SuccessStory; market: boolean })
   );
 }
 
-/** "Ils ont tous commencé à zéro": real journeys, then the market, as a swipeable carousel. */
+/**
+ * "Ils ont tous commencé à zéro": real journeys, then the market, as a swipeable carousel that
+ * moves on by itself every AUTOPLAY_SECONDS (the active dot fills meanwhile), back to the first
+ * story after the last. It holds while the member hovers it, touches it or tabs into it, starts
+ * over after a manual change, and stays still for those who reduce motion.
+ */
 export function StoriesStep({ onContinue }: { onContinue: () => void }) {
   const track = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
+  const reduceMotion = useReducedMotion();
+  const [held, setHeld] = useState({ hover: false, touch: false, focus: false });
+  const isHeld = held.hover || held.touch || held.focus;
+  const hold = (key: keyof typeof held, value: boolean) => setHeld((previous) => ({ ...previous, [key]: value }));
+  // The active dot's fill: its animation is the autoplay's clock.
+  const progress = useRef<HTMLSpanElement>(null);
+  const playback = useRef<AnimationPlaybackControls | null>(null);
 
   // The slide closest to the middle of the track is the current one.
   useEffect(() => {
@@ -72,6 +87,30 @@ export function StoriesStep({ onContinue }: { onContinue: () => void }) {
     el.scrollTo({ left: slide.offsetLeft + slide.offsetWidth / 2 - el.clientWidth / 2, behavior: "smooth" });
   };
 
+  // Each new current story fills its dot, then hands over to the next one. A manual change sets a
+  // new index, which starts the count again.
+  useEffect(() => {
+    const fill = progress.current;
+    if (!fill || reduceMotion) return;
+    let cancelled = false;
+    const controls = animate(fill, { scaleX: [0, 1] }, { duration: AUTOPLAY_SECONDS, ease: "linear" });
+    playback.current = controls;
+    void controls.then(() => {
+      if (!cancelled) go((index + 1) % STORIES.length);
+    });
+    return () => {
+      cancelled = true;
+      controls.stop();
+    };
+    // `go` only reads the track's ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, reduceMotion]);
+
+  useEffect(() => {
+    if (isHeld) playback.current?.pause();
+    else playback.current?.play();
+  }, [isHeld, index]);
+
   return (
     <motion.div
       className="flex flex-1 flex-col"
@@ -83,7 +122,17 @@ export function StoriesStep({ onContinue }: { onContinue: () => void }) {
         Ils ont tous commencé à zéro.
       </motion.h1>
 
-      <motion.div variants={stepAppear} className="mt-6">
+      <motion.div
+        variants={stepAppear}
+        className="mt-6"
+        onPointerEnter={(event) => event.pointerType === "mouse" && hold("hover", true)}
+        onPointerLeave={(event) => event.pointerType === "mouse" && hold("hover", false)}
+        onPointerDown={(event) => event.pointerType !== "mouse" && hold("touch", true)}
+        onPointerUp={(event) => event.pointerType !== "mouse" && hold("touch", false)}
+        onPointerCancel={() => hold("touch", false)}
+        onFocus={(event) => event.target.matches(":focus-visible") && hold("focus", true)}
+        onBlur={() => hold("focus", false)}
+      >
         {/* One slide at a time, the page's full width: always centered, nothing cut on one side only. */}
         <div ref={track} className="relative flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {STORIES.map((story, i) => (
@@ -102,9 +151,20 @@ export function StoriesStep({ onContinue }: { onContinue: () => void }) {
             <ChevronLeft className="h-4 w-4" />
           </button>
           <div className="flex gap-1.5" aria-hidden>
-            {STORIES.map((story, i) => (
-              <span key={story.name} className={cn("h-1.5 rounded-full transition-all duration-300", i === index ? "w-5 bg-primary" : "w-1.5 bg-muted-foreground/30")} />
-            ))}
+            {STORIES.map((story, i) =>
+              i === index ? (
+                // The current story: a track that fills up until the next one.
+                <span key={story.name} className="relative h-1.5 w-5 overflow-hidden rounded-full bg-primary/30 transition-all duration-300">
+                  <span
+                    ref={progress}
+                    className="absolute inset-0 origin-left rounded-full bg-primary"
+                    style={{ transform: reduceMotion ? "scaleX(1)" : "scaleX(0)" }}
+                  />
+                </span>
+              ) : (
+                <span key={story.name} className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 transition-all duration-300" />
+              ),
+            )}
           </div>
           <button
             type="button"

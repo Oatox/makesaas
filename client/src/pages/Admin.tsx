@@ -17,6 +17,7 @@ export default function AdminPage() {
   const isMarketingPage = location === "/admin/marketing";
   const [isMarketingToolPage, toolParams] = useRoute<{ toolId: string }>("/admin/marketing/:toolId");
   const [isUserDetailsPage, params] = useRoute<{ id: string }>("/admin/users/:id");
+  const [isPipelineDetailsPage, pipelineParams] = useRoute<{ slug: string }>("/admin/pipeline/:slug");
 
   if (!isAdmin) {
     return <AdminAccessDenied setLocation={setLocation} />;
@@ -28,6 +29,10 @@ export default function AdminPage() {
 
   if (isPipelinePage) {
     return <AdminPipelinePage />;
+  }
+
+  if (isPipelineDetailsPage && pipelineParams?.slug) {
+    return <AdminPipelinePage slug={pipelineParams.slug} />;
   }
 
   if (isMarketingPage) {

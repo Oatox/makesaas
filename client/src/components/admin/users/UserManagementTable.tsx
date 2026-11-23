@@ -42,9 +42,6 @@ const ROLE_FILTERS = [
   { value: "subscriber", label: "Abonnés" },
 ];
 
-const selectItemClass =
-  "h-11 cursor-pointer rounded-md pr-2 pl-8 text-sm font-medium md:h-9 data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-accent-foreground";
-
 // Pieces shared by the desktop table and the mobile cards.
 function UserIdentity({ profile }: { profile: AdminProfileRow }) {
   return (
@@ -126,9 +123,9 @@ export function UserManagementTable({
               </span>
             </div>
           </SelectTrigger>
-          <SelectContent align="end" className="min-w-[210px] rounded-[12px] border-border bg-card p-1.5 text-foreground">
+          <SelectContent align="end" className="min-w-[210px]">
             {ROLE_FILTERS.map((option) => (
-              <SelectItem key={option.value} value={option.value} className={selectItemClass}>
+              <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
             ))}

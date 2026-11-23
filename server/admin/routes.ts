@@ -5,6 +5,7 @@ import { getUserId, requireAdmin } from "../lib/auth";
 import { asyncRoute, HttpError, parseInput } from "../lib/http";
 import { logger } from "../lib/logger";
 import { supabaseAdmin } from "../lib/supabase-admin";
+import { removeUserFiles } from "../storage/files";
 import { mapProviders, mapSessionRow, type AdminSessionPayload } from "./mappers";
 
 const userParamsSchema = z.object({ id: z.string().uuid() });
@@ -183,10 +184,16 @@ export function registerAdminRoutes(app: Express) {
   );
 }
 
-/** Removes the auth user; the profile and subscription follow through ON DELETE CASCADE. */
+/**
+ * Removes the auth user; the profile and subscription follow through ON DELETE CASCADE, and their
+ * files in the R2 bucket are removed in the background.
+ */
 export async function deleteAuthUser(userId: string): Promise<void> {
   const { error } = await supabaseAdmin!.auth.admin.deleteUser(userId);
-  if (!error) return;
+  if (!error) {
+    void removeUserFiles(userId);
+    return;
+  }
 
   if (error.status === 404) throw new HttpError(404, "Utilisateur introuvable.");
   logger.error({ err: error, userId }, "Failed to delete user");

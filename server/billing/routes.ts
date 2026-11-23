@@ -5,6 +5,7 @@ import { getUserId, requireUser } from "../lib/auth";
 import { asyncRoute, HttpError } from "../lib/http";
 import { logger } from "../lib/logger";
 import { supabaseAdmin } from "../lib/supabase-admin";
+import { getIdeasService } from "../ideas/service";
 import { loadWhopConfig } from "./config";
 import { BillingService } from "./service";
 
@@ -128,7 +129,10 @@ export function registerBillingRoutes(app: Express) {
     }
 
     try {
-      await billing.syncMembership(membershipId);
+      const activatedUserId = await billing.syncMembership(membershipId);
+      // A new member: Gus starts writing their first SaaS ideas now, in the background, so that they
+      // are ready (or nearly) when the member lands on /lancement.
+      if (activatedUserId) void getIdeasService()?.startWelcomeIdeas(activatedUserId);
       res.status(200).json({ received: true });
     } catch (err) {
       logger.error({ err, type: event.type, membershipId }, "Failed to process Whop webhook");

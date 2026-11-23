@@ -253,15 +253,20 @@ function Sidebar({
   )
 }
 
-function SidebarTrigger({
-  className,
-  onClick,
-  ...props
-}: React.ComponentProps<typeof Button>) {
+// The clickable parts (SidebarTrigger, SidebarGroupAction, SidebarMenuButton, SidebarMenuAction,
+// SidebarMenuSubButton) forward their ref: on React 18 a plain function component drops it, and a
+// Radix trigger wrapping one (`<DropdownMenuTrigger asChild>`, tooltips…) then has no element to
+// anchor to, so its menu opens off-screen and a click seems to do nothing.
+
+const SidebarTrigger = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<typeof Button>
+>(({ className, onClick, ...props }, ref) => {
   const { toggleSidebar } = useSidebar()
 
   return (
     <Button
+      ref={ref}
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
@@ -277,7 +282,8 @@ function SidebarTrigger({
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )
-}
+})
+SidebarTrigger.displayName = "SidebarTrigger"
 
 function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   const { toggleSidebar } = useSidebar()
@@ -415,15 +421,15 @@ function SidebarGroupLabel({
   )
 }
 
-function SidebarGroupAction({
-  className,
-  asChild = false,
-  ...props
-}: React.ComponentProps<"button"> & { asChild?: boolean }) {
+const SidebarGroupAction = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<"button"> & { asChild?: boolean }
+>(({ className, asChild = false, ...props }, ref) => {
   const Comp = asChild ? Slot : "button"
 
   return (
     <Comp
+      ref={ref}
       data-slot="sidebar-group-action"
       data-sidebar="group-action"
       className={cn(
@@ -436,7 +442,8 @@ function SidebarGroupAction({
       {...props}
     />
   )
-}
+})
+SidebarGroupAction.displayName = "SidebarGroupAction"
 
 function SidebarGroupContent({
   className,
@@ -560,19 +567,18 @@ const SidebarMenuButton = React.forwardRef<
 )
 SidebarMenuButton.displayName = "SidebarMenuButton"
 
-function SidebarMenuAction({
-  className,
-  asChild = false,
-  showOnHover = false,
-  ...props
-}: React.ComponentProps<"button"> & {
-  asChild?: boolean
-  showOnHover?: boolean
-}) {
+const SidebarMenuAction = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<"button"> & {
+    asChild?: boolean
+    showOnHover?: boolean
+  }
+>(({ className, asChild = false, showOnHover = false, ...props }, ref) => {
   const Comp = asChild ? Slot : "button"
 
   return (
     <Comp
+      ref={ref}
       data-slot="sidebar-menu-action"
       data-sidebar="menu-action"
       className={cn(
@@ -590,7 +596,8 @@ function SidebarMenuAction({
       {...props}
     />
   )
-}
+})
+SidebarMenuAction.displayName = "SidebarMenuAction"
 
 function SidebarMenuBadge({
   className,
@@ -681,21 +688,19 @@ function SidebarMenuSubItem({
   )
 }
 
-function SidebarMenuSubButton({
-  asChild = false,
-  size = "md",
-  isActive = false,
-  className,
-  ...props
-}: React.ComponentProps<"a"> & {
-  asChild?: boolean
-  size?: "sm" | "md"
-  isActive?: boolean
-}) {
+const SidebarMenuSubButton = React.forwardRef<
+  HTMLAnchorElement,
+  React.ComponentProps<"a"> & {
+    asChild?: boolean
+    size?: "sm" | "md"
+    isActive?: boolean
+  }
+>(({ asChild = false, size = "md", isActive = false, className, ...props }, ref) => {
   const Comp = asChild ? Slot : "a"
 
   return (
     <Comp
+      ref={ref}
       data-slot="sidebar-menu-sub-button"
       data-sidebar="menu-sub-button"
       data-size={size}
@@ -711,7 +716,8 @@ function SidebarMenuSubButton({
       {...props}
     />
   )
-}
+})
+SidebarMenuSubButton.displayName = "SidebarMenuSubButton"
 
 export {
   Sidebar,

@@ -29,7 +29,10 @@ import { ErrorState } from "@/components/StateCard";
 import { TESTIMONIALS } from "@/components/landing/Testimonials";
 import { LEGAL } from "@/config/legal";
 import { MEMBER_COUNT_SHORT } from "@/config/social-proof";
+import { AUTH_CONFIG } from "@/config/auth";
 import { useAuth } from "@/hooks/use-auth";
+import { useSaveOnboardingProfile } from "@/hooks/use-ideas";
+import { useSaas } from "@/hooks/use-saas";
 import { createCheckout, usePaywallOffers } from "@/hooks/use-billing";
 import { useToast } from "@/hooks/use-toast";
 import { ApiError } from "@/lib/api-client";
@@ -648,15 +651,18 @@ function OffersScreen({
   );
 }
 
-/** Waits for the webhook to grant access, then opens the app. */
+/** Waits for the webhook to grant access, then opens the app: Gus's ideas first, for a member without a project. */
 function Activating() {
   const { hasAccess, retryProfile } = useAuth();
+  const { saasList, isLoading: saasLoading, isError: saasError } = useSaas();
   const [, navigate] = useLocation();
   const [timedOut, setTimedOut] = useState(false);
+  const hasProject = saasList.length > 0 || saasError;
 
   useEffect(() => {
     if (hasAccess) {
-      navigate("/app", { replace: true });
+      if (saasLoading) return;
+      navigate(hasProject ? AUTH_CONFIG.REDIRECT_PATH : AUTH_CONFIG.LAUNCH_PATH, { replace: true });
       return;
     }
     const poll = window.setInterval(retryProfile, ACTIVATION_POLL_MS);
@@ -665,7 +671,7 @@ function Activating() {
       window.clearInterval(poll);
       window.clearTimeout(timeout);
     };
-  }, [hasAccess, navigate, retryProfile]);
+  }, [hasAccess, saasLoading, hasProject, navigate, retryProfile]);
 
   return (
     <motion.div {...stagger} className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
@@ -729,6 +735,9 @@ const readFlag = (key: string) => {
 export function Paywall() {
   const { hasAccess, retryProfile } = useAuth();
   const { toast } = useToast();
+  // The onboarding answers go on the profile now: Gus's first ideas start as soon as the payment is
+  // confirmed (Whop webhook), and they are written from these answers.
+  useSaveOnboardingProfile();
   const offersQuery = usePaywallOffers();
   const status = new URLSearchParams(window.location.search).get("status");
 

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
 import { useHistoryState } from "wouter/use-browser-location";
@@ -13,11 +13,16 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   House,
+  Route,
   ShieldCheck,
   Users,
   LogOut,
@@ -25,20 +30,40 @@ import {
   Settings as SettingsIcon,
   Workflow,
   Megaphone,
+  TrendingUp,
+  ChartColumn,
+  Clapperboard,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/format";
 import type { LucideIcon } from "lucide-react";
-import { Logo } from "@/components/brand/Logo";
+import { SidebarDiscussions } from "@/components/coach/SidebarDiscussions";
+import { navLinkClass, navSubLinkClass } from "./nav-styles";
+import { SaasSwitcher } from "./SaasSwitcher";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; matchPrefix?: boolean };
-type NavGroup = { label: string; items: NavItem[]; adminOnly?: boolean };
+type NavSubItem = { href: string; label: string; icon?: LucideIcon };
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  matchPrefix?: boolean;
+  /** Sub-pages listed under the link, which then unfolds them instead of being a plain link. */
+  children?: NavSubItem[];
+};
+/** What a category with its own content (instead of fixed links) receives. */
+export type NavGroupContentProps = { isCollapsed: boolean; currentPath: string };
+type NavGroup = { label: string; adminOnly?: boolean } & (
+  | { items: NavItem[] }
+  /** Links built at runtime, e.g. the member's discussions. */
+  | { Content: React.ComponentType<NavGroupContentProps> }
+);
 
 // Single source for the sidebar navigation.
 const NAV_GROUPS: NavGroup[] = [
@@ -46,32 +71,32 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Application",
     items: [
       { href: "/app", label: "Accueil", icon: House, matchPrefix: true },
+      { href: "/roadmap", label: "Roadmap", icon: Route },
+      {
+        href: "/acquisition",
+        label: "Acquisition",
+        icon: TrendingUp,
+        matchPrefix: true,
+        children: [
+          { href: "/acquisition", label: "Statistiques", icon: ChartColumn },
+          { href: "/acquisition/contenu", label: "Création de contenu", icon: Clapperboard },
+        ],
+      },
     ],
   },
+  // The active SaaS's discussions with Gus (a new one starts from the header, TalkToGusButton).
+  { label: "Discussions", Content: SidebarDiscussions },
   {
     label: "Administration",
     adminOnly: true,
     items: [
       { href: "/admin", label: "Aperçu Admin", icon: ShieldCheck },
       { href: "/admin/users", label: "Utilisateurs", icon: Users, matchPrefix: true },
-      { href: "/admin/pipeline", label: "Pipeline", icon: Workflow },
+      { href: "/admin/pipeline", label: "Pipelines", icon: Workflow, matchPrefix: true },
       { href: "/admin/marketing", label: "Marketing", icon: Megaphone, matchPrefix: true },
     ],
   },
 ];
-
-// Links listed flat under their category label: muted at rest, a light wash on hover. The active one
-// gets a soft fill with a thin border and a top highlight, white text and an orange icon. Collapsed to
-// icons, each link is a 40px square with the same active style. Tailwind 3 applies stacked variants
-// right to left:
-// [&>svg]:hover: styles the icon when the link is hovered.
-const navLinkClass =
-  "h-11 gap-3 rounded-[10px] border border-transparent px-3 text-[15px] font-medium text-sidebar-foreground/65 transition-colors duration-150 " +
-  "[&>svg]:size-5 [&>svg]:text-sidebar-foreground/45 [&>svg]:transition-colors " +
-  "hover:bg-white/[0.045] hover:text-sidebar-foreground [&>svg]:hover:text-sidebar-foreground/80 " +
-  "data-[active=true]:border-white/[0.09] data-[active=true]:bg-white/[0.07] data-[active=true]:font-medium data-[active=true]:text-sidebar-foreground " +
-  "data-[active=true]:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] [&>svg]:data-[active=true]:text-primary hover:data-[active=true]:bg-white/[0.07] " +
-  "group-data-[collapsible=icon]:!h-10 group-data-[collapsible=icon]:!w-10 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center";
 
 function NavLink({ item, active, isCollapsed }: { item: NavItem; active: boolean; isCollapsed: boolean }) {
   return (
@@ -86,11 +111,67 @@ function NavLink({ item, active, isCollapsed }: { item: NavItem; active: boolean
   );
 }
 
-// User dropdown rows mirror the nav items (height, radius, text and 22px icons).
-const menuItemClass =
-  "h-14 cursor-pointer gap-3.5 rounded-[12px] px-4 text-base font-medium md:h-12 sm:rounded-[12px] sm:px-4 sm:py-0 " +
-  "text-sidebar-foreground/80 [&_svg]:size-[22px] data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-foreground " +
-  "focus:bg-sidebar-accent focus:text-sidebar-foreground";
+/**
+ * A link with sub-pages: clicking it unfolds them and opens the first one (when not already in the
+ * section); it unfolds by itself on any of its pages. Collapsed to icons, the sub-pages are hidden,
+ * so it is a plain link to the first one.
+ */
+function NavFolder({
+  item,
+  active,
+  isCollapsed,
+  currentPath,
+}: {
+  item: NavItem & { children: NavSubItem[] };
+  active: boolean;
+  isCollapsed: boolean;
+  currentPath: string;
+}) {
+  const [, navigate] = useLocation();
+  const [open, setOpen] = useState(active);
+
+  useEffect(() => {
+    if (active) setOpen(true);
+  }, [active]);
+
+  if (isCollapsed) return <NavLink item={{ ...item, href: item.children[0].href }} active={active} isCollapsed />;
+
+  return (
+    <Collapsible
+      asChild
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next && !active) navigate(item.children[0].href);
+      }}
+    >
+      <SidebarMenuItem className="group/folder">
+        <CollapsibleTrigger asChild>
+          {/* Folded while on one of its pages: the parent carries the active style instead. */}
+          <SidebarMenuButton isActive={active && !open} className={navLinkClass}>
+            <item.icon />
+            <span>{item.label}</span>
+            <ChevronRight className="ml-auto !size-4 transition-transform duration-200 group-data-[state=open]/folder:rotate-90" />
+          </SidebarMenuButton>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarMenuSub className="ml-[21px] mr-0 mt-1 border-white/[0.08] pl-2.5 pr-0">
+            {item.children.map((child) => (
+              <SidebarMenuSubItem key={child.href}>
+                <SidebarMenuSubButton asChild isActive={currentPath === child.href} className={navSubLinkClass}>
+                  <Link href={child.href}>
+                    {child.icon && <child.icon />}
+                    <span>{child.label}</span>
+                  </Link>
+                </SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
+  );
+}
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -127,14 +208,9 @@ export function AppSidebar() {
 
   return (
     <Sidebar variant="inset" collapsible="icon">
-      <SidebarHeader className="h-16 flex items-center justify-center overflow-hidden transition-[width,height] ease-linear group-data-[collapsible=icon]:h-12">
-        <Link href="/app" aria-label="MakeSaaS" className="flex h-full w-full items-center justify-center px-2 pt-1 text-sidebar-foreground">
-          {isCollapsed ? (
-            <Logo variant="mark" className="h-7 w-7" />
-          ) : (
-            <Logo className="h-5 animate-in fade-in duration-300" />
-          )}
-        </Link>
+      {/* The active SaaS, to switch to another one or create one (in place of the MakeSaaS logo). */}
+      <SidebarHeader className="flex min-h-16 items-center justify-center overflow-visible px-2 py-2 transition-[width,height] ease-linear group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:py-0">
+        <SaasSwitcher isCollapsed={isCollapsed} />
       </SidebarHeader>
 
       <SidebarContent>
@@ -146,11 +222,25 @@ export function AppSidebar() {
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-1">
-                {group.items.map((item) => (
-                  <NavLink key={item.href} item={item} active={isActive(item)} isCollapsed={isCollapsed} />
-                ))}
-              </SidebarMenu>
+              {"Content" in group ? (
+                <group.Content isCollapsed={isCollapsed} currentPath={currentPath} />
+              ) : (
+                <SidebarMenu className="gap-1">
+                  {group.items.map((item) =>
+                    item.children ? (
+                      <NavFolder
+                        key={item.href}
+                        item={{ ...item, children: item.children }}
+                        active={isActive(item)}
+                        isCollapsed={isCollapsed}
+                        currentPath={currentPath}
+                      />
+                    ) : (
+                      <NavLink key={item.href} item={item} active={isActive(item)} isCollapsed={isCollapsed} />
+                    ),
+                  )}
+                </SidebarMenu>
+              )}
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
@@ -194,29 +284,20 @@ export function AppSidebar() {
           <DropdownMenuContent
             // Expanded: exactly the trigger's width, centered on it, so it never overflows the sidebar.
             // Collapsed: the trigger is a 32px avatar, so fall back to a fixed width next to it.
-            className={`rounded-[14px] border-sidebar-border bg-sidebar p-1.5 text-sidebar-foreground ${
-              isCollapsed ? "w-60" : "w-[--radix-dropdown-menu-trigger-width] min-w-0"
-            }`}
+            className={isCollapsed ? "w-60" : "w-[--radix-dropdown-menu-trigger-width] min-w-0"}
             side={isCollapsed ? "right" : "top"}
             align={isCollapsed ? "end" : "center"}
-            sideOffset={4}
           >
-            <DropdownMenuItem
-              asChild
-              className={menuItemClass}
-            >
-              <Link href="/settings" className="flex w-full items-center gap-3.5">
-                <SettingsIcon className="shrink-0" />
-                <span>Paramètres</span>
+            <DropdownMenuItem asChild>
+              <Link href="/settings">
+                <SettingsIcon />
+                Paramètres
               </Link>
             </DropdownMenuItem>
-            <div className="my-1 h-px bg-sidebar-border/70" />
-            <DropdownMenuItem
-              className={`${menuItemClass} text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive focus:bg-destructive/10 focus:text-destructive`}
-              onClick={() => signOut()}
-            >
-              <LogOut className="shrink-0" />
-              <span>Déconnexion</span>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onSelect={() => signOut()}>
+              <LogOut />
+              Déconnexion
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

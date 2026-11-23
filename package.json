@@ -34,6 +34,7 @@
     "@whop/elements": "^1.10.0",
     "@whop/elements-react": "^1.10.0",
     "@whop/sdk": "^2.8.0",
+    "aws4fetch": "^1.0.20",
     "baseline-browser-mapping": "^2.10.20",
     "caniuse-lite": "^1.0.30001790",
     "class-variance-authority": "^0.7.1",

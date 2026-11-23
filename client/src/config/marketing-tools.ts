@@ -1,4 +1,4 @@
-import { Disc3, type LucideIcon } from "lucide-react";
+import { Disc3, Rocket, type LucideIcon } from "lucide-react";
 
 /**
  * Marketing tools of the admin (/admin/marketing): each one opens at /admin/marketing/<id>.
@@ -22,6 +22,13 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     description: "Une roue (ou un rouleau) à faire tourner en live ou en vidéo. Résultat imposable en secret.",
     icon: Disc3,
     src: "/tools/roulette/index.html?mode=wheel&v=1",
+  },
+  {
+    id: "onboarding",
+    title: "Le faux onboarding",
+    description: "Passions, temps, banque et objectif, puis le site qui se crée sous tes yeux et les paiements qui tombent. À filmer.",
+    icon: Rocket,
+    src: "/tools/onboarding/index.html?v=7",
   },
 ];
 

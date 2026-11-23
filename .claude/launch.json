@@ -6,6 +6,30 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["cross-env", "NODE_ENV=development", "bun", "server/index.ts"],
       "port": 3000
+    },
+    {
+      "name": "makesaas-3005",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["cross-env", "NODE_ENV=development", "PORT=3005", "bun", "server/index.ts"],
+      "port": 3005
+    },
+    {
+      "name": "makesaas-3008",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["cross-env", "NODE_ENV=development", "PORT=3008", "bun", "server/index.ts"],
+      "port": 3008
+    },
+    {
+      "name": "public-static",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "3010", "--directory", "client/public"],
+      "port": 3010
+    },
+    {
+      "name": "makesaas-3006",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["cross-env", "NODE_ENV=development", "PORT=3006", "bun", "server/index.ts"],
+      "port": 3006
     }
   ]
 }

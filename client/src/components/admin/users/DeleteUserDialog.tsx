@@ -17,11 +17,8 @@ export function DeleteUserDialog({ profile, onDelete }: { profile: Pick<Profile,
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <DropdownMenuItem
-          className="h-9 cursor-pointer rounded-md px-2 text-sm font-medium text-destructive data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-destructive focus:bg-sidebar-accent focus:text-destructive"
-          onSelect={(event) => event.preventDefault()}
-        >
-          <Trash2 className="h-4 w-4" />
+        <DropdownMenuItem variant="destructive" onSelect={(event) => event.preventDefault()}>
+          <Trash2 />
           Supprimer
         </DropdownMenuItem>
       </AlertDialogTrigger>

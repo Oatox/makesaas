@@ -152,22 +152,23 @@ export class BillingService {
   /**
    * Applies a membership to the user's subscription row. The membership is re-read from Whop rather than trusted
    * from the webhook payload, so late or replayed events always apply the current state.
+   * Returns the user whose subscription it just activated (a new membership granting access), null otherwise.
    */
-  async syncMembership(membershipId: string): Promise<void> {
+  async syncMembership(membershipId: string): Promise<string | null> {
     const membership = await this.whop.client.memberships.retrieve({ id: membershipId });
     if (!this.sells(membership)) {
       logger.warn({ membershipId, variantId: membership.variant_id, productId: membership.product_id }, "Whop membership on a plan the app does not sell");
-      return;
+      return null;
     }
 
     const userId = await this.resolveUserId(membership);
     if (!userId) {
       logger.warn({ membershipId }, "Whop membership without a matching app user");
-      return;
+      return null;
     }
     if (!(await this.userExists(userId))) {
       logger.warn({ membershipId, userId }, "Whop membership for a deleted app user");
-      return;
+      return null;
     }
 
     const current = await this.getSubscription(userId);
@@ -176,13 +177,13 @@ export class BillingService {
     if (!isCurrent) {
       // Another membership than the row's (a new subscription): it takes the row over only if it grants
       // access, and never from a Whop membership still running, so an old one ending cannot cut access.
-      if (!grantsAccess(membership.status)) return;
+      if (!grantsAccess(membership.status)) return null;
       if (await this.isHeldByRunningMembership(current)) {
         logger.error(
           { userId, membershipId, currentMembershipId: current?.whop_membership_id },
           "Duplicate Whop membership: the user pays twice, refund and cancel one from the Whop dashboard",
         );
-        return;
+        return null;
       }
     }
 
@@ -190,9 +191,12 @@ export class BillingService {
 
     if (!isCurrent) {
       logger.info({ userId, membershipId }, "Subscription activated");
-    } else if (grantsAccess(current.status) && !grantsAccess(membership.status)) {
+      return userId;
+    }
+    if (grantsAccess(current.status) && !grantsAccess(membership.status)) {
       logger.info({ userId, membershipId, status: membership.status }, "Subscription ended");
     }
+    return null;
   }
 
   /** The user who paid: from the checkout metadata, or the subscription already linked to the membership. */

@@ -256,9 +256,6 @@ export type OnboardingStep =
 /** Detail written in the field of an option ("Autre", passion...). */
 export const detailKey = (stepId: string) => `${stepId}-detail`;
 
-// The service is reserved to adults (CGU, article "Accès au service").
-const MINIMUM_AGE = 18;
-
 /** "Autre" option of a question: the answer is written in its card. */
 const other = (placeholder: string): OnboardingOption => ({
   value: "autre",
@@ -301,12 +298,6 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     defaultValue: 20,
     unit: "ans",
     firstLabel: "12 ou moins",
-    minimum: {
-      value: MINIMUM_AGE,
-      title: `${LEGAL.siteName} est réservé aux ${MINIMUM_AGE} ans et plus.`,
-      text: "Reviens nous voir dans quelques années, on t'attend.",
-      action: "Corriger mon âge",
-    },
   },
   {
     id: "profil",

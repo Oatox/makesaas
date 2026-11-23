@@ -18,6 +18,18 @@ export type JsonGenerationRequest = {
 
 export type JsonGenerationResult = { jobId: string; json: unknown };
 
+export type ImageGenerationRequest = {
+  /** Image model id, e.g. "nano-banana-2". */
+  model: string;
+  prompt: string;
+  /** "9:16", "4:5", "1:1"... (the values the model accepts). */
+  aspectRatio: string;
+  resolution?: "1K" | "2K" | "4K";
+};
+
+/** `url` is temporary on OneShotAPI's side: download the image and store it. */
+export type ImageGenerationResult = { jobId: string; url: string; contentType: string | null };
+
 export type ChatStreamRequest = { model: string; messages: ChatMessage[]; signal?: AbortSignal };
 
 const CHAT_STREAM_TIMEOUT_MS = 120_000;
@@ -28,7 +40,8 @@ type Job = {
   id: string;
   status: "queued" | "processing" | "completed" | "failed";
   // The guide documents `textResponse`, the API reference example shows `text`: accept both.
-  result?: { textResponse?: string; text?: string } | null;
+  // Image jobs return the media `url` instead.
+  result?: { textResponse?: string; text?: string; url?: string; contentType?: string } | null;
   error?: ApiErrorBody | null;
 };
 
@@ -43,12 +56,27 @@ export class OneShotError extends Error {
   }
 }
 
-/** Minimal OneShotAPI client for asynchronous Gemini text jobs with JSON output. */
+/** Minimal OneShotAPI client: Gemini text jobs with JSON output, streamed chat and image jobs. */
 export class OneShotClient {
   constructor(
     private readonly apiKey: string,
     private readonly options: { pollIntervalMs?: number; jobTimeoutMs?: number } = {},
   ) {}
+
+  /** Image job (Nano Banana...): waits for it and returns the temporary URL of the image. */
+  async generateImage({ model, prompt, aspectRatio, resolution }: ImageGenerationRequest): Promise<ImageGenerationResult> {
+    const accepted = await this.request<{ id: string }>(`/v1/models/${encodeURIComponent(model)}/jobs`, {
+      method: "POST",
+      body: JSON.stringify({ prompt, options: { aspectRatio, ...(resolution ? { resolution } : {}) } }),
+    });
+
+    const job = await this.waitForJob(accepted.id);
+    const url = job.result?.url;
+    if (typeof url !== "string" || !url) {
+      throw new OneShotError("empty_result", "OneShotAPI image job completed without a URL", { jobId: job.id });
+    }
+    return { jobId: job.id, url, contentType: job.result?.contentType ?? null };
+  }
 
   async generateJson({ model, messages, responseSchema }: JsonGenerationRequest): Promise<JsonGenerationResult> {
     const accepted = await this.request<{ id: string }>(`/v1/models/${encodeURIComponent(model)}/jobs`, {

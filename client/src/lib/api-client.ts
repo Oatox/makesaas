@@ -14,11 +14,18 @@ export class ApiError extends Error {
 }
 
 type ApiRequestOptions = {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   query?: Record<string, string | number>;
+  /** Sent as JSON; a Blob (e.g. an image File) is sent as is, with its own type. */
   body?: unknown;
   signal?: AbortSignal;
 };
+
+function encodeBody(body: unknown): { body?: BodyInit; contentType?: string } {
+  if (body === undefined) return {};
+  if (body instanceof Blob) return { body, contentType: body.type || "application/octet-stream" };
+  return { body: JSON.stringify(body), contentType: "application/json" };
+}
 
 const SESSION_EXPIRED = "Session expirée. Veuillez vous reconnecter.";
 
@@ -32,22 +39,20 @@ export async function getAccessToken(): Promise<string> {
   return session.access_token;
 }
 
-/**
- * Calls the Express API with the current Supabase access token.
- * Throws ApiError with the server's (French) message so the UI can show it as is.
- */
-export async function apiRequest<T>(path: string, { method = "GET", query, body, signal }: ApiRequestOptions = {}): Promise<T> {
+/** The successful response of an API call; signs out on 401 and throws ApiError on any other error. */
+async function apiFetch(path: string, { method = "GET", query, body, signal }: ApiRequestOptions): Promise<Response> {
   const accessToken = await getAccessToken();
   const url = query ? `${path}?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]))}` : path;
+  const encoded = encodeBody(body);
 
   const response = await fetch(url, {
     method,
     signal,
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(encoded.contentType ? { "Content-Type": encoded.contentType } : {}),
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: encoded.body,
   });
 
   if (response.status === 401) {
@@ -62,5 +67,40 @@ export async function apiRequest<T>(path: string, { method = "GET", query, body,
     throw new ApiError(response.status, message, typeof payload?.code === "string" ? payload.code : undefined);
   }
 
+  return response;
+}
+
+/**
+ * Calls the Express API with the current Supabase access token.
+ * Throws ApiError with the server's (French) message so the UI can show it as is.
+ */
+export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+  const response = await apiFetch(path, options);
   return (response.status === 204 ? undefined : await response.json()) as T;
+}
+
+/**
+ * Same as apiRequest for a route answering a stream of JSON lines (NDJSON): yields each object as
+ * it arrives. Errors before the stream starts are thrown as ApiError.
+ */
+export async function* apiStream<T>(path: string, options: ApiRequestOptions = {}): AsyncGenerator<T> {
+  const response = await apiFetch(path, options);
+  if (!response.body) throw new ApiError(response.status, "Réponse vide du serveur, réessayez.");
+
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) if (line.trim()) yield JSON.parse(line) as T;
+    }
+    if (buffer.trim()) yield JSON.parse(buffer) as T;
+  } finally {
+    // Stops the download if the caller stopped reading early (no-op once the stream ended).
+    void reader.cancel().catch(() => undefined);
+  }
 }

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>MakeSaaS · Crée ton SaaS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400..800&family=Unbounded:wght@300..500&display=swap" />
+  <link rel="stylesheet" href="style.css?v=8" />
+  <link rel="icon" type="image/svg+xml" href="/brand/favicon.svg?v=3" />
+</head>
+<body>
+  <div class="app">
+    <!-- The site's address on top of the page, as part of the onboarding (no browser frame). -->
+    <header class="brand" aria-label="MakeSaaS.app">
+      <svg class="brand-mark" viewBox="-4.8 -27.9 130.8 130.8" aria-hidden="true"><path d="M40.3 1.7Q41.3 0 43.1 0L69.4 0Q71.3 0 71.3 1.9L71.3 19.4Q71.3 21.3 70.4 22.9L49 61.9L49 37.6L29.3 73.3Q28.4 75 26.5 75L1.9 75Q0 75 0.9 73.3ZM87.5 1.7Q88.4 0 90.3 0L119.3 0Q121.1 0 120.8 1.9L109.4 73.1Q109.1 75 107.3 75L98 75Q96.2 75 96.2 73.1L96.2 37.6L76.5 73.3Q75.6 75 73.7 75L49.1 75Q47.2 75 48.1 73.3Z" fill="#FF7518" /></svg>
+      <span class="brand-text">MakeSaaS.app</span>
+    </header>
+
+    <!-- Back + progress, like the real onboarding. -->
+    <div class="topbar">
+      <button class="back" id="btnBack" type="button" aria-label="Question précédente">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+      </button>
+      <div class="progress" role="progressbar" aria-label="Progression"><span id="progressFill"></span></div>
+    </div>
+
+    <main class="main" id="main"></main>
+  </div>
+
+  <!-- Tool controls (fade out when the mouse rests, so they stay out of the video). -->
+  <div class="controls" id="controls">
+    <button type="button" id="btnRestart" title="Recommencer (R)" aria-label="Recommencer">
+      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 3v6h6" /></svg>
+    </button>
+    <button type="button" id="btnSound" title="Son on/off (M)" aria-label="Son">
+      <svg class="ico-on" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" /></svg>
+      <svg class="ico-off" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M17 9l5 6M22 9l-5 6" /></svg>
+    </button>
+    <button type="button" id="btnFull" title="Plein écran (F)" aria-label="Plein écran">
+      <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+    </button>
+  </div>
+
+  <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
+
+  <script src="icons.js?v=7"></script>
+  <script src="data.js?v=7"></script>
+  <script src="app.js?v=7"></script>
+</body>
+</html>

@@ -187,6 +187,18 @@
       linear-gradient(180deg, hsl(160 7% 11%), hsl(160 8% 9%));
   }
 
+  /* Floating menu panel (dropdown menus, select lists; see components/ui/menu-styles.ts): the
+     card's light from the top, a shade lighter than the cards it opens over, and a deeper
+     shadow since it floats above them. */
+  .menu-3d {
+    border: 1px solid hsl(var(--line));
+    background-image: linear-gradient(180deg, hsl(160 7% 13%), hsl(160 8% 10.5%));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.07),
+      0 1px 2px rgb(0 0 0 / 0.4),
+      0 18px 40px -12px rgb(0 0 0 / 0.75);
+  }
+
   /* Big 3D range slider (onboarding goal). Native input, so keyboard and screen readers work.
      --range-progress (0-1, set inline) drives the orange fill; it is offset by half a thumb on
      each side so the fill always ends under the thumb's center. */

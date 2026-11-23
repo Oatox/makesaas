@@ -6,6 +6,14 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { fieldClass } from "@/lib/field-styles"
+import {
+  menuIndicatorClass,
+  menuItemClass,
+  menuItemIndicatorPadding,
+  menuLabelClass,
+  menuPanelClass,
+  menuSeparatorClass,
+} from "./menu-styles"
 
 const Select = SelectPrimitive.Root
 
@@ -77,7 +85,11 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        "relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 max-sm:!fixed max-sm:!bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] max-sm:!left-3 max-sm:!right-3 max-sm:!top-auto max-sm:!max-h-[70dvh] max-sm:!min-w-0 max-sm:!w-auto max-sm:!transform-none max-sm:rounded-2xl max-sm:p-1 max-sm:shadow-2xl max-sm:data-[state=closed]:slide-out-to-bottom-2 max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=open]:slide-in-from-bottom-2 max-sm:data-[state=open]:zoom-in-100 origin-[--radix-select-content-transform-origin]",
+        menuPanelClass,
+        // The viewport holds the padding, so the scroll buttons sit flush with the edges.
+        "relative max-h-[--radix-select-content-available-height] overflow-y-auto overflow-x-hidden p-0 origin-[--radix-select-content-transform-origin]",
+        // Phones: a sheet at the bottom of the screen rather than a list under the field.
+        "max-sm:!fixed max-sm:!bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] max-sm:!left-3 max-sm:!right-3 max-sm:!top-auto max-sm:!max-h-[70dvh] max-sm:!min-w-0 max-sm:!w-auto max-sm:!transform-none max-sm:rounded-2xl max-sm:data-[state=closed]:slide-out-to-bottom-2 max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=open]:slide-in-from-bottom-2 max-sm:data-[state=open]:zoom-in-100",
         position === "popper" &&
           "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
         className
@@ -88,7 +100,7 @@ const SelectContent = React.forwardRef<
       <SelectScrollUpButton />
       <SelectPrimitive.Viewport
         className={cn(
-          "p-1",
+          "p-1.5",
           position === "popper" &&
             "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] max-sm:!h-auto max-sm:!min-w-0"
         )}
@@ -107,7 +119,7 @@ const SelectLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
-    className={cn("py-1.5 pl-8 pr-2 text-sm font-semibold", className)}
+    className={cn(menuLabelClass, menuItemIndicatorPadding, className)}
     {...props}
   />
 ))
@@ -120,14 +132,17 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex min-h-11 w-full cursor-default select-none items-center rounded-md py-2.5 pl-9 pr-3 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 sm:min-h-0 sm:rounded-sm sm:py-1.5 sm:pl-8 sm:pr-2",
+      menuItemClass,
+      menuItemIndicatorPadding,
+      // The chosen value stays white, like the active sidebar link.
+      "w-full data-[state=checked]:text-foreground",
       className
     )}
     {...props}
   >
-    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+    <span className={menuIndicatorClass}>
       <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4" />
+        <Check className="size-4" />
       </SelectPrimitive.ItemIndicator>
     </span>
 
@@ -142,7 +157,7 @@ const SelectSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Separator
     ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-muted", className)}
+    className={cn(menuSeparatorClass, className)}
     {...props}
   />
 ))
