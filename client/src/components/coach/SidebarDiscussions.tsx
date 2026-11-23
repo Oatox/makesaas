@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { MessagesSquare, MoreHorizontal, Pencil, SquarePen, Trash2 } from "lucide-react";
+import { MessagesSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { CoachConversation } from "@shared/coach";
 import type { NavGroupContentProps } from "@/components/layout/AppSidebar";
 import { navLinkClass, navSubLinkClass } from "@/components/layout/nav-styles";
@@ -28,7 +28,7 @@ function RecentDiscussion({
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={active} className={`${navSubLinkClass} px-2.5 pr-9`}>
+      <SidebarMenuButton asChild isActive={active} className={`${navSubLinkClass} px-3 pr-9`}>
         <Link href={conversationPath(conversation.id)} title={conversation.title}>
           <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
           {answering && <span aria-label="Gus répond" className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary" />}
@@ -66,9 +66,9 @@ function RecentDiscussion({
 /**
  * "Discussions" category of the sidebar (AppSidebar): the latest discussions of the active SaaS,
  * each renamable and deletable from its "…" menu; the open one stays listed even when it is older,
- * and "Voir tout" opens every discussion (searchable, by date) when there are more. Collapsed to
- * icons, a single icon opens that list. A new discussion starts from "Nouvelle discussion" at the
- * top of the list, or from "Discuter avec Gus" in the header (TalkToGusButton).
+ * and "Voir tout" opens every discussion (searchable, by date) when there are more. A new discussion
+ * starts from "Discuter avec Gus" at the top of the sidebar (AppSidebar) or in the header
+ * (TalkToGusButton). Collapsed to icons, a single icon opens every discussion.
  */
 export function SidebarDiscussions({ isCollapsed, currentPath }: NavGroupContentProps) {
   const conversations = useCoachConversations();
@@ -82,19 +82,10 @@ export function SidebarDiscussions({ isCollapsed, currentPath }: NavGroupContent
 
   const allDiscussions = <DiscussionsHistory open={allOpen} onOpenChange={setAllOpen} currentPath={currentPath} />;
 
-  const isNewDiscussion = currentPath === COACH_PATH;
-
   if (isCollapsed) {
     return (
       <>
         <SidebarMenu className="gap-1">
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={isNewDiscussion} tooltip="Nouvelle discussion" className={navLinkClass}>
-              <Link href={COACH_PATH} aria-label="Nouvelle discussion">
-                <SquarePen />
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               isActive={currentPath.startsWith(`${COACH_PATH}/`)}
@@ -113,41 +104,29 @@ export function SidebarDiscussions({ isCollapsed, currentPath }: NavGroupContent
 
   return (
     <>
-      <SidebarMenu className="gap-0.5">
-        <SidebarMenuItem>
-          <SidebarMenuButton asChild isActive={isNewDiscussion} className={`${navSubLinkClass} px-3`}>
-            <Link href={COACH_PATH} data-testid="link-new-discussion">
-              <SquarePen />
-              <span>Nouvelle discussion</span>
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
+      {/* The latest discussions, straight under the category label (a new one starts from
+          "Discuter avec Gus" in the header). */}
+      <SidebarMenu aria-label="Discussions récentes" className="gap-0.5">
+        {conversations.isLoading
+          ? [0, 1, 2].map((i) => (
+              <SidebarMenuItem key={i}>
+                <SidebarMenuSkeleton className="h-9" />
+              </SidebarMenuItem>
+            ))
+          : recent.map((conversation) => (
+              <RecentDiscussion key={conversation.id} conversation={conversation} active={conversation === open} onOpenDialog={setDialog} />
+            ))}
 
-        {/* The history hangs from a thin line under the "Nouvelle discussion" icon (like the
-            sub-pages of a folder in AppSidebar): a list of its own, below the action. Without any
-            discussion yet, nothing hangs there. */}
-        {(conversations.isLoading || recent.length > 0) && (
-          <li>
-            <ul aria-label="Discussions récentes" className="ml-5 mt-0.5 flex flex-col gap-0.5 border-l border-white/[0.08] pl-2">
-              {conversations.isLoading
-                ? [0, 1, 2].map((i) => (
-                    <SidebarMenuItem key={i}>
-                      <SidebarMenuSkeleton className="h-9" />
-                    </SidebarMenuItem>
-                  ))
-                : recent.map((conversation) => (
-                    <RecentDiscussion key={conversation.id} conversation={conversation} active={conversation === open} onOpenDialog={setDialog} />
-                  ))}
+        {!conversations.isLoading && recent.length === 0 && (
+          <li className="px-3 py-2 text-sm text-sidebar-foreground/40">Aucune discussion</li>
+        )}
 
-              {list.length > RECENT_DISCUSSIONS && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton onClick={() => setAllOpen(true)} className={`${navSubLinkClass} px-2.5 text-sidebar-foreground/45`}>
-                    Voir tout ({list.length})
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-            </ul>
-          </li>
+        {list.length > RECENT_DISCUSSIONS && (
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setAllOpen(true)} className={`${navSubLinkClass} px-3 text-sidebar-foreground/45`}>
+              Voir tout ({list.length})
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         )}
       </SidebarMenu>
 

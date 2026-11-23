@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { roadmapApi, type AppUrlBody, type FirstMissionResult, type RoadmapState } from "@shared/roadmap";
+import { roadmapApi, type AppUrlBody, type RoadmapState } from "@shared/roadmap";
 import { apiRequest } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
-import { coachKeys } from "./use-coach";
 
 export const roadmapKeys = {
   state: (saasId: string | undefined) => ["roadmap", saasId] as const,
@@ -75,20 +74,5 @@ export function useSetAppUrl() {
   return useMutation({
     mutationFn: (body: AppUrlBody) => apiRequest<RoadmapState>(roadmapApi.appUrl.path, { method: "PUT", body }),
     onSuccess: (state, body) => queryClient.setQueryData(roadmapKeys.state(body.saasId), state),
-  });
-}
-
-/**
- * Opens the discussion of the first mission ("Mettre ton app en ligne"), or finds it: answers its id
- * once the SaaS's discussions are read again, so the page opening it knows it.
- */
-export function useFirstMission() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (saasId: string) => {
-      const result = await apiRequest<FirstMissionResult>(roadmapApi.firstMission.path, { method: "POST", body: { saasId } });
-      await queryClient.invalidateQueries({ queryKey: coachKeys.conversations(saasId) });
-      return result;
-    },
   });
 }

@@ -4,7 +4,7 @@ import { PageGreeting } from "@/components/layout/PageGreeting";
 import { AdminStats } from "./AdminStats";
 import { AdminGrowthChart } from "./AdminGrowthChart";
 
-/** /admin: the greeting, as on the dashboard (Tableau de bord), then the sign-up figures and their growth. */
+/** /admin: the greeting, as on Accueil, then the sign-up figures and their growth. */
 export function AdminDashboardPage() {
   const { data: metrics, isLoading: isLoadingMetrics } = useAdminMetrics();
   const { data: growthData, isLoading: isLoadingGrowth } = useUserGrowth();

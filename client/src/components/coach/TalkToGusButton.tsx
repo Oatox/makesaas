@@ -10,7 +10,7 @@ type PageAction = { label: string; prompt: string };
 
 /** The pages where Gus works on what they show; elsewhere, "Discuter avec Gus" opens a blank discussion. */
 function pageAction(location: string): PageAction | null {
-  if (location === "/app") {
+  if (location === "/dash") {
     return {
       label: `Analyser avec ${COACH_NAME}`,
       prompt:
@@ -24,17 +24,10 @@ function pageAction(location: string): PageAction | null {
         "Analyse mes statistiques TikTok : mes vidéos, mes vues et mes abonnés. Qu'est-ce qui marche, qu'est-ce qui ne marche pas, et qu'est-ce que je dois poster ensuite ?",
     };
   }
-  if (location === "/acquisition/contenu") {
-    return {
-      label: `Idées avec ${COACH_NAME}`,
-      prompt:
-        "Propose-moi 5 idées de carrousels TikTok pour mon app, à partir de ce qui marche déjà sur mes comptes : pour chacune, le sujet et l'accroche de la première slide.",
-    };
-  }
-  if (location === "/accueil") {
+  if (location === "/roadmap") {
     return {
       label: `Faire le point avec ${COACH_NAME}`,
-      prompt: "Fais le point sur ma roadmap : où j'en suis, ce qui me bloque peut-être, et ce que je dois faire cette semaine pour avancer.",
+      prompt: "Fais le point sur ma roadmap : les paliers que j'ai atteints, celui que je vise maintenant, et ce qui m'en rapprochera le plus vite.",
     };
   }
   return null;
@@ -44,16 +37,26 @@ const BUTTON_CLASS = "min-h-9 shrink-0 gap-2 py-1 pl-1 pr-1 sm:min-h-9 sm:py-1 s
 
 /**
  * Gus's button, at the top right of every page (AppLayout header). On a page with figures (Tableau de bord,
- * Acquisition, content, roadmap), Gus works on them: the button opens a discussion that asks him to
+ * Acquisition, roadmap), Gus works on them: the button opens a discussion that asks him to
  * ("Analyser avec Gus"…). Elsewhere, "Discuter avec Gus" starts a blank one. Hidden on the
- * new-discussion page itself and on the admin pages; only Gus's face on phones.
+ * discussions themselves (the new one and an open one: the sidebar starts another), on Accueil, on the
+ * content pages (carousels) and on the admin pages; only Gus's face on phones.
  */
 export function TalkToGusButton() {
   const [location] = useLocation();
   const { currentSaas } = useSaas();
   const askGus = useAskGus();
-  // Not on the new-discussion page itself, nor on the admin pages (they are not about the member's SaaS).
-  if (location === COACH_PATH || location === "/admin" || location.startsWith("/admin/")) return null;
+  // Not in the discussions themselves (already with Gus), nor on Accueil and the content pages (their
+  // own actions lead), nor on the admin pages (they are not about the member's SaaS).
+  const hidden =
+    location === COACH_PATH ||
+    location.startsWith(`${COACH_PATH}/`) ||
+    location === "/accueil" ||
+    location === "/acquisition/contenu" ||
+    location.startsWith("/acquisition/contenu/") ||
+    location === "/admin" ||
+    location.startsWith("/admin/");
+  if (hidden) return null;
 
   const action = currentSaas ? pageAction(location) : null;
   const content = (label: string) => (

@@ -1,7 +1,7 @@
 /**
  * The prompts a member pastes into Base44 (the AI app builder that builds and hosts their app) or into
  * ChatGPT for its logo, filled with their project: shown in the roadmap's steps
- * (shared/roadmap-missions.ts) and in Gus's first mission (server/roadmap/first-mission.ts). Written
+ * (shared/roadmap-missions.ts) and in what Gus knows (server/coach/context.ts). Written
  * here, not by a model: the same for every member, only the project changes, and they must be right
  * the first time.
  */

@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
 import { grantsAccess } from "@shared/billing";
 import { ChevronLeft, ChevronRight, Clock, Filter, Mail, Search } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { AdminProfileRow } from "@/hooks/use-admin-profiles";
-import { formatDate } from "@/lib/format";
+import { formatDate, getInitials } from "@/lib/format";
 import { ConfirmRoleChangeDialog } from "./ConfirmRoleChangeDialog";
 import { UserActionsDropdown } from "./UserActionsDropdown";
 
@@ -43,14 +44,23 @@ const ROLE_FILTERS = [
 ];
 
 // Pieces shared by the desktop table and the mobile cards.
+/** The user's photo (from their Google account), or their initials. */
 function UserIdentity({ profile }: { profile: AdminProfileRow }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <span className="truncate font-medium transition-colors group-hover:text-primary">{profile.full_name || "N/A"}</span>
-      <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-        <Mail className="h-3 w-3 shrink-0" />
-        <span className="truncate">{profile.email}</span>
-      </span>
+    <div className="flex min-w-0 items-center gap-3">
+      <Avatar className="h-10 w-10 shrink-0">
+        {profile.avatar_url ? <AvatarImage src={profile.avatar_url} alt="" referrerPolicy="no-referrer" /> : null}
+        <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+          {getInitials(profile.full_name || profile.email)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="truncate font-medium transition-colors group-hover:text-primary">{profile.full_name || "N/A"}</span>
+        <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          <Mail className="h-3 w-3 shrink-0" />
+          <span className="truncate">{profile.email}</span>
+        </span>
+      </div>
     </div>
   );
 }

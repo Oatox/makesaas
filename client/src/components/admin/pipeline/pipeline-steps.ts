@@ -56,7 +56,7 @@ export const JOURNEY_STAGES = [
   { id: "onboarding", label: "Onboarding", paths: "/onboarding" },
   { id: "signup", label: "Inscription et paiement", paths: "/register · /abonnement" },
   { id: "launch", label: "Lancement", paths: "/lancement" },
-  { id: "app", label: "Application", paths: "/app · /acquisition · /discussions" },
+  { id: "app", label: "Application", paths: "/dash · /acquisition · /discussions" },
 ] as const;
 export type JourneyStage = (typeof JOURNEY_STAGES)[number]["id"];
 

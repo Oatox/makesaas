@@ -1,4 +1,4 @@
-import { MRR_TIERS, monthlyGoalOf, type MissionDone, type RoadmapMission, type RoadmapStage, type StepAction } from "./roadmap";
+import { MRR_TIERS, monthlyGoalOf, type Milestone, type MissionDone, type RoadmapMission, type RoadmapStage, type StepAction } from "./roadmap";
 
 /**
  * The content of the roadmap: its stages, their missions and each mission's steps (shared/roadmap.ts
@@ -11,13 +11,13 @@ const euros = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR
 
 /**
  * ⚠️ PLACEHOLDER: Base44's sign-up page, where members build their app. Put your affiliate link here:
- * the "Créer mon compte Base44" button of the roadmap and Gus's first mission open it.
+ * the "Créer mon compte Base44" button of its task opens it.
  */
 export const BASE44_URL = "https://base44.com";
 
 const STATS: StepAction = { kind: "page", label: "Ouvrir mes statistiques", href: "/acquisition" };
 const CONTENT: StepAction = { kind: "page", label: "Créer un carrousel", href: "/acquisition/contenu" };
-const REVENUE: StepAction = { kind: "page", label: "Voir mes revenus", href: "/app" };
+const REVENUE: StepAction = { kind: "page", label: "Voir mes revenus", href: "/dash" };
 
 /** The stages every member goes through before the MRR ones. */
 const BASE_STAGES: RoadmapStage[] = [
@@ -417,6 +417,78 @@ export function roadmapStagesFor(goal: number): RoadmapStage[] {
         ...(isGoal ? { isGoal } : {}),
       };
     }),
+  ];
+}
+
+/**
+ * The milestones the Roadmap page shows, in order: each one checked from the SaaS's data by one of the
+ * missions above (its key), never ticked by hand. The launch ones first, then the growth ones up to
+ * the member's goal.
+ */
+export function milestonesFor(goal: number): Milestone[] {
+  const stages = roadmapStagesFor(goal);
+  const checkOf = (key: string) => {
+    const mission = stages.flatMap((stage) => stage.missions).find((item) => item.key === key);
+    if (!mission) throw new Error(`No mission ${key} for a milestone`);
+    return mission.check;
+  };
+  const milestone = (key: string, title: string, detail: string, phase: Milestone["phase"], link?: Milestone["link"]): Milestone => ({
+    key,
+    title,
+    detail,
+    check: checkOf(key),
+    phase,
+    ...(link ? { link } : {}),
+  });
+  const linkOf = (action: StepAction) => (action.kind === "page" ? { label: action.label, href: action.href } : undefined);
+
+  return [
+    milestone("idea:chosen", "Ton idée", "Tu sais ce que tu construis, et pour qui.", "launch"),
+    milestone("brand:logo", "Ton logo", "Ton SaaS a son logo et ses couleurs.", "launch"),
+    milestone("build:online", "Ton app en ligne", "Tout le monde peut l'ouvrir, à son adresse.", "launch"),
+    milestone("payment:connect", "Tes paiements connectés", "MakeSaaS suit tes revenus tout seul.", "launch", linkOf(REVENUE)),
+    milestone("video:track", "Ton compte TikTok", "Tes vidéos sont suivies sur MakeSaaS.", "launch", linkOf(STATS)),
+    milestone("video:posted", "Ta 1re vidéo", "Les premières personnes découvrent ton app.", "launch", linkOf(STATS)),
+    milestone("customer:7_videos", "7 vidéos", "La régularité, c'est ce qui fait décoller un compte.", "growth", linkOf(STATS)),
+    milestone("customer:first_payment", "Ton 1er client", "Un inconnu paie pour ton app.", "growth", linkOf(REVENUE)),
+    ...stages
+      .filter((stage) => stage.mrr)
+      .map((stage) => ({
+        ...milestone(`${stage.key}:reached`, `${euros.format(stage.mrr!)} par mois`, stage.detail, "growth", linkOf(REVENUE)),
+        mrr: stage.mrr,
+        ...(stage.isGoal ? { isGoal: true } : {}),
+      })),
+  ];
+}
+
+/**
+ * The tasks of every day once the SaaS is launched (shared/today.ts), until Gus writes them: keyed by
+ * their day, so each day has its own, ticked by the member.
+ */
+export function dailyTasks(day: string): RoadmapMission[] {
+  return [
+    {
+      key: `daily:video:${day}`,
+      title: "Poste une vidéo",
+      why: "Plus tu postes, plus TikTok apprend à qui montrer ton app.",
+      minutes: 20,
+      steps: [
+        { text: "Prépare-la : un carrousel sur le problème que règle ton app, ou ton écran qui montre son résultat.", action: CONTENT },
+        { text: "Publie-la sur le compte de ton app, avec une accroche différente d'hier." },
+      ],
+      check: { kind: "manual" },
+    },
+    {
+      key: `daily:comments:${day}`,
+      title: "Réponds aux commentaires",
+      why: "Les premiers curieux deviennent souvent les premiers clients.",
+      minutes: 10,
+      steps: [
+        { text: "Réponds à chaque commentaire de tes vidéos, même court." },
+        { text: "Une question qui revient ? Note-la : c'est ta prochaine vidéo." },
+      ],
+      check: { kind: "manual" },
+    },
   ];
 }
 

@@ -1,14 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ChevronsUpDown, Lightbulb, Loader2, Plus, RotateCw, Settings } from "lucide-react";
-import { SAAS_MAX_PER_USER } from "@shared/saas";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { ChevronsUpDown, Lightbulb, Loader2, RotateCw, Settings } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SaasAvatar } from "@/components/saas/SaasAvatar";
 import { SaasDialog, type SaasDialogState } from "@/components/saas/SaasDialog";
 import { AUTH_CONFIG } from "@/config/auth";
@@ -47,8 +40,9 @@ const triggerClassFor = (isCollapsed: boolean) =>
 const itemClass = "group/saas-item gap-3 pl-1.5 pr-1.5";
 
 /**
- * Sidebar header: the active SaaS, the menu to switch to another one or create one, and the
- * settings of each SaaS. Without any SaaS yet, a card to create the first one.
+ * Sidebar header: the active SaaS, the menu to switch to another one, and the settings of each SaaS.
+ * For now the menu creates none: a SaaS comes from Gus's ideas (/lancement). Without any SaaS yet, a
+ * card leading there.
  */
 export function SaasSwitcher({ isCollapsed }: { isCollapsed: boolean }) {
   const { saasList, currentSaas, isLoading, isError, retry, switchSaas, isSwitching } = useSaas();
@@ -61,7 +55,6 @@ export function SaasSwitcher({ isCollapsed }: { isCollapsed: boolean }) {
     setDialogKey((key) => key + 1);
     setDialog(state);
   };
-  const atLimit = saasList.length >= SAAS_MAX_PER_USER;
 
   const handleSwitch = async (saasId: string) => {
     if (saasId === currentSaas?.id) return;
@@ -98,7 +91,7 @@ export function SaasSwitcher({ isCollapsed }: { isCollapsed: boolean }) {
           aria-label={isError ? "Recharger tes SaaS" : "Choisir mon idée avec Gus"}
           className={cn(
             triggerClassFor(isCollapsed),
-            // An empty tile, as "Nouveau SaaS" in the menu.
+            // An empty tile, waiting for the SaaS.
             isCollapsed && "border border-dashed border-white/20 text-sidebar-foreground/70 hover:border-white/35 hover:text-white",
           )}
           data-testid="button-saas-create-first"
@@ -200,21 +193,6 @@ export function SaasSwitcher({ isCollapsed }: { isCollapsed: boolean }) {
               );
             })}
           </div>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={() => openDialog({ mode: "create" })}
-            disabled={atLimit}
-            className={itemClass}
-            data-testid="button-saas-create"
-          >
-            {/* An empty tile in line with the SaaS avatars. */}
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-dashed border-white/15 text-foreground/60">
-              <Plus className="size-4" />
-            </span>
-            <span className="min-w-0 flex-1 truncate">
-              {atLimit ? `Limite de ${SAAS_MAX_PER_USER} SaaS atteinte` : "Nouveau SaaS"}
-            </span>
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 

@@ -178,7 +178,7 @@ function WithHeading({ heading, children }: { heading: ReactNode; children: Reac
 
 /**
  * Revenue of the active SaaS: MRR, revenue, subscribers and churn from its connected payment accounts.
- * `heading` (the page's greeting) shares the row of the period filter once there are figures, and
+ * `heading` (the page's title) shares the row of the period filter once there are figures, and
  * stands alone above the other states.
  */
 export function RevenueDashboard({ heading }: { heading: ReactNode }) {
@@ -249,9 +249,9 @@ function SaasRevenue({ saas, heading }: { saas: Saas; heading: ReactNode }) {
   return (
     <motion.div className="space-y-4 sm:space-y-5" initial="hidden" animate="visible" transition={{ staggerChildren: 0.06 }}>
       {/* The page heading, then one filter row above everything it scopes, on the same line. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
         {heading}
-        {/* Phones: a full-width row under the greeting, the period stretched; from sm, at its right.
+        {/* Phones: a full-width row under the title, the period stretched; from sm, at its right.
             The payment account is managed from the SaaS settings (Paiements tab), not from here. */}
         <motion.div variants={fadeIn} className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
           <Select value={period} onValueChange={(value) => setPeriod(value as PeriodKey)}>

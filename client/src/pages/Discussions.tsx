@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRoute } from "wouter";
 import { navigate } from "wouter/use-browser-location";
-import { motion } from "framer-motion";
 import {
   CalendarCheck,
   Lightbulb,
@@ -117,12 +116,9 @@ function NewConversation({ saasId, saasName }: { saasId: string; saasName: strin
             <ChatThread messages={[]} live={live} />
           </div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
-            className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-1 py-8 text-center"
-          >
+          // Shown as is, without an entry animation: an offset here would make the area scroll and
+          // the welcome jump while useStickToBottom sticks it to the bottom.
+          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-1 py-8 text-center">
             <CoachAvatar online className="h-16 w-16" />
             <h2 className="mt-5 font-display text-2xl font-light tracking-tight sm:text-3xl">
               {firstName ? `Salut ${firstName}, de quoi on parle ?` : "De quoi on parle ?"}
@@ -143,7 +139,7 @@ function NewConversation({ saasId, saasName }: { saasId: string; saasName: strin
                 </button>
               ))}
             </div>
-          </motion.div>
+          </div>
         )}
       </div>
       <div className="mx-auto w-full max-w-3xl pt-3">

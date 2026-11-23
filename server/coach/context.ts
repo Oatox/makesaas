@@ -2,14 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatOnboardingProfile, onboardingProfileSchema } from "@shared/onboarding-profile";
 import type { RevenueOverview, RevenueProvider, RevenueSnapshot } from "@shared/revenue";
 import {
-  currentStageIndex,
-  stageProgress,
   type MissionDone,
   type MissionStep,
   type RoadmapStage,
   type RoadmapState,
 } from "@shared/roadmap";
-import { missionCheckText, roadmapStagesFor } from "@shared/roadmap-missions";
+import { milestonesFor, missionCheckText, roadmapStagesFor } from "@shared/roadmap-missions";
+import { currentObjective, dayKey, launchTasks, milestoneCounter, objectiveProgress, objectivesOf, todayPlan } from "@shared/today";
 import { missionPromptText, PROMPT_TARGET } from "@shared/roadmap-prompts";
 import { logger } from "../lib/logger";
 import { getExchangeRates } from "../revenue/exchange-rates";
@@ -129,49 +128,74 @@ function stepLine(step: MissionStep, index: number): string {
   return `${index + 1}. ${step.text}${button}`;
 }
 
-export function formatRoadmap(stages: RoadmapStage[], state: Pick<RoadmapState, "done" | "project">): string {
+/**
+ * Where the member is: the milestones of their Roadmap, which are the objectives of Accueil (launching
+ * the SaaS, then each MRR tier; checked from their data), with the steps of the one in progress and its
+ * figure, the phase (launch or growth), and their tasks of `day` on Accueil, with the steps and prompts
+ * of the next one.
+ */
+export function formatRoadmap(stages: RoadmapStage[], state: Pick<RoadmapState, "done" | "project" | "progress" | "goal">, day: string): string {
   const done: Record<string, MissionDone> = state.done;
-  const current = currentStageIndex(stages, done);
-  const total = sum(stages.map((stage) => stage.missions.length));
-  const finished = sum(stages.map((stage) => stageProgress(stage, done).done));
+  const objectives = objectivesOf(milestonesFor(state.goal));
+  const current = currentObjective(objectives, done);
+  const reached = objectives.filter((objective) => objectiveProgress(objective, done, state.progress).complete).length;
 
-  const lines = [`Progression : ${finished} missions faites sur ${total}.`, "", "Les étapes :"];
-  stages.forEach((stage, index) => {
-    const progress = stageProgress(stage, done);
-    const status = progress.complete ? "terminée" : index === current ? `EN COURS (${progress.done}/${progress.total} missions)` : `à venir (${progress.done}/${progress.total})`;
-    lines.push(`${index + 1}. ${stage.title} : ${status}`);
-  });
-
-  if (current === null) {
-    lines.push("", "Il a terminé toute sa roadmap : son objectif est atteint.");
-    return lines.join("\n");
-  }
-
-  const stage = stages[current];
-  lines.push("", `Étape en cours : ${stage.title} (${stage.detail})`);
-  for (const mission of stage.missions) {
-    const missionDone = done[mission.key];
-    const how = mission.check.kind === "manual" ? "il la coche lui-même" : "se coche toute seule avec ses données";
-    lines.push(`- [${missionDone ? "x" : " "}] ${mission.title} (${how})${missionDone ? `, faite le ${dateOf(missionDone.at)}` : ""}`);
-  }
-
-  const next = stage.missions.find((mission) => !done[mission.key]);
-  if (next) {
-    lines.push("", `Sa prochaine mission : « ${next.title} ». ${next.why}`, "Les étapes qu'il voit dans sa roadmap, chacune avec son bouton :");
-    next.steps.forEach((step, index) => lines.push(stepLine(step, index)));
-    lines.push(missionCheckText(next.check));
-    for (const step of next.steps) {
-      if (step.action?.kind !== "chatgpt" && step.action?.kind !== "copy") continue;
-      const prompt = step.action.prompt;
-      lines.push("", `Le prompt à coller dans ${PROMPT_TARGET[prompt]} que sa roadmap lui donne :`, missionPromptText(prompt, state.project));
+  const lines = [
+    `Ses paliers (sa page Roadmap, et l'objectif en haut de son Accueil ; constatés dans ses données) : ${reached} atteint${reached > 1 ? "s" : ""} sur ${objectives.length}.`,
+  ];
+  for (const objective of objectives) {
+    const progress = objectiveProgress(objective, done, state.progress);
+    const isCurrent = objective === current;
+    const status = progress.complete
+      ? `atteint le ${dateOf(progress.reachedAt?.at ?? "")}`
+      : isCurrent
+        ? `EN COURS (${progress.total === 1 && progress.counter ? progress.counter.label : `${progress.reached} / ${progress.total} étapes`})`
+        : "à venir";
+    lines.push(`- [${progress.complete ? "x" : " "}] ${objective.title} : ${status}`);
+    // The steps of the milestone in progress, when it has several.
+    if (!isCurrent || objective.milestones.length < 2) continue;
+    for (const milestone of objective.milestones) {
+      const record = done[milestone.key];
+      const counter = milestone === progress.current ? milestoneCounter(milestone, state.progress) : null;
+      const step = record
+        ? `atteinte le ${dateOf(record.at)}`
+        : milestone === progress.current
+          ? `EN COURS${counter ? ` (${counter.label})` : ""}`
+          : "à venir";
+      lines.push(`  - [${record ? "x" : " "}] ${milestone.title} : ${step}`);
     }
   }
+  if (!current) lines.push("", "Il a atteint son objectif.");
 
-  // Missions ahead he already did (out of order).
-  const ahead = stages
-    .slice(current + 1)
-    .flatMap((item) => item.missions.filter((mission) => done[mission.key]).map((mission) => `${mission.title} (${item.title})`));
-  if (ahead.length) lines.push("", `Missions déjà faites plus loin dans sa roadmap : ${ahead.join(", ")}.`);
+  const plan = todayPlan(stages, done, day);
+  const launch = launchTasks(stages);
+  lines.push(
+    "",
+    plan.phase === "launch"
+      ? `Phase : lancement de son SaaS (${launch.filter((task) => done[task.key]).length} tâches de lancement faites sur ${launch.length}).`
+      : "Phase : croissance (son SaaS est lancé).",
+    "",
+    "Ses tâches du jour, sur sa page Accueil :",
+  );
+  for (const task of plan.tasks) {
+    const record = done[task.key];
+    const how = task.check.kind === "manual" ? "il la coche lui-même" : "se coche toute seule avec ses données";
+    lines.push(`- [${record ? "x" : " "}] ${task.title} (${how})`);
+  }
+
+  const next = plan.tasks.find((task) => !done[task.key]);
+  if (!next) {
+    lines.push("", "Il a fait toutes ses tâches du jour.");
+    return lines.join("\n");
+  }
+  lines.push("", `Sa prochaine tâche : « ${next.title} ». ${next.why}`, "Les étapes qu'il voit, chacune avec son bouton :");
+  next.steps.forEach((step, index) => lines.push(stepLine(step, index)));
+  lines.push(missionCheckText(next.check));
+  for (const step of next.steps) {
+    if (step.action?.kind !== "chatgpt" && step.action?.kind !== "copy") continue;
+    const prompt = step.action.prompt;
+    lines.push("", `Le prompt à coller dans ${PROMPT_TARGET[prompt]} que sa tâche lui donne :`, missionPromptText(prompt, state.project));
+  }
   return lines.join("\n");
 }
 
@@ -401,7 +425,7 @@ export async function buildCoachContext(db: SupabaseClient, userId: string, saas
     part("roadmap", async () => {
       const state = await roadmapState;
       if (!state) throw new Error("Roadmap unavailable");
-      return formatRoadmap(roadmapStagesFor(state.goal), state);
+      return formatRoadmap(roadmapStagesFor(state.goal), state, dayKey(new Date(), "Europe/Paris"));
     }),
     part("chiffres", async () => {
       const [connections, accounts, videos, carousels] = await Promise.all([

@@ -20,6 +20,7 @@ const Acquisition = React.lazy(() => import("@/pages/Acquisition"));
 const Discussions = React.lazy(() => import("@/pages/Discussions"));
 const Launch = React.lazy(() => import("@/pages/Launch"));
 const Roadmap = React.lazy(() => import("@/pages/Roadmap"));
+const Today = React.lazy(() => import("@/pages/Today"));
 const AdminPage = React.lazy(() => import("@/pages/Admin"));
 const Settings = React.lazy(() => import("@/pages/Settings"));
 const Subscribe = React.lazy(() => import("@/pages/Subscribe"));
@@ -148,8 +149,12 @@ function Router() {
       </Route>
 
       {/* Protected Routes */}
-      <Route path="/app">
+      <Route path="/dash">
         <ProtectedRoute component={Dashboard} />
+      </Route>
+      {/* The dashboard's former address (links already shared, Gus's older messages). */}
+      <Route path="/app">
+        <Redirect to="/dash" />
       </Route>
 
       <Route path={AUTH_CONFIG.LAUNCH_PATH}>
@@ -157,11 +162,10 @@ function Router() {
       </Route>
 
       <Route path="/accueil">
-        <ProtectedRoute component={Roadmap} />
+        <ProtectedRoute component={Today} />
       </Route>
-      {/* The roadmap's former address (links already shared, Gus's older messages). */}
       <Route path="/roadmap">
-        <Redirect to="/accueil" />
+        <ProtectedRoute component={Roadmap} />
       </Route>
 
       <Route path="/acquisition">

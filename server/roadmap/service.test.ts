@@ -8,7 +8,6 @@ import {
   chatGptUrl,
   missionPromptText,
 } from "@shared/roadmap-prompts";
-import { firstMissionMessages } from "./first-mission";
 import { observedMissions, type MissionFacts } from "./service";
 
 const CREATED = "2026-11-20T10:00:00.000Z";
@@ -198,16 +197,5 @@ describe("prompts", () => {
         }
       }
     }
-  });
-
-  test("Gus's first mission starts with the style: the logo prompt for ChatGPT in a code block", () => {
-    const { question, answer } = firstMissionMessages(project);
-    expect(question).toBe("Comment je mets Fitlo en ligne ?");
-    expect(answer).toContain("```\nJe lance une app appelée Fitlo");
-    expect(answer).toContain("Génère son logo");
-    expect(answer.match(/```/g)).toHaveLength(2);
-    expect(answer).not.toContain("Crée une app web");
-    // Gus sends the member to Base44 with the sign-up link (the affiliate link, BASE44_URL).
-    expect(answer).toContain("[Base44](https://");
   });
 });

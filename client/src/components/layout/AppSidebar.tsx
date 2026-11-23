@@ -23,6 +23,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import {
   Gauge,
   House,
+  Route,
   ShieldCheck,
   Users,
   LogOut,
@@ -45,7 +46,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/format";
 import type { LucideIcon } from "lucide-react";
 import { SidebarDiscussions } from "@/components/coach/SidebarDiscussions";
-import { navLinkClass, navSubLinkClass } from "./nav-styles";
+import { COACH_NAME, CoachAvatar } from "@/components/brand/Coach";
+import { COACH_PATH } from "@/hooks/use-coach";
+import { cn } from "@/lib/utils";
+import { navLinkClass, navSubPageLinkClass } from "./nav-styles";
 import { SaasSwitcher } from "./SaasSwitcher";
 
 type NavSubItem = { href: string; label: string; icon?: LucideIcon };
@@ -71,7 +75,8 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Application",
     items: [
       { href: "/accueil", label: "Accueil", icon: House },
-      { href: "/app", label: "Tableau de bord", icon: Gauge, matchPrefix: true },
+      { href: "/roadmap", label: "Roadmap", icon: Route },
+      { href: "/dash", label: "Tableau de bord", icon: Gauge, matchPrefix: true },
       {
         href: "/acquisition",
         label: "Acquisition",
@@ -108,6 +113,38 @@ function NavLink({ item, active, isCollapsed }: { item: NavItem; active: boolean
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
+  );
+}
+
+/**
+ * Gus's button, at the top of the sidebar under the SaaS switcher: opens a new discussion. A soft
+ * card at rest so it reads as an action, not a page; collapsed to icons, Gus's face alone.
+ */
+function TalkToGusLink({ active, isCollapsed }: { active: boolean; isCollapsed: boolean }) {
+  const label = `Discuter avec ${COACH_NAME}`;
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          asChild
+          isActive={active}
+          tooltip={label}
+          className={cn(
+            navLinkClass,
+            "border-white/[0.07] bg-white/[0.04] text-sidebar-foreground/85 hover:bg-white/[0.07]",
+            "group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent",
+          )}
+        >
+          <Link href={COACH_PATH} aria-label={label} data-testid="link-sidebar-talk-to-gus">
+            {/* Collapsed: Gus's face alone, a bit larger and without the online dot (too small there).
+                The label stays the last span even then (hidden): the button truncates its last span,
+                which would clip the avatar's ring. */}
+            <CoachAvatar className={isCollapsed ? "!size-7" : "!size-6"} online={!isCollapsed} />
+            <span className={isCollapsed ? "sr-only" : undefined}>{label}</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }
 
@@ -158,7 +195,7 @@ function NavFolder({
           <SidebarMenuSub className="ml-[21px] mr-0 mt-1 border-white/[0.08] pl-2.5 pr-0">
             {item.children.map((child) => (
               <SidebarMenuSubItem key={child.href}>
-                <SidebarMenuSubButton asChild isActive={currentPath === child.href} className={navSubLinkClass}>
+                <SidebarMenuSubButton asChild isActive={currentPath === child.href} className={navSubPageLinkClass}>
                   <Link href={child.href}>
                     {child.icon && <child.icon />}
                     <span>{child.label}</span>
@@ -214,6 +251,10 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
+        <SidebarGroup className="py-1">
+          <TalkToGusLink active={currentPath === COACH_PATH} isCollapsed={isCollapsed} />
+        </SidebarGroup>
+
         {/* One category per group, stacked from the top: a small label (hidden when the sidebar is
             collapsed to icons), then its links. */}
         {NAV_GROUPS.filter((group) => !group.adminOnly || isAdmin).map((group) => (

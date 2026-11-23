@@ -1,5 +1,5 @@
 export const AUTH_CONFIG = {
-  /** Where members land once signed in: Accueil, their roadmap. */
+  /** Where members land once signed in: Accueil, their tasks of the day. */
   REDIRECT_PATH: "/accueil",
   LOGIN_PATH: "/login",
   REGISTER_PATH: "/register",

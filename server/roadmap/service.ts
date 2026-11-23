@@ -81,6 +81,16 @@ export function observedMissions(facts: MissionFacts, stages: RoadmapStage[]): R
   return done;
 }
 
+/** The MRR of the live account today (the series' last day), in whole euros; null without a live account. */
+export function currentMrrInEuros(
+  revenue: Pick<RevenueOverview, "currency" | "mrr"> | null,
+  rates: ExchangeRates | null,
+): number | null {
+  if (!revenue) return null;
+  const perEuro = rates?.[revenue.currency] ?? 1;
+  return Math.round((revenue.mrr.at(-1) ?? 0) / perEuro);
+}
+
 type SaasRow = {
   id: string;
   name: string;
@@ -128,7 +138,8 @@ export class RoadmapService {
       this.db.from("roadmap_missions").select("key, done_at, source").eq("saas_id", saasId).eq("user_id", userId),
       this.db
         .from("tiktok_videos")
-        .select("posted_at")
+        // The first ones date the video milestones; the count is all of them.
+        .select("posted_at", { count: "exact" })
         .eq("saas_id", saasId)
         .eq("user_id", userId)
         .order("posted_at", { ascending: true })
@@ -180,7 +191,17 @@ export class RoadmapService {
       for (const [key, value] of fresh) done[key] = value;
     }
 
-    return { goal, project: projectOf(saas), appUrl: saas.app_url, done };
+    return {
+      goal,
+      project: projectOf(saas),
+      appUrl: saas.app_url,
+      done,
+      progress: {
+        videos: videos.count ?? (videos.data ?? []).length,
+        tiktokAccounts: tiktok.count ?? 0,
+        mrr: currentMrrInEuros(overview, rates),
+      },
+    };
   }
 
   /** Saves the address of the member's app (checked by their browser), then answers the roadmap. */

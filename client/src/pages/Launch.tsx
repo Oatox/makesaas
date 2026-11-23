@@ -15,10 +15,8 @@ import { Button } from "@/components/ui/button";
 import { AUTH_CONFIG } from "@/config/auth";
 import { useAuth } from "@/hooks/use-auth";
 import { isRunning, useIdeas, useSaveOnboardingProfile } from "@/hooks/use-ideas";
-import { useFirstMission } from "@/hooks/use-roadmap";
 import { saasErrorMessage, useSaas } from "@/hooks/use-saas";
 import { useToast } from "@/hooks/use-toast";
-import { ApiError } from "@/lib/api-client";
 import { loadOnboardingProgress } from "@/lib/onboarding-storage";
 
 const stagger = { initial: "hidden", animate: "visible", variants: { visible: { transition: { staggerChildren: 0.08 } } } } as const;
@@ -41,8 +39,8 @@ type Stage = "ideas" | "project" | "plan" | "mission";
  * then shows 3 app ideas made from their answers, the first being the one he recommends. The first
  * series is usually already being written: the payment webhook started it. "D'autres idées" asks for
  * 3 new ones. Keeping one leads to three last steps with Gus: confirming the project (the SaaS is
- * created then), seeing the plan to the member's goal, and the first mission, a discussion where Gus
- * gives the logo prompt, then the one to build the app with Base44: the member enters the app there.
+ * created then), seeing the plan to the member's goal, and the first mission: putting the app online,
+ * whose tasks wait on Accueil, where the member enters the app.
  */
 export default function Launch() {
   const { profile } = useAuth();
@@ -63,8 +61,6 @@ export default function Launch() {
   const [chosen, setChosen] = useState<SaasIdea | null>(null);
   const [projectName, setProjectName] = useState("");
   const [projectPitch, setProjectPitch] = useState("");
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const firstMission = useFirstMission();
   const arrived = useRef(false);
   // The answers and the monthly goal on the profile (already done by the paywall on this device).
   useSaveOnboardingProfile();
@@ -204,7 +200,6 @@ export default function Launch() {
         audience: chosen.content.audience,
         idea_id: chosen.id,
       });
-      setProjectId(created.id);
       setStage("plan");
       void say("you", [`C'est bon pour ${created.name}.`]);
       void say("coach", [
@@ -222,26 +217,7 @@ export default function Launch() {
   const toMission = () => {
     setStage("mission");
     void say("you", ["Et maintenant ?"]);
-    void say("coach", [
-      "Première mission : mettre ton app en ligne.",
-      "Je t'ai tout préparé dans une discussion, étape par étape : on commence par son style et son logo, puis on la construit avec Base44.",
-    ]);
-  };
-
-  // The member enters the app on that discussion.
-  const openMission = async () => {
-    if (!projectId) return;
-    try {
-      const { conversationId } = await firstMission.mutateAsync(projectId);
-      navigate(`/discussions/${conversationId}`);
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Mission indisponible",
-        description: error instanceof ApiError ? error.message : "Tu la retrouves dans ta roadmap.",
-      });
-      navigate(AUTH_CONFIG.REDIRECT_PATH);
-    }
+    void say("coach", ["Première mission : mettre ton app en ligne."]);
   };
 
   const shownIndex = series.findIndex((item) => item.id === shownId);
@@ -387,7 +363,7 @@ export default function Launch() {
             )}
             {stage === "plan" && idle && <ContinueButton label="Et maintenant ?" onClick={toMission} />}
             {stage === "mission" && idle && (
-              <ContinueButton label="Mettre mon app en ligne" onClick={() => void openMission()} disabled={firstMission.isPending} />
+              <ContinueButton label="Mettre mon app en ligne" onClick={() => navigate(APP_HOME)} />
             )}
           </>
         )}

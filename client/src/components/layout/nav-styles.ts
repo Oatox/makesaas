@@ -13,8 +13,18 @@ export const navLinkClass =
   "data-[active=true]:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] [&>svg]:data-[active=true]:text-primary hover:data-[active=true]:bg-white/[0.07] " +
   "group-data-[collapsible=icon]:!h-10 group-data-[collapsible=icon]:!w-10 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center";
 
-// Sub-page links: smaller rows hanging from a thin line under the parent's icon, same muted → white
-// states as the main links (and the same muted → orange icon).
+// Sub-page links of a folder (e.g. Acquisition): hanging from a thin line under the parent's icon,
+// a little smaller than the main links so their labels fit the indented width ("Création de
+// contenu"), with the same states (no border, the line already sets them apart).
+export const navSubPageLinkClass =
+  "h-10 gap-2.5 rounded-[9px] px-2.5 text-sm font-medium text-sidebar-foreground/65 transition-colors duration-150 " +
+  "[&>svg]:size-4 [&>svg]:text-sidebar-foreground/45 [&>svg]:transition-colors " +
+  "hover:bg-white/[0.045] hover:text-sidebar-foreground [&>svg]:hover:text-sidebar-foreground/80 " +
+  "data-[active=true]:bg-white/[0.07] data-[active=true]:text-sidebar-foreground hover:data-[active=true]:bg-white/[0.07] " +
+  "[&>svg]:data-[active=true]:text-primary";
+
+// Smaller rows (the discussions listed in the sidebar), same muted → white states as the main links
+// (and the same muted → orange icon).
 export const navSubLinkClass =
   "h-9 gap-2.5 rounded-[8px] px-2.5 text-sm font-medium text-sidebar-foreground/60 transition-colors duration-150 " +
   "[&>svg]:size-4 [&>svg]:text-sidebar-foreground/45 [&>svg]:transition-colors " +

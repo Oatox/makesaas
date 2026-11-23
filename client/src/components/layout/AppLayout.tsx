@@ -50,7 +50,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             height as a flex column instead of a scrolling area. */}
         {isFullHeightPage ? (
           <div className="flex min-h-0 flex-1 flex-col px-4 md:px-5 lg:px-[4%]">
-            <div className="flex min-h-0 w-full flex-1 flex-col bg-card p-1 pb-3 md:p-2 md:pb-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* No entry animation: the discussion shows in place at once. */}
+            <div className="flex min-h-0 w-full flex-1 flex-col bg-card p-1 pb-3 md:p-2 md:pb-4">
               {children}
             </div>
           </div>

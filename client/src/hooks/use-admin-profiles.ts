@@ -48,11 +48,11 @@ export type AdminUserDetailsResponse = {
 };
 
 /** Columns shown in the users table. */
-const PROFILE_ROW_COLUMNS = "id, email, full_name, role, created_at";
+const PROFILE_ROW_COLUMNS = "id, email, full_name, avatar_url, role, created_at";
 /** Embedded subscription (one row per user); "!inner" keeps only users having one. */
 const subscriptionEmbed = (inner: boolean) => `subscription:subscriptions${inner ? "!inner" : ""}(status)`;
 
-export type AdminProfileRow = Pick<Profile, "id" | "email" | "full_name" | "role"> & {
+export type AdminProfileRow = Pick<Profile, "id" | "email" | "full_name" | "avatar_url" | "role"> & {
   created_at: string | null;
   subscription: Pick<SubscriptionSummary, "status"> | null;
 };

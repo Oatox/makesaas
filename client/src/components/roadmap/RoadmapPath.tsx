@@ -1,39 +1,33 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import {
-  Check,
-  Clapperboard,
-  CreditCard,
-  Flag,
-  Hammer,
-  Lightbulb,
-  Palette,
-  TrendingUp,
-  UserRound,
-  type LucideIcon,
-} from "lucide-react";
-import { stageProgress, type MissionDone, type RoadmapStage } from "@shared/roadmap";
+import { Check, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** Height of a stage's row, in px: the path's vertical step. */
+/** Height of a node's row, in px: the path's vertical step. */
 const ROW = 156;
-/** Diameter of a stage's node, in px. */
+/** Diameter of a node, in px. */
 const NODE = 76;
-/** The id of the drawer of the open stage's missions (pages/Roadmap.tsx), which the open node controls. */
-export const STAGE_PANEL_ID = "roadmap-stage-panel";
 
-/** Each stage's icon; the MRR stages share one, the goal has its flag. */
-const ICONS: Record<string, LucideIcon> = {
-  idea: Lightbulb,
-  build: Hammer,
-  brand: Palette,
-  payment: CreditCard,
-  video: Clapperboard,
-  customer: UserRound,
+/** A node of the path: a milestone of the Roadmap page (pages/Roadmap.tsx). */
+export type PathNode = {
+  key: string;
+  /** Small caps above the title ("Lancement", "Ton objectif"). */
+  kicker: string;
+  title: string;
+  /** Under the title: when it was reached, its figure, or "À venir". */
+  status: string;
+  done: boolean;
+  /** Share reached, for the ring of the one in progress (0 to 1). */
+  progress: number;
+  icon: LucideIcon;
+  /** Drawn as the summit. */
+  isGoal?: boolean;
 };
-const iconOf = (stage: RoadmapStage) => (stage.isGoal ? Flag : (ICONS[stage.key] ?? TrendingUp));
 
-/** Where a stage's node sits across the path, in % of its width: a smooth wave from side to side. */
+/** The id of the drawer of the open milestone (pages/Roadmap.tsx), which the open node controls. */
+export const MILESTONE_PANEL_ID = "roadmap-milestone-panel";
+
+/** Where a node sits across the path, in % of its width: a smooth wave from side to side. */
 const xOf = (index: number) => 50 + 24 * Math.sin((index * Math.PI) / 2.5);
 
 /** A ring around the node, filled with the share of its missions done. */
@@ -61,24 +55,22 @@ function ProgressRing({ value, active }: { value: number; active: boolean }) {
 }
 
 /**
- * The roadmap drawn as a winding path, one big node per stage: done ones in orange, the member's
- * current one marked "Tu es ici", the goal flagged at the end. Clicking a node (or its label)
- * opens its missions in the drawer (pages/Roadmap.tsx).
+ * The roadmap drawn as a winding path, one big node per milestone: reached ones in orange, the one in
+ * progress marked "Tu es ici" with a ring of its figure, the goal at the end. Clicking a node (or its
+ * label) opens what the milestone means and where the member stands (pages/Roadmap.tsx).
  */
 export function RoadmapPath({
-  stages,
-  done,
+  nodes,
   current,
   open,
-  onToggle,
+  onOpen,
 }: {
-  stages: RoadmapStage[];
-  done: Record<string, MissionDone>;
-  /** The stage the member is on; null once every stage is done. */
+  nodes: PathNode[];
+  /** The node in progress; null once every one is reached. */
   current: number | null;
-  /** The stage whose missions are open; null: none. */
+  /** The open milestone's index; null: none. */
   open: number | null;
-  onToggle: (index: number) => void;
+  onOpen: (index: number) => void;
 }) {
   const reduceMotion = useReducedMotion();
   // The path is drawn in real pixels: the container's width, measured (and followed on resize).
@@ -93,17 +85,17 @@ export function RoadmapPath({
     return () => observer.disconnect();
   }, []);
 
-  const height = stages.length * ROW;
+  const height = nodes.length * ROW;
   const point = (index: number) => ({ x: (width * xOf(index)) / 100, y: index * ROW + ROW / 2 });
-  // One S-curve per pair of stages, leaving each node straight down and reaching the next one from above.
+  // One S-curve per pair of nodes, leaving each one straight down and reaching the next one from above.
   const bend = ROW * 0.55;
-  const segments = stages.slice(0, -1).map((_, index) => {
+  const segments = nodes.slice(0, -1).map((_, index) => {
     const a = point(index);
     const b = point(index + 1);
     return `M ${a.x} ${a.y} C ${a.x} ${a.y + bend} ${b.x} ${b.y - bend} ${b.x} ${b.y}`;
   });
-  // Orange up to the current stage (or the whole way once at the goal).
-  const reached = current ?? stages.length - 1;
+  // Orange up to the node in progress (or the whole way once at the goal).
+  const reached = current ?? nodes.length - 1;
 
   return (
     <div ref={containerRef} className="relative mx-auto w-full max-w-[720px]" style={{ height }}>
@@ -132,17 +124,16 @@ export function RoadmapPath({
       )}
 
       <ol className="relative h-full">
-        {stages.map((stage, index) => {
-          const progress = stageProgress(stage, done);
+        {nodes.map((node, index) => {
           const isCurrent = index === current;
-          const isOpen = index === open;
-          const complete = progress.complete;
+          const complete = node.done;
           const x = xOf(index);
           const labelRight = x <= 50;
-          const Icon = iconOf(stage);
+          const Icon = node.icon;
+          const isOpen = index === open;
           return (
             <motion.li
-              key={stage.key}
+              key={node.key}
               className="absolute inset-x-0"
               style={{ top: index * ROW, height: ROW }}
               initial={reduceMotion ? false : { opacity: 0, y: 12 }}
@@ -168,10 +159,11 @@ export function RoadmapPath({
                 )}
                 <button
                   type="button"
-                  onClick={() => onToggle(index)}
-                  aria-label={`${stage.title} : ${progress.done} mission${progress.done > 1 ? "s" : ""} sur ${progress.total}`}
+                  onClick={() => onOpen(index)}
+                  aria-label={`${node.title} : ${node.status}`}
+                  aria-haspopup="dialog"
                   aria-expanded={isOpen}
-                  aria-controls={isOpen ? STAGE_PANEL_ID : undefined}
+                  aria-controls={isOpen ? MILESTONE_PANEL_ID : undefined}
                   className={cn(
                     "relative flex items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 active:translate-y-[3px] active:scale-100",
                     isOpen && "scale-105",
@@ -180,13 +172,13 @@ export function RoadmapPath({
                       ? "bg-gradient-to-b from-[hsl(24_100%_60%)] to-[hsl(18_95%_48%)] text-primary-foreground shadow-[0_6px_0_0_hsl(16_90%_32%),0_12px_24px_-8px_hsl(var(--primary)/0.5)]"
                       : isCurrent
                         ? "bg-gradient-to-b from-[hsl(160_7%_20%)] to-[hsl(160_8%_12%)] text-primary shadow-[0_6px_0_0_hsl(160_9%_7%),0_0_0_3px_hsl(var(--primary))]"
-                        : stage.isGoal
+                        : node.isGoal
                           ? "bg-gradient-to-b from-[hsl(160_7%_17%)] to-[hsl(160_8%_11%)] text-primary shadow-[0_6px_0_0_hsl(160_9%_6%),0_0_0_2px_hsl(var(--primary)/0.45)]"
                           : "bg-gradient-to-b from-[hsl(160_7%_17%)] to-[hsl(160_8%_11%)] text-muted-foreground shadow-[0_6px_0_0_hsl(160_9%_6%)]",
                   )}
                   style={{ width: NODE, height: NODE }}
                 >
-                  {!complete && <ProgressRing value={progress.done / progress.total} active={isCurrent} />}
+                  {!complete && <ProgressRing value={isCurrent ? node.progress : 0} active={isCurrent} />}
                   {complete ? <Check className="h-9 w-9" strokeWidth={3} /> : <Icon className="h-8 w-8" />}
                 </button>
               </div>
@@ -194,7 +186,7 @@ export function RoadmapPath({
               {/* Its label, on the side with room. */}
               <button
                 type="button"
-                onClick={() => onToggle(index)}
+                onClick={() => onOpen(index)}
                 tabIndex={-1}
                 className={cn("absolute top-1/2 -translate-y-1/2 text-left", !labelRight && "text-right")}
                 style={
@@ -203,20 +195,17 @@ export function RoadmapPath({
                     : { right: `calc(${100 - x}% + ${NODE / 2 + 18}px)`, maxWidth: `calc(${x}% - ${NODE / 2 + 26}px)` }
                 }
               >
-                <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {stage.isGoal ? "Ton objectif" : `Étape ${index + 1}`}
-                </span>
+                <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{node.kicker}</span>
                 <span
                   className={cn(
                     "mt-0.5 block font-display text-base font-light leading-tight sm:text-xl",
                     complete || isCurrent ? "text-foreground" : "text-foreground/70",
                   )}
                 >
-                  {/* The kicker already says it is the goal. */}
-                  {stage.isGoal ? stage.title.replace(/^Ton objectif : /, "") : stage.title}
+                  {node.title}
                 </span>
-                <span className={cn("mt-1 block text-xs", complete ? "text-primary" : "text-muted-foreground")}>
-                  {complete ? "Terminée" : `${progress.done}/${progress.total} mission${progress.total > 1 ? "s" : ""}`}
+                <span className={cn("mt-1 block text-xs", complete ? "text-primary" : isCurrent ? "text-foreground/80" : "text-muted-foreground")}>
+                  {node.status}
                 </span>
               </button>
             </motion.li>

@@ -2,9 +2,11 @@ import { z } from "zod";
 import type { MissionProject, MissionPrompt } from "./roadmap-prompts";
 
 /**
- * The roadmap of a SaaS (/roadmap): stages from the idea to the member's monthly goal (picked in the
- * onboarding, saved on profiles.monthly_goal), each made of missions with their tutorial
- * (shared/roadmap-missions.ts: roadmapStagesFor). A stage is done when all its missions are.
+ * The journey of a SaaS, from the idea to the member's monthly goal (picked in the onboarding, saved
+ * on profiles.monthly_goal). Its content (shared/roadmap-missions.ts) is a list of stages
+ * (roadmapStagesFor), each made of missions with their steps, and two views read it:
+ *   - Accueil (/accueil): the day's tasks (shared/today.ts), the missions to do, a few each day;
+ *   - Roadmap (/roadmap): the milestones (milestonesFor), only checked from the SaaS's data.
  *
  * A mission is done in one of two ways:
  *   - checked from the SaaS's data by the server (server/roadmap/), "observed" (or "before" when it
@@ -72,6 +74,13 @@ export type StepAction =
  */
 export type MissionStep = { text: string; action?: StepAction };
 
+/**
+ * The banners a task can wear on Accueil (client/src/components/roadmap/TaskBanner.tsx), one per kind of
+ * work. Gus picks one of them for each task he writes, so that his tasks look like the others.
+ */
+export const TASK_ILLUSTRATIONS = ["brand", "build", "launch", "account", "payment", "video", "community", "growth", "strategy"] as const;
+export type TaskIllustration = (typeof TASK_ILLUSTRATIONS)[number];
+
 export type RoadmapMission = {
   /** Stable: saved in roadmap_missions. "<stage>:<mission>". */
   key: string;
@@ -82,6 +91,8 @@ export type RoadmapMission = {
   minutes?: number;
   /** How long it takes otherwise ("7 jours"); neither: it happens on its own (a payment, an MRR). */
   span?: string;
+  /** Its banner on Accueil; by default the one of its kind of work, from its key (illustrationOf). */
+  illustration?: TaskIllustration;
   steps: MissionStep[];
   check: MissionCheck;
 };
@@ -105,6 +116,34 @@ export type MissionSource = "declared" | "observed" | "before";
 
 export type MissionDone = { at: string; source: MissionSource };
 
+/**
+ * A milestone of the Roadmap page: checked from the SaaS's data by the mission of the same key, never
+ * ticked by hand. "launch" ones come before the app's first video, "growth" ones after.
+ */
+export type Milestone = {
+  key: string;
+  title: string;
+  /** What reaching it means, in one line. */
+  detail: string;
+  check: MissionCheck;
+  phase: "launch" | "growth";
+  /** The MRR it is reached at, for the MRR tiers. */
+  mrr?: number;
+  /** The last one: the member's own goal. */
+  isGoal?: boolean;
+  /** The page of the app with its figures. */
+  link?: { label: string; href: string };
+};
+
+/** Where the SaaS stands, for the counters of the milestones in progress ("3 / 7 vidéos"). */
+export type RoadmapProgress = {
+  /** Videos seen on its TikTok accounts. */
+  videos: number;
+  tiktokAccounts: number;
+  /** MRR of its live payment account today, in euros; null without one. */
+  mrr: number | null;
+};
+
 /** What GET roadmapApi.state answers. The stages come from roadmapStagesFor(goal). */
 export type RoadmapState = {
   /** The member's monthly goal: the last stage. */
@@ -115,6 +154,7 @@ export type RoadmapState = {
   appUrl: string | null;
   /** Every mission done, by key (checked from the data, or ticked by the member). */
   done: Record<string, MissionDone>;
+  progress: RoadmapProgress;
 };
 
 export type StageProgress = { done: number; total: number; complete: boolean };
@@ -196,18 +236,9 @@ export const appUrlBodySchema = z.object({
 });
 export type AppUrlBody = z.input<typeof appUrlBodySchema>;
 
-/** POST roadmapApi.firstMission: opens (or finds) the discussion "Mettre ton app en ligne". */
-export const firstMissionBodySchema = z.object({ saasId: z.string().uuid("SaaS invalide") });
-export type FirstMissionResult = { conversationId: string };
-
-/** Title of the discussion of the first mission: also how it is found again. */
-export const FIRST_MISSION_TITLE = "Mettre ton app en ligne";
-
 export const roadmapApi = {
   /** GET ?saasId= → RoadmapState, after checking the missions against the SaaS's data. */
   state: { path: "/api/roadmap" },
   /** PUT AppUrlBody → RoadmapState. */
   appUrl: { path: "/api/roadmap/app-url" },
-  /** POST { saasId } → FirstMissionResult. */
-  firstMission: { path: "/api/roadmap/first-mission" },
 } as const;

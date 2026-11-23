@@ -33,32 +33,58 @@ describe("coach context", () => {
     expect(text).toContain("Prix conseillé : 9 € par mois");
   });
 
-  test("the roadmap: the current stage mission by mission, and the next mission's tutorial with its prompt", () => {
-    const stages = roadmapStagesFor(5_000);
-    const text = formatRoadmap(stages, {
-      project: PROJECT,
-      done: Object.fromEntries(
-        ["idea:chosen", "brand:logo", "build:claude"].map((key) => [key, { at: "2026-11-21T10:00:00Z", source: "declared" as const }]),
-      ),
-    });
-    expect(text).toContain("2. Donne un style à ton SaaS : terminée");
-    expect(text).toContain("3. Construis ton SaaS : EN COURS (1/3 missions)");
-    expect(text).toContain("- [x] Crée ton compte Base44");
-    expect(text).toContain("Sa prochaine mission : « Construis la première version ».");
-    expect(text).toContain("Le prompt à coller dans Base44 que sa roadmap lui donne :");
+  const PROGRESS = { videos: 0, tiktokAccounts: 0, mrr: null };
+
+  test("the roadmap: the milestones (objectives) with the steps of the one in progress, the phase, the day's tasks, and the next one's steps with its prompt", () => {
+    const text = formatRoadmap(
+      roadmapStagesFor(5_000),
+      {
+        goal: 5_000,
+        project: PROJECT,
+        progress: PROGRESS,
+        done: Object.fromEntries(
+          ["idea:chosen", "brand:logo", "build:claude"].map((key) => [key, { at: "2026-11-21T10:00:00Z", source: "declared" as const }]),
+        ),
+      },
+      "2026-11-23",
+    );
+    expect(text).toContain("0 atteint sur 5.");
+    expect(text).toContain("- [ ] Lancer ton SaaS : EN COURS (2 / 6 étapes)");
+    expect(text).toContain("  - [x] Ton logo : atteinte le");
+    expect(text).toContain("  - [ ] Ton app en ligne : EN COURS");
+    expect(text).toMatch(/- \[ \] Atteindre 100\s€ par mois : à venir/);
+    expect(text).not.toContain("7 vidéos");
+    expect(text).toContain("Phase : lancement de son SaaS (2 tâches de lancement faites sur 12).");
+    expect(text).toContain("- [ ] Construis la première version (il la coche lui-même)");
+    expect(text).toContain("Sa prochaine tâche : « Construis la première version ».");
+    expect(text).toContain("Le prompt à coller dans Base44 que sa tâche lui donne :");
     expect(text).toContain("Crée une app web appelée Fitlo");
   });
 
-  test("the logo mission gives Gus its ChatGPT prompt", () => {
+  test("the logo task gives Gus its ChatGPT prompt, and a milestone in progress its figure", () => {
     const at = "2026-11-21T10:00:00Z";
-    const done = Object.fromEntries(
-      ["idea:chosen"].map((key) => [key, { at, source: "declared" as const }]),
-    );
-    const text = formatRoadmap(roadmapStagesFor(5_000), { project: PROJECT, done });
-    expect(text).toContain("2. Donne un style à ton SaaS : EN COURS (0/1 missions)");
-    expect(text).toContain("Sa prochaine mission : « Crée ton logo ».");
+    const done = Object.fromEntries(["idea:chosen"].map((key) => [key, { at, source: "declared" as const }]));
+    const text = formatRoadmap(roadmapStagesFor(5_000), { goal: 5_000, project: PROJECT, progress: PROGRESS, done }, "2026-11-23");
+    expect(text).toContain("Sa prochaine tâche : « Crée ton logo ».");
     expect(text).toContain("1. Demande ton logo à ChatGPT. [bouton « Ouvrir ChatGPT », avec le prompt ci-dessous déjà écrit]");
     expect(text).toContain("Génère son logo");
+
+    const growing = formatRoadmap(
+      roadmapStagesFor(5_000),
+      {
+        goal: 5_000,
+        project: PROJECT,
+        progress: { videos: 3, tiktokAccounts: 1, mrr: null },
+        done: Object.fromEntries(
+          ["idea:chosen", "brand:logo", "build:online", "payment:connect", "video:track", "video:posted"].map((key) => [key, { at, source: "observed" as const }]),
+        ),
+      },
+      "2026-11-23",
+    );
+    expect(growing).toContain("1 atteint sur 5.");
+    expect(growing).toContain("- [x] Lancer ton SaaS : atteint le");
+    expect(growing).toMatch(/- \[ \] Atteindre 100\s€ par mois : EN COURS \(0 \/ 3 étapes\)/);
+    expect(growing).toContain("  - [ ] 7 vidéos : EN COURS (3 / 7 vidéos)");
   });
 
   test("the figures without any account say so", () => {
