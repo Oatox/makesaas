@@ -36,7 +36,7 @@ function Header() {
             </Button>
           </Link>
         )}
-        <Link href="/app">
+        <Link href={AUTH_CONFIG.REDIRECT_PATH}>
           <Button size="sm" className="px-4">{user ? "App" : "Commencer"}</Button>
         </Link>
       </div>

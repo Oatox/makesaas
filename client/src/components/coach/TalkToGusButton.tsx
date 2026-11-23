@@ -31,7 +31,7 @@ function pageAction(location: string): PageAction | null {
         "Propose-moi 5 idées de carrousels TikTok pour mon app, à partir de ce qui marche déjà sur mes comptes : pour chacune, le sujet et l'accroche de la première slide.",
     };
   }
-  if (location === "/roadmap") {
+  if (location === "/accueil") {
     return {
       label: `Faire le point avec ${COACH_NAME}`,
       prompt: "Fais le point sur ma roadmap : où j'en suis, ce qui me bloque peut-être, et ce que je dois faire cette semaine pour avancer.",
@@ -43,7 +43,7 @@ function pageAction(location: string): PageAction | null {
 const BUTTON_CLASS = "min-h-9 shrink-0 gap-2 py-1 pl-1 pr-1 sm:min-h-9 sm:py-1 sm:pr-4";
 
 /**
- * Gus's button, at the top right of every page (AppLayout header). On a page with figures (Accueil,
+ * Gus's button, at the top right of every page (AppLayout header). On a page with figures (Tableau de bord,
  * Acquisition, content, roadmap), Gus works on them: the button opens a discussion that asks him to
  * ("Analyser avec Gus"…). Elsewhere, "Discuter avec Gus" starts a blank one. Hidden on the
  * new-discussion page itself and on the admin pages; only Gus's face on phones.

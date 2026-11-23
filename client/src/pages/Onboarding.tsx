@@ -106,7 +106,7 @@ export default function OnboardingPage() {
 
   // Subscribers have nothing to do here.
   if (!isLoading && hasAccess) {
-    return <Redirect to="/app" />;
+    return <Redirect to={AUTH_CONFIG.REDIRECT_PATH} />;
   }
 
   const total = steps.length;

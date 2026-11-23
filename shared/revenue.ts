@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Revenue dashboard (Accueil): the member connects the payment accounts of each of their SaaS
+ * Revenue dashboard (Tableau de bord): the member connects the payment accounts of each of their SaaS
  * (Stripe, Whop) with a read-only API key; the server reads their subscriptions and payments, and
  * the dashboard shows the active SaaS's MRR, revenue, subscribers and churn over time.
  *

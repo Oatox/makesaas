@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { Logo } from "@/components/brand/Logo";
 import { blurIn } from "@/lib/motion";
+import { AUTH_CONFIG } from "@/config/auth";
 
 // Same entrance as the landing hero: fade in from a blur, slightly from below.
 const fadeIn = blurIn();
@@ -46,7 +47,7 @@ export default function AuthPage() {
           <AuthForm
             mode={isLogin ? "login" : "register"}
             onModeChange={(mode) => setLocation(mode === "login" ? "/login" : "/register")}
-            oauthRedirectPath="/app"
+            oauthRedirectPath={AUTH_CONFIG.REDIRECT_PATH}
             itemVariants={fadeIn}
           />
         </motion.main>

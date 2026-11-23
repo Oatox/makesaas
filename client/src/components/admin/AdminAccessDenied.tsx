@@ -1,5 +1,6 @@
 import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AUTH_CONFIG } from "@/config/auth";
 
 export function AdminAccessDenied({ setLocation }: { setLocation: (path: string) => void }) {
   return (
@@ -11,7 +12,7 @@ export function AdminAccessDenied({ setLocation }: { setLocation: (path: string)
       <p className="text-muted-foreground max-w-md">
         Vous n'avez pas les permissions nécessaires pour voir cette page. Cette zone est réservée aux administrateurs.
       </p>
-      <Button onClick={() => setLocation("/app")}>Retour à l'application</Button>
+      <Button onClick={() => setLocation(AUTH_CONFIG.REDIRECT_PATH)}>Retour à l'application</Button>
     </div>
   );
 }

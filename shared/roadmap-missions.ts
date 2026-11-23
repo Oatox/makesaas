@@ -253,7 +253,7 @@ function mrrMissions(key: string, level: number, amount: number): RoadmapMission
     key: `${key}:reached`,
     title: `Atteins ${euros.format(amount)} par mois`,
     why: "Des abonnés qui paient chaque mois : ton revenu se construit.",
-    steps: [{ text: "Suis ton revenu mensuel sur l'Accueil.", action: REVENUE }],
+    steps: [{ text: "Suis ton revenu mensuel sur ton tableau de bord.", action: REVENUE }],
     check: { kind: "mrr", amount },
   };
 

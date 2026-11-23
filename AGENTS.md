@@ -56,7 +56,7 @@ Set them in `.env` (development) or in the host platform (production):
 
 ## User journey
 
-- Landing `/` → onboarding `/onboarding` (questions saved in localStorage, `client/src/components/onboarding/steps.tsx`; adding a step there is all it takes) → sign-up `/register` → paywall `/abonnement` → Gus's 3 SaaS ideas `/lancement`, then the project, the plan and the first mission (the app stays locked until the member has a SaaS) → the discussion of the first mission, and `/roadmap`.
+- Landing `/` → onboarding `/onboarding` (questions saved in localStorage, `client/src/components/onboarding/steps.tsx`; adding a step there is all it takes) → sign-up `/register` → paywall `/abonnement` → Gus's 3 SaaS ideas `/lancement`, then the project, the plan and the first mission (the app stays locked until the member has a SaaS) → the discussion of the first mission, and Accueil `/accueil` (the roadmap, where members land once signed in: `AUTH_CONFIG.REDIRECT_PATH`; `/roadmap` redirects there).
 - `ProtectedRoute` (client/src/App.tsx) sends visitors to the onboarding and signed-in users without a subscription to the paywall.
 
 ## Product data
@@ -91,7 +91,7 @@ Set them in `.env` (development) or in the host platform (production):
 
 - Keeping an idea leads to three last steps with Gus on the same page (`client/src/components/ideas/LaunchSteps.tsx`): the project to confirm (name and sentence, editable: the SaaS is created there), the plan to the member's monthly goal from the onboarding, then the first mission. The member enters the app on that discussion.
 
-## Roadmap (/roadmap)
+## Roadmap (Accueil, /accueil)
 
 - The active SaaS's roadmap (`client/src/pages/Roadmap.tsx`, `client/src/components/roadmap/`): a winding path of clickable stage nodes (`RoadmapPath`), from the idea to the member's monthly goal; a node opens the stage in a drawer on the side (from the bottom on phones), in guided mode (`StageDetail`): the mission to do now in front, all its steps at once (numbered, each with its button under it) and a single "C'est fait" at the end, then the stage's other missions in short lists ("Ensuite", "Terminées"); a mission done while it is open is celebrated and the next comes in front.
 - Members build their app with Base44, the AI app builder that also hosts it (prompts in `shared/roadmap-prompts.ts`); its sign-up link, opened by the roadmap and Gus's first mission, is `BASE44_URL` in `shared/roadmap-missions.ts` (⚠️ PLACEHOLDER: the affiliate link).
@@ -101,7 +101,7 @@ Set them in `.env` (development) or in the host platform (production):
 - The app's address: the member pastes it in its mission; the browser checks that it answers (`fetch` in no-cors mode: the server never fetches member URLs), then `PUT /api/roadmap/app-url` saves it on `saas.app_url` (server-only column).
 - The first mission (`POST /api/roadmap/first-mission`, `server/roadmap/first-mission.ts`): opens, or finds by its title, a discussion "Mettre ton app en ligne" where Gus gives the ChatGPT prompt of the style stage (the logo), then the build prompt for Base44 when the member comes back. The member goes on with Gus there; `CoachMarkdown` code blocks have a "Copier" button.
 
-## Revenue dashboard (Accueil)
+## Revenue dashboard (Tableau de bord)
 
 - `/app` shows the active SaaS's revenue (`client/src/components/revenue/RevenueDashboard.tsx`): the period's key figures (`KpiCards`: revenue collected, MRR/ARR, new subscribers, churn, each with a mini chart), the MRR card (revenue collected as bars on the left axis, MRR as a line on the right axis) and the latest payments (an icon per kind of payment), over 30 days / 90 days / 12 months.
 - A SaaS connects a single payment account (unique index `revenue_connections_saas_key`): to change it, the member removes it first (Paiements tab of the SaaS settings; a failed sync shows above the figures); reconnecting the same account only replaces its key. Members connect it with a read-only API key: Stripe (restricted key `rk_…` reading Charges and Subscriptions) and Whop (account API key with `payment:basic:read`, `member:basic:read` and plan read). `POST /api/revenue/connections` (body `{ saasId, provider, apiKey }`) checks the key, imports 12 months of history and stores the key encrypted (`server/revenue/secret-box.ts`) in `revenue_connections` with the computed daily series (`snapshot`). Members read the public columns and remove accounts straight from Supabase (RLS); the key and the snapshot are never granted to clients.

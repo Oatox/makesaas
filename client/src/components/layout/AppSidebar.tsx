@@ -21,8 +21,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
+  Gauge,
   House,
-  Route,
   ShieldCheck,
   Users,
   LogOut,
@@ -70,8 +70,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Application",
     items: [
-      { href: "/app", label: "Accueil", icon: House, matchPrefix: true },
-      { href: "/roadmap", label: "Roadmap", icon: Route },
+      { href: "/accueil", label: "Accueil", icon: House },
+      { href: "/app", label: "Tableau de bord", icon: Gauge, matchPrefix: true },
       {
         href: "/acquisition",
         label: "Acquisition",

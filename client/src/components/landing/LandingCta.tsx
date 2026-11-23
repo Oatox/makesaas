@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
+import { AUTH_CONFIG } from "@/config/auth";
 
 const SIZES = {
   default: { button: "h-11 px-5 text-base", arrow: "!size-[18px]" },
@@ -22,7 +23,7 @@ export function LandingCta({
 }) {
   const { user } = useAuth();
   return (
-    <Link href={user ? "/app" : "/onboarding"} className={cn("inline-flex", className)}>
+    <Link href={user ? AUTH_CONFIG.REDIRECT_PATH : AUTH_CONFIG.ONBOARDING_PATH} className={cn("inline-flex", className)}>
       <Button className={cn("group", SIZES[size].button)}>
         {label}
         <ArrowRight className={cn(SIZES[size].arrow, "transition-transform duration-200 group-hover:translate-x-1")} />

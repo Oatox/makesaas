@@ -240,7 +240,7 @@ export default function Launch() {
         title: "Mission indisponible",
         description: error instanceof ApiError ? error.message : "Tu la retrouves dans ta roadmap.",
       });
-      navigate("/roadmap");
+      navigate(AUTH_CONFIG.REDIRECT_PATH);
     }
   };
 

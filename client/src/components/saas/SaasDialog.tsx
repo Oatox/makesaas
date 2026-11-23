@@ -151,7 +151,7 @@ const TABS: { value: SaasSettingsTab; label: string; icon: LucideIcon | typeof S
     label: "Paiements",
     icon: CreditCard,
     title: "Compte de paiement",
-    description: "Le compte Stripe ou Whop dont l'Accueil lit le MRR et les revenus de ce SaaS.",
+    description: "Le compte Stripe ou Whop dont le tableau de bord lit le MRR et les revenus de ce SaaS.",
   },
 ];
 

@@ -156,8 +156,12 @@ function Router() {
         <ProtectedRoute component={Launch} bare />
       </Route>
 
-      <Route path="/roadmap">
+      <Route path="/accueil">
         <ProtectedRoute component={Roadmap} />
+      </Route>
+      {/* The roadmap's former address (links already shared, Gus's older messages). */}
+      <Route path="/roadmap">
+        <Redirect to="/accueil" />
       </Route>
 
       <Route path="/acquisition">
