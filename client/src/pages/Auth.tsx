@@ -15,29 +15,14 @@ function HomeLogoLink() {
   );
 }
 
-/* Right-hand showcase (desktop only): plain panel with the landing's night pitch at the bottom. */
-function Showcase() {
-  return (
-    <aside className="relative hidden overflow-hidden rounded-[28px] border border-border/60 bg-background lg:m-3 lg:block">
-      <img
-        src="/landing/hero-pitch-desktop-v4.webp"
-        alt=""
-        aria-hidden
-        width={2170}
-        height={625}
-        className="hero-scene pointer-events-none absolute inset-x-0 bottom-0 h-auto w-full max-w-none"
-      />
-    </aside>
-  );
-}
-
+/** Sign-in and sign-up: the form alone, centered on every screen size, the logo on top and the legal links below. */
 export default function AuthPage() {
   const [location, setLocation] = useLocation();
   const isLogin = location === "/login";
 
   return (
-    <div className="bg-grain relative min-h-[100svh] bg-background lg:grid lg:h-[100svh] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-      <div className="relative flex min-h-[100svh] flex-col px-6 py-6 sm:px-10 lg:min-h-0 lg:overflow-y-auto">
+    <div className="bg-grain relative min-h-[100svh] bg-background">
+      <div className="relative flex min-h-[100svh] flex-col px-6 py-6 sm:px-10">
         <header>
           <HomeLogoLink />
         </header>
@@ -66,15 +51,13 @@ export default function AuthPage() {
           />
         </motion.main>
 
-        <footer className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground lg:justify-start">
+        <footer className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
           <Link href="/mentions-legales" className="transition-colors hover:text-foreground">Mentions légales</Link>
           <Link href="/cgu" className="transition-colors hover:text-foreground">CGU</Link>
           <Link href="/cgv" className="transition-colors hover:text-foreground">CGV</Link>
           <Link href="/confidentialite" className="transition-colors hover:text-foreground">Confidentialité</Link>
         </footer>
       </div>
-
-      <Showcase />
     </div>
   );
 }
