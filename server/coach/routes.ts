@@ -16,6 +16,7 @@ import { OneShotClient, OneShotError, type ChatMessage } from "../ai/oneshot-cli
 import { AiPipelineNotFoundError, AiPipelineRepository, renderTemplate } from "../ai/pipelines";
 import { getUserId, requireSubscriber } from "../lib/auth";
 import { asyncRoute, HttpError, parseInput } from "../lib/http";
+import { buildCoachContext } from "./context";
 import { logger } from "../lib/logger";
 import { supabaseAdmin } from "../lib/supabase-admin";
 import { HOUR_MS } from "../lib/time";
@@ -138,6 +139,9 @@ export function registerCoachRoutes(app: Express) {
       }
       if (!saas.data) throw new HttpError(404, "Ce SaaS est introuvable.");
 
+      // Everything Gus knows about the member and this SaaS, read while the conversation loads.
+      const context = buildCoachContext(db, userId, body.saasId);
+
       let conversation: CoachConversation | null = null;
       let history: Turn[] = [];
       // The conversation locked in `answering` by this request, released at the end.
@@ -221,6 +225,7 @@ export function registerCoachRoutes(app: Express) {
           prenom: profile.data?.full_name?.trim().split(/\s+/)[0] || "inconnu",
           saas: saas.data.name,
           date: todayFormatter.format(new Date()),
+          ...(await context),
         };
 
         // The model keeps generating (and billing) when the member leaves: the answer is read to

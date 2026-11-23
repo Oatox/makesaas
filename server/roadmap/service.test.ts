@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { currentStageIndex, stageProgress } from "@shared/roadmap";
-import { roadmapStagesFor } from "@shared/roadmap-missions";
-import { buildAppPrompt, buildPaymentPrompt } from "@shared/roadmap-prompts";
+import { missionTime, roadmapStagesFor, stageTimeLeft } from "@shared/roadmap-missions";
+import {
+  buildAppPrompt,
+  buildLogoPrompt,
+  buildOnlinePrompt,
+  buildPaymentPrompt,
+  chatGptUrl,
+  missionPromptText,
+} from "@shared/roadmap-prompts";
 import { firstMissionMessages } from "./first-mission";
 import { observedMissions, type MissionFacts } from "./service";
 
@@ -23,6 +30,7 @@ const series = (days: Record<number, number>, carry = false) => {
 const facts = (overrides: Partial<MissionFacts> = {}): MissionFacts => ({
   saasCreatedAt: CREATED,
   hasAppUrl: false,
+  hasLogo: false,
   hasPaymentAccount: false,
   tiktokAccounts: 0,
   videoDates: [],
@@ -35,7 +43,7 @@ const facts = (overrides: Partial<MissionFacts> = {}): MissionFacts => ({
 describe("roadmapStagesFor", () => {
   test("the base stages, the MRR tiers under the goal, then the goal", () => {
     const keys = (goal: number) => roadmapStagesFor(goal).map((stage) => stage.key);
-    expect(keys(5_000)).toEqual(["idea", "build", "payment", "video", "customer", "mrr_100", "mrr_1000", "mrr_2500", "mrr_5000"]);
+    expect(keys(5_000)).toEqual(["idea", "brand", "build", "payment", "video", "customer", "mrr_100", "mrr_1000", "mrr_2500", "mrr_5000"]);
     expect(keys(3_000).slice(-2)).toEqual(["mrr_2500", "mrr_3000"]);
     expect(roadmapStagesFor(3_000).at(-1)?.isGoal).toBe(true);
     // No goal (or a wrong one): 10 000 € by default.
@@ -49,6 +57,29 @@ describe("roadmapStagesFor", () => {
       expect(new Set(keys).size).toBe(keys.length);
       for (const stage of stages) for (const mission of stage.missions) expect(mission.key.startsWith(`${stage.key}:`)).toBe(true);
     }
+  });
+
+  test("every mission is a few short steps, and says how long it takes unless it happens on its own", () => {
+    for (const stage of roadmapStagesFor(100_000)) {
+      for (const mission of stage.missions) {
+        expect(mission.steps.length).toBeGreaterThan(0);
+        expect(mission.steps.length).toBeLessThanOrEqual(4);
+        for (const step of mission.steps) expect(step.text.length).toBeLessThanOrEqual(140);
+        const onItsOwn = mission.check.kind === "first_payment" || mission.check.kind === "mrr";
+        expect(missionTime(mission) === null).toBe(onItsOwn);
+      }
+    }
+  });
+
+  test("the time of a mission, and what is left of a stage", () => {
+    const stage = (key: string) => STAGES.find((item) => item.key === key)!;
+    expect(missionTime(stage("brand").missions[0])).toBe("5 min");
+    expect(stageTimeLeft(stage("brand"), {})).toBe("≈ 5 min");
+    expect(stageTimeLeft(stage("build"), {})).toBe("≈ 1 h 25");
+    expect(stageTimeLeft(stage("build"), { "build:claude": { at: NOW, source: "declared" } })).toBe("≈ 1 h 15");
+    // A mission over days: no total.
+    expect(stageTimeLeft(stage("customer"), {})).toBeNull();
+    expect(missionTime(stage("customer").missions[0])).toBe("7 jours");
   });
 
   test("every MRR stage ends on its amount, checked from the data", () => {
@@ -76,6 +107,12 @@ describe("observedMissions", () => {
     expect(done["mrr_1000:2_accounts"]).toBeUndefined();
     // Manual missions are only ticked by the member.
     expect(done["build:claude"]).toBeUndefined();
+    expect(done["brand:logo"]).toBeUndefined();
+  });
+
+  test("the logo, once the SaaS has one", () => {
+    const done = observedMissions(facts({ hasLogo: true }), STAGES);
+    expect(done["brand:logo"]).toEqual({ at: NOW, source: "observed" });
   });
 
   test("the first payment and the MRR, compared in euros", () => {
@@ -98,7 +135,8 @@ describe("stage progress", () => {
   test("a stage is done when all its missions are; the current one is the first not done", () => {
     const done = { "idea:chosen": { at: CREATED, source: "declared" as const }, "build:claude": { at: NOW, source: "declared" as const } };
     expect(stageProgress(STAGES[0], done)).toEqual({ done: 1, total: 1, complete: true });
-    expect(stageProgress(STAGES[1], done)).toEqual({ done: 1, total: 3, complete: false });
+    expect(stageProgress(STAGES[1], done)).toEqual({ done: 0, total: 1, complete: false });
+    expect(stageProgress(STAGES[2], done)).toEqual({ done: 1, total: 3, complete: false });
     expect(currentStageIndex(STAGES, done)).toBe(1);
   });
 });
@@ -113,6 +151,10 @@ describe("prompts", () => {
     // Intl puts a narrow no-break space before the euro sign.
     expect(prompt).toMatch(/Un abonnement à 9\s€ par mois débloque la suite\./);
     expect(prompt).toContain("SPEC.md");
+    // The style stage comes first: the app takes the logo it made, and its colors.
+    expect(prompt).toContain("logo.png");
+    expect(prompt).toContain("les couleurs de mon logo");
+    expect(prompt).not.toContain("[COLLE ICI");
   });
 
   test("a SaaS created by its name only still gets prompts", () => {
@@ -122,9 +164,37 @@ describe("prompts", () => {
     expect(buildPaymentPrompt(bare)).toContain("un abonnement mensuel");
   });
 
-  test("Gus's first mission holds the build prompt in a code block", () => {
+  test("the logo prompt for ChatGPT carries the project on its own", () => {
+    expect(buildLogoPrompt(project)).toContain("app appelée Fitlo");
+    expect(buildLogoPrompt(project)).toContain("Pour qui : Étudiants");
+    expect(buildLogoPrompt(project)).toContain("Génère son logo");
+    expect(buildLogoPrompt(project)).toContain("sans aucun texte");
+    expect(buildLogoPrompt(project)).not.toContain("direction artistique");
+    expect(buildLogoPrompt({ ...project, description: null, audience: null, problem: null })).not.toContain("L'idée");
+  });
+
+  test("the ChatGPT button carries its prompt, and every step's prompt exists", () => {
+    const url = new URL(chatGptUrl(buildLogoPrompt(project)));
+    expect(url.origin).toBe("https://chatgpt.com");
+    expect(url.searchParams.get("q")).toBe(buildLogoPrompt(project));
+    expect(buildOnlinePrompt(project)).toContain("Mets Fitlo en ligne");
+    for (const stage of STAGES) {
+      for (const mission of stage.missions) {
+        for (const step of mission.steps) {
+          if (step.action?.kind === "chatgpt" || step.action?.kind === "copy") {
+            expect(missionPromptText(step.action.prompt, project)).toContain("Fitlo");
+          }
+        }
+      }
+    }
+  });
+
+  test("Gus's first mission starts with the style: the logo prompt for ChatGPT in a code block", () => {
     const { question, answer } = firstMissionMessages(project);
     expect(question).toBe("Comment je mets Fitlo en ligne ?");
-    expect(answer).toContain("```\nJe veux créer une app web appelée Fitlo");
+    expect(answer).toContain("```\nJe lance une app appelée Fitlo");
+    expect(answer).toContain("Génère son logo");
+    expect(answer.match(/```/g)).toHaveLength(2);
+    expect(answer).not.toContain("Je veux créer une app web");
   });
 });

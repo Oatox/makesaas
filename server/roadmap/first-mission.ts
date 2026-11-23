@@ -1,30 +1,27 @@
-import { buildAppPrompt, type MissionProject } from "@shared/roadmap-prompts";
+import { buildLogoPrompt, type MissionProject } from "@shared/roadmap-prompts";
 
 /**
  * The first mission of a new SaaS, "Mettre ton app en ligne": a discussion with Gus opened from
- * /lancement (or the roadmap), where Gus gives the member the prompt to build their app with Claude
- * (shared/roadmap-prompts.ts). Written here, not by the model: it must be right the first time. The
- * member then goes on with Gus in that discussion.
+ * /lancement (or the roadmap). The roadmap starts with the app's style, so Gus first gives the prompt
+ * for ChatGPT that draws its logo (shared/roadmap-prompts.ts); the build prompt
+ * for Claude comes next, from Gus (he knows the next mission's prompt) or from the roadmap. Written here,
+ * not by the model: it must be right the first time. The member then goes on with Gus in that discussion.
  */
 
-/** The opening of the discussion: the member's question, then Gus's answer with the prompt. */
+/** The opening of the discussion: the member's question, then Gus's answer with the prompts. */
 export function firstMissionMessages(project: MissionProject): { question: string; answer: string } {
   return {
     question: `Comment je mets ${project.name} en ligne ?`,
     answer: [
-      `Ta première mission : mettre **${project.name}** en ligne. On la construit avec **Claude**, sans écrire une ligne de code.`,
+      `Ta première mission : mettre **${project.name}** en ligne. On commence par son logo, pour qu'elle ait l'air d'une vraie app dès sa première version : ton app prendra ses couleurs. Ensuite, on la construit avec **Claude**, sans écrire une ligne de code.`,
       "",
-      "1. Installe l'application **Claude** sur ton ordinateur ([claude.ai/download](https://claude.ai/download)) et prends l'abonnement **Pro**.",
-      `2. Ouvre l'onglet **Code**, puis choisis un dossier vide pour ${project.name}.`,
-      "3. Copie le prompt ci-dessous, colle-le dans Claude et envoie-le.",
+      "**Son logo.** Ouvre [ChatGPT](https://chatgpt.com) et colle ce prompt. Pas convaincu ? Demande-lui une autre version. Quand il te plaît, télécharge-le et ajoute-le à ton projet depuis ta roadmap :",
       "",
       "```",
-      buildAppPrompt(project),
+      buildLogoPrompt(project),
       "```",
       "",
-      "Claude va te poser quelques questions, écrire le plan de ton app, puis construire une première version que tu verras dans son aperçu. Elle n'a pas besoin d'être parfaite : le but, c'est qu'elle marche jusqu'à l'écran de résultat.",
-      "",
-      "Tu retrouves chaque étape dans ta roadmap, avec son tutoriel. Quand c'est fait, ou si quelque chose bloque, écris-moi ici : je te donne la suite.",
+      "Quand ton logo est prêt, écris-moi ici : je te donne le prompt pour construire ton app avec Claude. Tu retrouves aussi chaque étape dans ta roadmap, avec son tutoriel.",
     ].join("\n"),
   };
 }

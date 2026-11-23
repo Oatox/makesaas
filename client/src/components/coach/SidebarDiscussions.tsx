@@ -12,7 +12,7 @@ import { DiscussionDialogs, type DiscussionDialogState } from "./DiscussionDialo
 import { DiscussionsHistory } from "./DiscussionsHistory";
 
 /** Latest discussions listed in the sidebar; "Voir tout" opens all of them when there are more. */
-const RECENT_DISCUSSIONS = 8;
+const RECENT_DISCUSSIONS = 3;
 
 function RecentDiscussion({
   conversation,

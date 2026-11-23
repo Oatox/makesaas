@@ -79,7 +79,7 @@ export type PipelineConfig = {
   responseSchema: object | null;
 };
 
-const COACH_SYSTEM_VARIABLES = ["prenom", "saas", "date"];
+const COACH_SYSTEM_VARIABLES = ["prenom", "saas", "date", "profil", "projet", "roadmap", "chiffres"];
 const CAROUSEL_VARIABLES = Object.keys(CAROUSEL_TEMPLATE_VARIABLES);
 
 /**

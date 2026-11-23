@@ -42,6 +42,10 @@ export const COACH_TEMPLATE_VARIABLES = {
   prenom: "Prénom du membre (« inconnu » s'il ne l'a pas donné)",
   saas: "Nom du SaaS actif",
   date: "Date du jour",
+  profil: "Le membre : ses réponses au questionnaire, son objectif de revenu, ses autres SaaS",
+  projet: "Son SaaS actif : nom, description, cible, adresse de l'app et l'idée gardée",
+  roadmap: "Sa roadmap : les étapes, l'étape en cours mission par mission, le tutoriel de sa prochaine mission",
+  chiffres: "Ses chiffres réels : revenus (MRR, abonnés, paiements), comptes et vidéos TikTok, carrousels",
   input: "Message du membre (étape Message uniquement)",
 } as const;
 export type CoachTemplateVariable = keyof typeof COACH_TEMPLATE_VARIABLES;

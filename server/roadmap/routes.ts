@@ -42,7 +42,7 @@ export function registerRoadmapRoutes(app: Express) {
     }),
   );
 
-  // Opens the discussion "Mettre ton app en ligne" with Gus's prompt, or finds the one already opened.
+  // Opens the discussion "Mettre ton app en ligne" with Gus's first prompts, or finds the one already opened.
   app.post(
     roadmapApi.firstMission.path,
     requireSubscriber,

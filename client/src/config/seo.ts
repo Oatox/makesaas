@@ -11,7 +11,7 @@ export const SITE = {
   logo: "/brand/icon-512.png",
   themeColor: "#0B0E0D",
   description:
-    "MakeSaaS : tout le socle d'un SaaS déjà prêt (authentification, onboarding, abonnements, administration, IA) pour lancer ton produit en quelques jours.",
+    "MakeSaaS t'aide à lancer ton business : une idée faite pour toi, un plan clair jour après jour et un coach à chaque étape, jusqu'à tes premiers clients.",
 };
 
 export type SeoPage = {

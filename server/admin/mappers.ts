@@ -92,7 +92,7 @@ export function mapProviders(user: User | null | undefined): AdminProviderPayloa
     if (!providers.has(key)) providers.set(key, connectedProvider(key));
   }
 
-  if (user?.email && !providers.has("email")) providers.set("email", connectedProvider("email"));
-
+  // No "email" fallback from user.email: every Google account has an address too, and only an
+  // "email" identity (a password) means the member can sign in with it.
   return Array.from(providers.values());
 }

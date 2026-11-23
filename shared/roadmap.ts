@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { MissionProject } from "./roadmap-prompts";
+import type { MissionProject, MissionPrompt } from "./roadmap-prompts";
 
 /**
  * The roadmap of a SaaS (/roadmap): stages from the idea to the member's monthly goal (picked in the
@@ -10,7 +10,8 @@ import type { MissionProject } from "./roadmap-prompts";
  *   - checked from the SaaS's data by the server (server/roadmap/), "observed" (or "before" when it
  *     happened before the SaaS was created on MakeSaaS; "declared" for what the member said, like the
  *     address of their app): saved once seen, and never undone, even when a connection breaks;
- *   - ticked by the member ("C'est fait"), "declared": they can untick it.
+ *   - ticked by the member ("C'est fait"), "declared": they can untick it. They tick them in the
+ *     roadmap's order (missionBlocker), and untick them from the last one back (canUntickMission).
  * Both live in public.roadmap_missions (section 14 of supabase_setup.sql).
  */
 
@@ -36,6 +37,8 @@ export type MissionCheck =
   | { kind: "saas" }
   /** The member gave the address of their app, and it answered. */
   | { kind: "app_url" }
+  /** The SaaS has a logo (added from its settings). */
+  | { kind: "logo" }
   /** A Stripe / Whop account is connected to the SaaS. */
   | { kind: "payment_account" }
   | { kind: "tiktok_accounts"; min: number }
@@ -46,29 +49,41 @@ export type MissionCheck =
   /** The MRR of the live connected account, compared in euros. */
   | { kind: "mrr"; amount: number };
 
-/** An interactive block in a mission's tutorial. */
-export type MissionTool =
-  /** The prompt that builds the first version (buildAppPrompt), and Gus's discussion. */
-  | "app_prompt"
-  /** The prompt that adds the subscription screen (buildPaymentPrompt). */
-  | "payment_prompt"
+/** The button of a mission's step: what the member does right there. */
+export type StepAction =
+  /** Opens a site in a new tab. */
+  | { kind: "open"; label: string; url: string }
+  /** Opens a page of MakeSaaS. */
+  | { kind: "page"; label: string; href: string }
+  /** Opens ChatGPT with this prompt already written (a new discussion). */
+  | { kind: "chatgpt"; prompt: MissionPrompt }
+  /** Copies this prompt, shown folded, to paste into Claude or into a ChatGPT discussion already open. */
+  | { kind: "copy"; prompt: MissionPrompt }
+  /** Opens a new discussion with Gus, starting with this message. */
+  | { kind: "gus"; label: string; message: string }
+  /** Opens the SaaS's settings on one of its tabs (its logo, its payment account). */
+  | { kind: "settings"; tab: "general" | "payments"; label: string }
   /** The field where the member pastes the address of their app. */
-  | "app_url"
-  /** Opens the SaaS's settings, on its payment account. */
-  | "payment_account";
+  | { kind: "app_url" };
+
+/**
+ * One step of a mission: a short sentence starting with a verb (Gus's Markdown: **bold**,
+ * [links](https://…)), and at most one button. The member goes through them one at a time.
+ */
+export type MissionStep = { text: string; action?: StepAction };
 
 export type RoadmapMission = {
   /** Stable: saved in roadmap_missions. "<stage>:<mission>". */
   key: string;
   title: string;
-  /** Why it matters, in one sentence. */
+  /** Why it matters, in one short line: for Gus (the drawer shows the title, its time and its steps). */
   why: string;
-  /** The tutorial, one step each (Gus's Markdown: **bold**, [links](https://…)). */
-  steps: string[];
+  /** About how long it takes, in minutes, for what is done in one sitting. */
+  minutes?: number;
+  /** How long it takes otherwise ("7 jours"); neither: it happens on its own (a payment, an MRR). */
+  span?: string;
+  steps: MissionStep[];
   check: MissionCheck;
-  tool?: MissionTool;
-  /** Pages of the app that help. */
-  links?: { label: string; href: string }[];
 };
 
 export type RoadmapStage = {
@@ -113,6 +128,40 @@ export function stageProgress(stage: RoadmapStage, done: Record<string, MissionD
 export function currentStageIndex(stages: RoadmapStage[], done: Record<string, MissionDone>): number | null {
   const index = stages.findIndex((stage) => !stageProgress(stage, done).complete);
   return index >= 0 ? index : null;
+}
+
+/** A mission in the roadmap's order, with its stage. */
+export type MissionAt = { mission: RoadmapMission; stage: RoadmapStage; stageIndex: number };
+
+/** Every mission in the roadmap's order: stage after stage, each stage's in its order. */
+function missionsInOrder(stages: RoadmapStage[]): MissionAt[] {
+  return stages.flatMap((stage, stageIndex) => stage.missions.map((mission) => ({ mission, stage, stageIndex })));
+}
+
+/**
+ * The member ticks the missions in the roadmap's order: one waits until every mission before it (in
+ * its stage, and in the stages before) is done. Returns the first of them still to do, or null when
+ * the mission can be ticked. Missions checked from the data are done whenever they are seen, in any
+ * order; they still hold back the missions after them.
+ */
+export function missionBlocker(stages: RoadmapStage[], done: Record<string, MissionDone>, key: string): MissionAt | null {
+  for (const entry of missionsInOrder(stages)) {
+    if (entry.mission.key === key) return null;
+    if (!done[entry.mission.key]) return entry;
+  }
+  return null;
+}
+
+/**
+ * Whether the member can untick a mission they ticked: not once they ticked one after it, which
+ * would then be done before it (they untick from the last one back).
+ */
+export function canUntickMission(stages: RoadmapStage[], done: Record<string, MissionDone>, key: string): boolean {
+  const order = missionsInOrder(stages);
+  const index = order.findIndex((entry) => entry.mission.key === key);
+  return order
+    .slice(index + 1)
+    .every(({ mission }) => !(mission.check.kind === "manual" && done[mission.key]?.source === "declared"));
 }
 
 /** Mirrored by roadmap_missions_key_check in supabase_setup.sql. */

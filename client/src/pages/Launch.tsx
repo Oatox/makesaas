@@ -224,7 +224,7 @@ export default function Launch() {
     void say("you", ["Et maintenant ?"]);
     void say("coach", [
       "Première mission : mettre ton app en ligne.",
-      "Je t'ai tout préparé dans une discussion : le prompt à donner à Claude pour construire ton app, et les étapes, une par une.",
+      "Je t'ai tout préparé dans une discussion, étape par étape : on commence par son style et son logo, puis on la construit avec Claude.",
     ]);
   };
 

@@ -13,6 +13,8 @@ export type MissionFacts = {
   saasCreatedAt: string;
   /** The member gave the address of their app. */
   hasAppUrl: boolean;
+  /** The SaaS has a logo. */
+  hasLogo: boolean;
   /** A Stripe / Whop account is connected (live or test). */
   hasPaymentAccount: boolean;
   tiktokAccounts: number;
@@ -51,6 +53,9 @@ export function observedMissions(facts: MissionFacts, stages: RoadmapStage[]): R
       case "app_url":
         result = facts.hasAppUrl ? { at: facts.now, source: "declared" } : null;
         break;
+      case "logo":
+        result = facts.hasLogo ? { at: facts.now, source: "observed" } : null;
+        break;
       case "payment_account":
         result = facts.hasPaymentAccount ? { at: facts.now, source: "observed" } : null;
         break;
@@ -83,6 +88,7 @@ type SaasRow = {
   audience: string | null;
   created_at: string;
   app_url: string | null;
+  logo_url: string | null;
   idea: { content?: { problem?: unknown; price?: unknown } } | null;
 };
 
@@ -152,6 +158,7 @@ export class RoadmapService {
       {
         saasCreatedAt: saas.created_at,
         hasAppUrl: !!saas.app_url,
+        hasLogo: !!saas.logo_url,
         hasPaymentAccount: (connections.data ?? []).length > 0,
         tiktokAccounts: tiktok.count ?? 0,
         videoDates: (videos.data ?? []).map((video) => video.posted_at),
@@ -189,7 +196,7 @@ export class RoadmapService {
   async ownSaas(userId: string, saasId: string): Promise<SaasRow> {
     const { data, error } = await this.db
       .from("saas")
-      .select("id, name, description, audience, created_at, app_url, idea:saas_ideas(content)")
+      .select("id, name, description, audience, created_at, app_url, logo_url, idea:saas_ideas(content)")
       .eq("id", saasId)
       .eq("user_id", userId)
       .maybeSingle();

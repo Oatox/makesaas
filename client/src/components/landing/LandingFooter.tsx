@@ -42,8 +42,8 @@ export function LandingFooter() {
               <Logo className="h-5 md:h-6" />
             </a>
             <p className="max-w-md text-sm leading-relaxed text-muted-foreground md:text-base">
-              Tout le socle d'un SaaS déjà prêt : authentification, onboarding, abonnements, administration et IA.
-              Il ne reste qu'à construire ton produit.
+              MakeSaaS t'aide à lancer ton business : une idée faite pour toi, un plan clair jour après jour et un
+              coach à chaque étape, jusqu'à tes premiers clients.
             </p>
           </div>
 
