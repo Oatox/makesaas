@@ -9,7 +9,6 @@ import {
   dialogContentClass,
   dialogDescriptionClass,
   dialogFooterClass,
-  dialogHandleClass,
   dialogHeaderClass,
   dialogMobileSheetClass,
   dialogOverlayClass,
@@ -54,7 +53,6 @@ const DialogContent = React.forwardRef<
       )}
       {...props}
     >
-      <div className={dialogHandleClass} aria-hidden="true" />
       {children}
       <DialogPrimitive.Close className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none sm:right-4 sm:top-4 sm:h-9 sm:w-9">
         <X className="h-[18px] w-[18px]" />

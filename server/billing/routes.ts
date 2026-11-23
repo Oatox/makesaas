@@ -1,6 +1,6 @@
 import type { Express, Request } from "express";
 import { unwrapWebhook, WebhookVerificationError } from "@whop/sdk/helpers";
-import { billingApi, type CheckoutSession, type PaywallResponse } from "@shared/billing";
+import { billingApi, isOfferKey, type CheckoutSession, type PaywallResponse } from "@shared/billing";
 import { getUserId, requireUser } from "../lib/auth";
 import { asyncRoute, HttpError } from "../lib/http";
 import { logger } from "../lib/logger";
@@ -61,12 +61,12 @@ export function registerBillingRoutes(app: Express) {
     return billing;
   };
 
-  // Public: the onboarding shows the plan before sign-up.
+  // Public: the offers can be shown before sign-up.
   app.get(
     billingApi.plan.path,
     asyncRoute(async (_req, res) => {
       const billing = requireBilling();
-      const body: PaywallResponse = { plan: await billing.getPaywallPlan(), environment: billing.environment };
+      const body: PaywallResponse = { offers: await billing.getPaywallOffers(), environment: billing.environment };
       res.set("Cache-Control", "public, max-age=300").json(body);
     }),
   );
@@ -75,10 +75,28 @@ export function registerBillingRoutes(app: Express) {
     billingApi.checkout.path,
     requireUser,
     asyncRoute(async (req, res) => {
-      const session: CheckoutSession = await requireBilling().createCheckout(getUserId(res), checkoutRedirectUrl(req));
+      // Body: CheckoutRequest. Without an offer (older clients), the monthly one.
+      const offer: unknown = req.body?.offer ?? "monthly";
+      if (!isOfferKey(offer)) throw new HttpError(400, "Offre inconnue.");
+      const session: CheckoutSession = await requireBilling().createCheckout(getUserId(res), offer, checkoutRedirectUrl(req));
       res.status(201).json(session);
     }),
   );
+
+  // The member stops or restarts the renewal from the settings (access stays until the period ends).
+  for (const [path, cancel] of [
+    [billingApi.cancel.path, true],
+    [billingApi.resume.path, false],
+  ] as const) {
+    app.post(
+      path,
+      requireUser,
+      asyncRoute(async (_req, res) => {
+        await requireBilling().setCancelAtPeriodEnd(getUserId(res), cancel);
+        res.status(204).end();
+      }),
+    );
+  }
 
   // Signed by Whop (Standard Webhooks). Verified on the exact bytes received (req.rawBody, kept by
   // express.json in server/index.ts). A 5xx makes Whop retry, so only processing errors return one.

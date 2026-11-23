@@ -24,7 +24,7 @@ export const FAQS = [
   },
   {
     q: "C'est payant ?",
-    a: "Répondre aux questions est gratuit. Ensuite, ton plan, Gus et les outils sont accessibles avec un abonnement mensuel, sans engagement : tu arrêtes en un clic depuis ton compte, et tu gardes l'accès jusqu'à la fin du mois payé.",
+    a: "Répondre aux questions est gratuit. Ensuite, ton plan, Gus et les outils sont accessibles avec un abonnement d'un, trois ou douze mois, sans engagement : tu arrêtes en un clic depuis ton compte, et tu gardes l'accès jusqu'à la fin de la période payée.",
   },
   {
     q: "Je vais gagner de l'argent ?",

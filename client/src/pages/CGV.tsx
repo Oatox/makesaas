@@ -61,12 +61,14 @@ export default function CGV() {
 
       <LegalSection title="5. Prix et paiement">
         <p>
-          {LEGAL.siteName} propose un abonnement mensuel unique, <span className={strong}>{PLAN.name}</span>. Son prix
-          toutes taxes comprises est affiché avant le paiement : le prix applicable est celui affiché au moment de votre
-          achat. TVA non applicable, article 293 B du Code général des impôts.
+          {LEGAL.siteName} propose un abonnement unique, <span className={strong}>{PLAN.name}</span>, payable selon
+          l'offre choisie par période d'un mois, de trois mois ou de douze mois : toutes donnent le même accès. Le prix
+          toutes taxes comprises de chaque offre est affiché avant le paiement : le prix applicable est celui affiché au
+          moment de votre achat. TVA non applicable, article 293 B du Code général des impôts.
         </p>
         <p>
-          Le prix est prélevé à la souscription, puis au début de chaque nouveau mois, jusqu'à la résiliation. Vous payez
+          Le prix de la période choisie est prélevé à la souscription, puis au début de chaque nouvelle période, jusqu'à
+          la résiliation. Vous payez
           par carte ou par les moyens proposés dans la fenêtre de paiement sécurisée de Whop : {LEGAL.siteName} n'a
           jamais accès aux données de votre carte.
         </p>
@@ -79,8 +81,8 @@ export default function CGV() {
       <LegalSection title="6. Sans engagement, résiliation en ligne">
         <p>
           L'abonnement est sans engagement. Vous pouvez le résilier à tout moment, en ligne, depuis votre compte
-          (Paramètres, « Gérer mon abonnement ») ou en écrivant à <SupportEmail />. La résiliation arrête les
-          prélèvements suivants, et vous gardez l'accès jusqu'à la fin du mois déjà payé.
+          (Paramètres, « Résilier ») ou en écrivant à <SupportEmail />. La résiliation arrête les
+          prélèvements suivants, et vous gardez l'accès jusqu'à la fin de la période déjà payée.
         </p>
       </LegalSection>
 
@@ -99,13 +101,13 @@ export default function CGV() {
           e-mail.
         </p>
         <p>
-          Les renouvellements ne sont pas remboursés, et un mois commencé n'est pas remboursé au prorata. Exceptions : la
+          Les renouvellements ne sont pas remboursés, et une période commencée n'est pas remboursée au prorata. Exceptions : la
           garantie {LEGAL.siteName} (article 8), une suspension de compte qui ne vous est pas imputable (article 9), une
           erreur de notre part ou une obligation légale.
         </p>
       </LegalSection>
 
-      <LegalSection title={`8. Garantie ${LEGAL.siteName}`}>
+      <LegalSection id="garantie" title={`8. Garantie ${LEGAL.siteName}`}>
         {/* Same conditions as FirstMRR's guarantee: an offer you can pay for, online before the first
             video, then 6 videos in 48 hours. */}
         <p>

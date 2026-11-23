@@ -27,7 +27,6 @@ import { PactStep } from "@/components/onboarding/PactStep";
 import { CoachChatStep } from "@/components/onboarding/CoachChatStep";
 import { BuildStep } from "@/components/onboarding/BuildStep";
 import { ProjectionStep } from "@/components/onboarding/ProjectionStep";
-import { Paywall } from "@/components/billing/Paywall";
 import { STEP_TITLE_CLASS, stepAppear as appear } from "@/components/onboarding/StepHeader";
 import { TypewriterText } from "@/components/onboarding/TypewriterText";
 import { useOnboardingProgress } from "@/hooks/use-onboarding";
@@ -71,9 +70,9 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
-/** End of the onboarding: the paywall once signed in, otherwise the way to create the account first. */
+/** End of the onboarding: the paywall page once signed in, otherwise the way to create the account first. */
 function EndStep({ isSignedIn, onReset }: { isSignedIn: boolean; onReset: () => void }) {
-  if (isSignedIn) return <Paywall title="Investis sur toi-même pour atteindre tes objectifs." />;
+  if (isSignedIn) return <Redirect to={AUTH_CONFIG.SUBSCRIBE_PATH} replace />;
 
   return (
     <motion.div className="space-y-7" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.07 } } }}>

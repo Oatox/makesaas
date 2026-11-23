@@ -84,11 +84,11 @@ const TAG_SIZE =
   "max-md:[@media(min-height:920px)]:px-3.5 max-md:[@media(min-height:920px)]:py-1.5 max-md:[@media(min-height:920px)]:text-base " +
   "md:[@media(min-height:1020px)]:px-3.5 md:[@media(min-height:1020px)]:py-1.5 md:[@media(min-height:1020px)]:text-base";
 
-/** Initial in a ring of the brand orange, slowly turning. */
-function Avatar({ name }: { name: string }) {
+/** Initial in a ring of the brand orange, slowly turning (also the paywall's plan card). */
+export function InitialAvatar({ name, className = AVATAR_SIZE }: { name: string; className?: string }) {
   const reduceMotion = useReducedMotion();
   return (
-    <span aria-hidden className={cn("relative shrink-0", AVATAR_SIZE)}>
+    <span aria-hidden className={cn("relative shrink-0", className)}>
       <motion.span
         className="absolute inset-0 rounded-full"
         style={{ background: "conic-gradient(from 0deg, hsl(var(--primary)), hsl(var(--primary) / 0.1), hsl(var(--primary) / 0.55), hsl(var(--primary)))" }}
@@ -134,7 +134,7 @@ export function FounderProfileStep({ answers, onContinue }: { answers: Onboardin
       <div className="mt-4 flex flex-1 flex-col gap-3 [@media(max-height:720px)]:mt-3 [@media(max-height:720px)]:gap-2 [@media(min-height:721px)_and_(max-height:820px)]:mt-3 [@media(min-height:721px)_and_(max-height:820px)]:gap-2.5">
         {/* ID card: takes the room the lists leave, laid out for the screen height (see HERO_LAYOUT). */}
         <motion.section variants={stepAppear} className={cn("relative flex flex-1 items-center justify-center", HERO_LAYOUT)}>
-          <Avatar name={name} />
+          <InitialAvatar name={name} />
           <div className={cn("relative min-w-0", HERO_TEXT)}>
             <p className={cn("truncate font-display font-light leading-tight", NAME_SIZE)}>{name}</p>
             {/* Age and situation, as tags: the first name is already above. */}

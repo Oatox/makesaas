@@ -9,7 +9,6 @@ import {
   dialogContentClass,
   dialogDescriptionClass,
   dialogFooterClass,
-  dialogHandleClass,
   dialogHeaderClass,
   dialogMobileSheetClass,
   dialogOverlayClass,
@@ -53,7 +52,6 @@ const AlertDialogContent = React.forwardRef<
       role="alertdialog"
       {...props}
     >
-      <div className={dialogHandleClass} aria-hidden="true" />
       {children}
     </DialogPrimitive.Content>
   </AlertDialogPortal>

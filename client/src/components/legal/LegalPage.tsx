@@ -29,9 +29,10 @@ export function LegalPage({ title, children }: { title: string; children: ReactN
   );
 }
 
-export function LegalSection({ title, children }: { title: string; children: ReactNode }) {
+/** A numbered article; `id` makes it linkable (e.g. /cgv#garantie from the paywall). */
+export function LegalSection({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
-    <section className="space-y-3">
+    <section id={id} className="scroll-mt-24 space-y-3">
       <h2 className="text-xl font-normal text-foreground">{title}</h2>
       {children}
     </section>

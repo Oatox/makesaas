@@ -1,4 +1,5 @@
-import { Checkout, CheckoutElement, WhopElements } from "@whop/elements-react";
+import type { ReactNode } from "react";
+import { Checkout, CheckoutElement, ExpressCheckoutElement, WhopElements } from "@whop/elements-react";
 import { loadWhop } from "@whop/elements";
 import { Loader2 } from "lucide-react";
 
@@ -8,21 +9,23 @@ const loading = (
   </div>
 );
 
+type Environment = "production" | "sandbox";
+
 /**
- * Whop's embedded checkout for a checkout configuration created by the server (it carries the
- * user id, which comes back on the membership). Loaded lazily: the Whop script is only fetched here.
- * onComplete only switches the UI: access itself is granted by the webhook.
+ * Whop's provider and checkout for a checkout configuration created by the server (it carries the
+ * user id, which comes back on the membership). The Whop script loads once, whatever the number of
+ * checkouts on the page. onComplete only switches the UI: access itself is granted by the webhook.
  */
-export default function WhopCheckout({
+function WhopCheckoutFrame({
   sessionId,
   environment,
-  email,
   onComplete,
+  children,
 }: {
   sessionId: string;
-  environment: "production" | "sandbox";
-  email?: string | null;
+  environment: Environment;
   onComplete: () => void;
+  children: ReactNode;
 }) {
   return (
     <WhopElements
@@ -39,8 +42,62 @@ export default function WhopCheckout({
           if (result.result === "payment") onComplete();
         }}
       >
-        <CheckoutElement buyerEmail={email ?? undefined} fallback={loading} />
+        {children}
       </Checkout>
     </WhopElements>
+  );
+}
+
+/** Whop's embedded checkout (card and the other methods). Loaded lazily: the Whop script is only fetched here. */
+export default function WhopCheckout({
+  sessionId,
+  environment,
+  email,
+  fallback = loading,
+  onComplete,
+}: {
+  sessionId: string;
+  environment: Environment;
+  email?: string | null;
+  /** Shown while Whop's form loads. */
+  fallback?: ReactNode;
+  onComplete: () => void;
+}) {
+  return (
+    <WhopCheckoutFrame sessionId={sessionId} environment={environment} onComplete={onComplete}>
+      <CheckoutElement buyerEmail={email ?? undefined} fallback={fallback} />
+    </WhopCheckoutFrame>
+  );
+}
+
+/**
+ * One-press Apple Pay and Google Pay buttons for the same checkout configuration (a checkout mounts
+ * either the full form or these buttons, hence a checkout of their own). Whop only renders the
+ * wallets the device can pay with, and only on a domain with Apple Pay enabled on Whop (the
+ * association file is served by server/billing/apple-pay.ts): nothing on localhost.
+ */
+export function WhopExpressCheckout({
+  sessionId,
+  environment,
+  onComplete,
+  onUnavailable,
+}: {
+  sessionId: string;
+  environment: Environment;
+  onComplete: () => void;
+  /** Whop could not offer the buttons (it then shows a refusal, better left out of the page). */
+  onUnavailable: () => void;
+}) {
+  return (
+    <WhopCheckoutFrame sessionId={sessionId} environment={environment} onComplete={onComplete}>
+      <ExpressCheckoutElement
+        wallets={{ applePay: "auto", googlePay: "auto", payPal: "never" }}
+        layout="auto"
+        onError={(error) => {
+          console.warn("[paywall] Apple Pay / Google Pay unavailable", error);
+          onUnavailable();
+        }}
+      />
+    </WhopCheckoutFrame>
   );
 }

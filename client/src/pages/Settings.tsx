@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { DeleteAccountDialog } from "@/components/settings/DeleteAccountDialog";
+import { ManageSubscription } from "@/components/settings/ManageSubscription";
 import { ProfileForm } from "@/components/settings/ProfileForm";
 import { blurIn } from "@/lib/motion";
 import { motion } from "framer-motion";
@@ -92,13 +93,7 @@ export default function Settings() {
             .join(" ")}
           iconClass={hasAccess ? "bg-primary/15 text-primary" : undefined}
         >
-          {isWhop && subscription.manage_url && (
-            <Button asChild variant="secondary" className="h-11 w-full px-5 sm:w-auto">
-              <a href={subscription.manage_url} target="_blank" rel="noopener noreferrer">
-                Gérer mon abonnement
-              </a>
-            </Button>
-          )}
+          {isWhop && <ManageSubscription subscription={subscription} periodEnd={renewal} />}
         </Row>
       </Section>
 

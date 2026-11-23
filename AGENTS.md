@@ -41,7 +41,8 @@ Set them in `.env` (development) or in the host platform (production):
 - `SUPABASE_SECRET_KEY` — Supabase secret key (`sb_secret_...`, server-only)
 - `WHOP_API_KEY` — Whop account API key (server-only; without it the paywall shows "abonnements indisponibles")
 - `WHOP_WEBHOOK_SECRET` — signing secret of the Whop webhook (`ws_...`, server-only)
-- `WHOP_PLAN_ID` — Whop plan id (`plan_...`) of the single monthly plan
+- `WHOP_PRODUCT_ID` — Whop product id (`prod_...`): its visible renewal plans of 30, 90 and 365 days become the 1, 3 and 12-month offers (the paywall only offers the periods the product has)
+- `WHOP_PLAN_ID` — instead of a product, the plan id (`plan_...`) of a single monthly plan
 - `WHOP_ENVIRONMENT` — `sandbox` to use sandbox.whop.com, production otherwise
 - `ONESHOT_API_KEY` — OneShotAPI key for the AI pipelines (server-only, optional: without it the AI routes answer 503)
 
@@ -56,8 +57,9 @@ Set them in `.env` (development) or in the host platform (production):
 
 ## Subscriptions (Whop)
 
-- A single paid plan unlocks the whole app (`PLAN` in `shared/billing.ts`: name and description); there is no free plan. Subscriptions live in their own table `subscriptions` (one row per user, `provider` `whop` or `manual`), never on `profiles`. Access = a row whose `status` grants access (`grantsAccess` in `shared/billing.ts`, mirrored by `subscription_grants_access` in SQL), or the admin role: `hasAccess` from `useAuth()` on the client, `private.has_access()` in RLS.
-- `POST /api/billing/checkout` creates a Whop checkout configuration carrying `metadata.supabase_user_id`. Access is granted only by the signed webhook `POST /api/billing/whop/webhook` (`server/billing/`), which re-reads the membership from Whop and upserts the user's `subscriptions` row. A new membership never replaces one still running on Whop: a double payment is logged as an error, to refund from the Whop dashboard.
+- A single paid plan unlocks the whole app (`PLAN` in `shared/billing.ts`: name and description); there is no free plan. It is sold for 1, 3 or 12 months (`OFFERS` and `RECOMMENDED_OFFER` in `shared/billing.ts`, one Whop plan each, found on the product `WHOP_PRODUCT_ID` by billing period; any membership on that product grants access); the paywall (`/abonnement`, `client/src/components/billing/Paywall.tsx`) shows the guarantee, then the offers with Whop's checkout embedded under them. Subscriptions live in their own table `subscriptions` (one row per user, `provider` `whop` or `manual`), never on `profiles`. Access = a row whose `status` grants access (`grantsAccess` in `shared/billing.ts`, mirrored by `subscription_grants_access` in SQL), or the admin role: `hasAccess` from `useAuth()` on the client, `private.has_access()` in RLS.
+- `POST /api/billing/checkout` (body `{ offer }`) creates a Whop checkout configuration on that offer's plan, carrying `metadata.supabase_user_id`. Access is granted only by the signed webhook `POST /api/billing/whop/webhook` (`server/billing/`), which re-reads the membership from Whop and upserts the user's `subscriptions` row. A new membership never replaces one still running on Whop: a double payment is logged as an error, to refund from the Whop dashboard.
+- Members cancel or resume the renewal from the settings (`ManageSubscription`): `POST /api/billing/subscription/cancel` and `/resume` change `cancel_at_period_end` on Whop, then sync the row right away (access stays until the paid period ends).
 - `requireSubscriber` (server/lib/auth.ts) guards paid API routes.
 
 ## AI pipelines

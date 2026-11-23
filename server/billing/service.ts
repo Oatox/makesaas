@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Whop } from "@whop/sdk";
-import { PLAN, grantsAccess, type CheckoutSession, type PaywallPlan } from "@shared/billing";
+import { OFFER_KEYS, OFFERS, grantsAccess, type CheckoutSession, type OfferKey, type PaywallOffer } from "@shared/billing";
 import { HttpError } from "../lib/http";
 import { logger } from "../lib/logger";
 import type { WhopConfig } from "./config";
@@ -8,13 +8,22 @@ import type { WhopConfig } from "./config";
 /** Metadata key carrying the Supabase user id from the checkout to the membership. */
 export const USER_ID_METADATA_KEY = "supabase_user_id";
 
-const PRICE_TTL_MS = 10 * 60 * 1000;
+const PLANS_TTL_MS = 10 * 60 * 1000;
 
 type SubscriptionRow = { status: string; whop_membership_id: string | null };
 
+/** A Whop plan on sale: the offer it is, and its price (null when Whop could not be reached). */
+type SoldPlan = { key: OfferKey; planId: string; price: number | null; currency: string | null };
+
+/** The offer a renewal period stands for (30, 90 or 365 days, a few days either way), if any. */
+function offerForPeriod(days: number | null): OfferKey | null {
+  if (days === null) return null;
+  return OFFER_KEYS.find((key) => Math.abs(OFFERS[key].days - days) <= 3) ?? null;
+}
+
 /** Whop subscriptions: checkout sessions for the paywall, and membership → subscriptions row sync. */
 export class BillingService {
-  private cachedPlan: { value: PaywallPlan; expiresAt: number } | null = null;
+  private cachedPlans: { value: SoldPlan[]; expiresAt: number } | null = null;
 
   constructor(
     private readonly whop: WhopConfig,
@@ -25,25 +34,81 @@ export class BillingService {
     return this.whop.environment;
   }
 
-  /** The plan with its Whop price, cached a few minutes (prices change rarely). */
-  async getPaywallPlan(): Promise<PaywallPlan> {
-    if (this.cachedPlan && this.cachedPlan.expiresAt > Date.now()) return this.cachedPlan.value;
+  /** The offers on sale with their Whop prices, in OFFER_KEYS order. */
+  async getPaywallOffers(): Promise<PaywallOffer[]> {
+    return (await this.soldPlans()).map(({ key, price, currency }) => ({ key, price, currency }));
+  }
 
-    const base = { name: PLAN.name, description: PLAN.description };
+  /** The plans on sale, cached a few minutes (they change rarely); one without its price is retried next time. */
+  private async soldPlans(): Promise<SoldPlan[]> {
+    if (this.cachedPlans && this.cachedPlans.expiresAt > Date.now()) return this.cachedPlans.value;
+
+    const { catalog } = this.whop;
+    const value = catalog.kind === "product" ? await this.productPlans(catalog.productId) : [await this.singlePlan(catalog.planId)];
+    if (value.every((plan) => plan.price !== null)) this.cachedPlans = { value, expiresAt: Date.now() + PLANS_TTL_MS };
+    return value;
+  }
+
+  /** The product's visible renewal plans of 1, 3 and 12 months; the newest wins when two share a period. */
+  private async productPlans(productId: string): Promise<SoldPlan[]> {
+    const found = new Map<OfferKey, { plan: SoldPlan; createdAt: string }>();
     try {
-      const variant = await this.whop.client.variants.retrieve({ id: this.whop.planId });
-      const value = { ...base, price: variant.renewal_price || variant.initial_price, currency: variant.currency };
-      this.cachedPlan = { value, expiresAt: Date.now() + PRICE_TTL_MS };
-      return value;
+      const page = await this.whop.client.variants.list({
+        product_ids: [productId],
+        billing_types: ["renewal"],
+        visibilities: ["visible"],
+        release_methods: ["buy_now"],
+      });
+      for await (const variant of page) {
+        const key = offerForPeriod(variant.billing_period);
+        if (!key) continue;
+        const previous = found.get(key);
+        if (previous) {
+          logger.warn({ productId, offer: key, plans: [previous.plan.planId, variant.id] }, "Two Whop plans share a billing period: the newest is sold");
+        }
+        if (!previous || variant.created_at > previous.createdAt) {
+          const plan = { key, planId: variant.id, price: variant.renewal_price || variant.initial_price, currency: variant.currency };
+          found.set(key, { plan, createdAt: variant.created_at });
+        }
+      }
+    } catch (err) {
+      logger.error({ err, productId }, "Failed to list the Whop product's plans");
+      throw new HttpError(502, "Les offres sont momentanément indisponibles, réessayez dans un instant.");
+    }
+
+    if (found.size === 0) {
+      logger.error({ productId }, "The Whop product has no visible renewal plan of 30, 90 or 365 days");
+      throw new HttpError(503, "Les abonnements ne sont pas encore disponibles.");
+    }
+    return OFFER_KEYS.flatMap((key) => {
+      const entry = found.get(key);
+      return entry ? [entry.plan] : [];
+    });
+  }
+
+  /** A single monthly plan (WHOP_PLAN_ID). */
+  private async singlePlan(planId: string): Promise<SoldPlan> {
+    try {
+      const variant = await this.whop.client.variants.retrieve({ id: planId });
+      return { key: "monthly", planId, price: variant.renewal_price || variant.initial_price, currency: variant.currency };
     } catch (err) {
       // The paywall still works without the price: the checkout shows it.
-      logger.error({ err }, "Failed to load Whop plan price");
-      return { ...base, price: null, currency: null };
+      logger.error({ err, planId }, "Failed to load Whop plan price");
+      return { key: "monthly", planId, price: null, currency: null };
     }
   }
 
-  /** A checkout configuration bound to the user: its metadata comes back on the membership. */
-  async createCheckout(userId: string, redirectUrl?: string): Promise<CheckoutSession> {
+  /** Whether a membership is on what the app sells: any plan of its product (older prices included), or its plan. */
+  private sells(membership: Whop.Membership) {
+    const { catalog } = this.whop;
+    return catalog.kind === "product" ? membership.product_id === catalog.productId : membership.variant_id === catalog.planId;
+  }
+
+  /** A checkout configuration for one offer, bound to the user: its metadata comes back on the membership. */
+  async createCheckout(userId: string, offer: OfferKey, redirectUrl?: string): Promise<CheckoutSession> {
+    const plan = (await this.soldPlans()).find((p) => p.key === offer);
+    if (!plan) throw new HttpError(400, "Cette offre n'est pas disponible.");
+
     const current = await this.getSubscription(userId);
     if (grantsAccess(current?.status)) {
       throw new HttpError(409, "Vous êtes déjà abonné.");
@@ -51,16 +116,37 @@ export class BillingService {
 
     try {
       const config = await this.whop.client.checkoutConfigurations.create({
-        variant_id: this.whop.planId,
+        variant_id: plan.planId,
         // Without it Whop sends the buyer to the Whop store page once paid, not back to the app.
         ...(redirectUrl ? { redirect_url: redirectUrl } : {}),
         metadata: { [USER_ID_METADATA_KEY]: userId },
       });
       return { sessionId: config.id };
     } catch (err) {
-      logger.error({ err, userId }, "Failed to create Whop checkout configuration");
+      logger.error({ err, userId, offer }, "Failed to create Whop checkout configuration");
       throw new HttpError(502, "Le paiement est momentanément indisponible, réessayez dans un instant.");
     }
+  }
+
+  /**
+   * Stops (`true`) or restarts (`false`) the renewal of the user's Whop subscription; access stays
+   * until the paid period ends either way. The row is synced right away (the webhook that follows
+   * finds it up to date).
+   */
+  async setCancelAtPeriodEnd(userId: string, cancel: boolean): Promise<void> {
+    const current = await this.getSubscription(userId);
+    if (!current?.whop_membership_id || !grantsAccess(current.status)) {
+      throw new HttpError(404, "Aucun abonnement en cours à gérer.");
+    }
+
+    try {
+      await this.whop.client.memberships.update({ id: current.whop_membership_id, cancel_at_period_end: cancel });
+    } catch (err) {
+      logger.error({ err, userId, membershipId: current.whop_membership_id, cancel }, "Failed to change the Whop subscription renewal");
+      throw new HttpError(502, "Impossible de modifier l'abonnement pour le moment, réessayez dans un instant.");
+    }
+    await this.syncMembership(current.whop_membership_id);
+    logger.info({ userId, membershipId: current.whop_membership_id }, cancel ? "Subscription set to end" : "Subscription renewal resumed");
   }
 
   /**
@@ -69,8 +155,8 @@ export class BillingService {
    */
   async syncMembership(membershipId: string): Promise<void> {
     const membership = await this.whop.client.memberships.retrieve({ id: membershipId });
-    if (membership.variant_id !== this.whop.planId) {
-      logger.warn({ membershipId, variantId: membership.variant_id }, "Whop membership on a plan the app does not sell");
+    if (!this.sells(membership)) {
+      logger.warn({ membershipId, variantId: membership.variant_id, productId: membership.product_id }, "Whop membership on a plan the app does not sell");
       return;
     }
 

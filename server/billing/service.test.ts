@@ -1,14 +1,25 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { WhopConfig } from "./config";
+import type { WhopCatalog, WhopConfig } from "./config";
 import { BillingService, USER_ID_METADATA_KEY } from "./service";
 
+const PRODUCT_ID = "prod_app";
 const PLAN_ID = "plan_app";
+const ANNUAL_PLAN_ID = "plan_app_annual";
 const USER_ID = "user-1";
+
+/** The product's plans on Whop: monthly and annual (with an older annual price), no quarterly one. */
+const PRODUCT_PLANS = [
+  { id: PLAN_ID, billing_period: 30, renewal_price: 18.99, initial_price: 0, currency: "eur", created_at: "2026-01-01T00:00:00Z" },
+  { id: "plan_old_annual", billing_period: 365, renewal_price: 59.99, initial_price: 0, currency: "eur", created_at: "2025-06-01T00:00:00Z" },
+  { id: ANNUAL_PLAN_ID, billing_period: 365, renewal_price: 69.99, initial_price: 0, currency: "eur", created_at: "2026-01-02T00:00:00Z" },
+  { id: "plan_weekly", billing_period: 7, renewal_price: 4.99, initial_price: 0, currency: "eur", created_at: "2026-01-03T00:00:00Z" },
+];
 
 type Membership = {
   id: string;
   variant_id: string;
+  product_id: string;
   status: string;
   user_id: string;
   metadata: Record<string, unknown> | null;
@@ -23,6 +34,7 @@ function membership(id: string, status: string, overrides: Partial<Membership> =
   return {
     id,
     variant_id: PLAN_ID,
+    product_id: PRODUCT_ID,
     status,
     user_id: "whop_user",
     metadata: { [USER_ID_METADATA_KEY]: USER_ID },
@@ -33,16 +45,20 @@ function membership(id: string, status: string, overrides: Partial<Membership> =
   };
 }
 
-/** In-memory Whop memberships and Supabase tables, covering only the calls BillingService makes. */
-function setup() {
+/**
+ * In-memory Whop memberships and Supabase tables, covering only the calls BillingService makes. Sells
+ * the product by default; `{ kind: "plan" }` sells the single monthly plan.
+ */
+function setup(catalog: WhopCatalog = { kind: "product", productId: PRODUCT_ID }, { whopDown = false } = {}) {
   const memberships = new Map<string, Membership>();
   const subscriptions = new Map<string, SubscriptionRow>();
   const profiles = new Set([USER_ID]);
+  const checkouts: { variant_id: string }[] = [];
 
   const whop = {
     environment: "sandbox",
     webhookSecret: "ws_test",
-    planId: PLAN_ID,
+    catalog,
     client: {
       memberships: {
         retrieve: async ({ id }: { id: string }) => {
@@ -50,8 +66,36 @@ function setup() {
           if (!found) throw new Error(`Unknown membership ${id}`);
           return found;
         },
+        update: async ({ id, cancel_at_period_end }: { id: string; cancel_at_period_end: boolean }) => {
+          const found = memberships.get(id);
+          if (whopDown || !found) throw new Error("Whop unreachable");
+          found.cancel_at_period_end = cancel_at_period_end;
+          return found;
+        },
       },
-      checkoutConfigurations: { create: async () => ({ id: "ch_1" }) },
+      variants: {
+        retrieve: async ({ id }: { id: string }) => {
+          const found = PRODUCT_PLANS.find((plan) => plan.id === id);
+          if (whopDown || !found) throw new Error("Whop unreachable");
+          return found;
+        },
+        list: async ({ product_ids }: { product_ids: string[] }) => {
+          if (whopDown) throw new Error("Whop unreachable");
+          const plans = product_ids.includes(PRODUCT_ID) ? PRODUCT_PLANS : [];
+          // A page, iterated with for await.
+          return {
+            async *[Symbol.asyncIterator]() {
+              yield* plans;
+            },
+          };
+        },
+      },
+      checkoutConfigurations: {
+        create: async (params: { variant_id: string }) => {
+          checkouts.push(params);
+          return { id: `ch_${checkouts.length}` };
+        },
+      },
     },
   } as unknown as WhopConfig;
 
@@ -79,7 +123,7 @@ function setup() {
     },
   } as unknown as SupabaseClient;
 
-  return { billing: new BillingService(whop, db), memberships, subscriptions };
+  return { billing: new BillingService(whop, db), memberships, subscriptions, checkouts };
 }
 
 describe("BillingService.syncMembership", () => {
@@ -97,10 +141,26 @@ describe("BillingService.syncMembership", () => {
     expect(row()).toMatchObject({ status: "active", provider: "whop", whop_membership_id: "mem_1" });
   });
 
-  test("a membership on another Whop plan is ignored", async () => {
-    add(membership("mem_1", "active", { variant_id: "plan_other_product" }));
+  test("a membership on any plan of the product (an older price too) is applied", async () => {
+    add(membership("mem_1", "active", { variant_id: "plan_old_annual" }));
+    await env.billing.syncMembership("mem_1");
+    expect(row()).toMatchObject({ status: "active", whop_membership_id: "mem_1" });
+  });
+
+  test("a membership on another Whop product is ignored", async () => {
+    add(membership("mem_1", "active", { variant_id: "plan_other", product_id: "prod_other" }));
     await env.billing.syncMembership("mem_1");
     expect(row()).toBeUndefined();
+  });
+
+  test("with a single plan, only that plan's memberships are applied", async () => {
+    env = setup({ kind: "plan", planId: PLAN_ID });
+    add(membership("mem_1", "active", { variant_id: ANNUAL_PLAN_ID }));
+    await env.billing.syncMembership("mem_1");
+    expect(row()).toBeUndefined();
+    add(membership("mem_2", "active"));
+    await env.billing.syncMembership("mem_2");
+    expect(row()).toMatchObject({ status: "active", whop_membership_id: "mem_2" });
   });
 
   test("a membership without a known user is ignored", async () => {
@@ -162,11 +222,76 @@ describe("BillingService.createCheckout", () => {
   test("refuses a user who already has access", async () => {
     const { billing, subscriptions } = setup();
     subscriptions.set(USER_ID, { user_id: USER_ID, status: "active", whop_membership_id: "mem_1" });
-    await expect(billing.createCheckout(USER_ID)).rejects.toMatchObject({ status: 409 });
+    await expect(billing.createCheckout(USER_ID, "monthly")).rejects.toMatchObject({ status: 409 });
   });
 
-  test("returns a checkout session otherwise", async () => {
+  test("returns a checkout session on the offer's Whop plan otherwise", async () => {
+    const { billing, checkouts } = setup();
+    expect(await billing.createCheckout(USER_ID, "annual")).toEqual({ sessionId: "ch_1" });
+    expect(checkouts[0]).toMatchObject({ variant_id: ANNUAL_PLAN_ID });
+  });
+
+  test("refuses an offer without a Whop plan", async () => {
+    const { billing, checkouts } = setup();
+    await expect(billing.createCheckout(USER_ID, "quarterly")).rejects.toMatchObject({ status: 400 });
+    expect(checkouts).toHaveLength(0);
+  });
+});
+
+describe("BillingService.setCancelAtPeriodEnd", () => {
+  test("cancelling stops the renewal on Whop and in the row, access stays; resuming restarts it", async () => {
+    const env = setup();
+    env.memberships.set("mem_1", membership("mem_1", "active"));
+    await env.billing.syncMembership("mem_1");
+
+    await env.billing.setCancelAtPeriodEnd(USER_ID, true);
+    expect(env.memberships.get("mem_1")?.cancel_at_period_end).toBe(true);
+    expect(env.subscriptions.get(USER_ID)).toMatchObject({ status: "active", cancel_at_period_end: true });
+
+    await env.billing.setCancelAtPeriodEnd(USER_ID, false);
+    expect(env.subscriptions.get(USER_ID)).toMatchObject({ status: "active", cancel_at_period_end: false });
+  });
+
+  test("a user without a running Whop subscription (a manual grant) has nothing to manage", async () => {
+    const env = setup();
+    env.subscriptions.set(USER_ID, { user_id: USER_ID, status: "active", provider: "manual", whop_membership_id: null });
+    await expect(env.billing.setCancelAtPeriodEnd(USER_ID, true)).rejects.toMatchObject({ status: 404 });
+  });
+
+  test("Whop refusing the change leaves the row as it was", async () => {
+    const env = setup(undefined, { whopDown: true });
+    env.memberships.set("mem_1", membership("mem_1", "active"));
+    env.subscriptions.set(USER_ID, { user_id: USER_ID, status: "active", whop_membership_id: "mem_1", cancel_at_period_end: false });
+    await expect(env.billing.setCancelAtPeriodEnd(USER_ID, true)).rejects.toMatchObject({ status: 502 });
+    expect(env.subscriptions.get(USER_ID)).toMatchObject({ cancel_at_period_end: false });
+  });
+});
+
+describe("BillingService.getPaywallOffers", () => {
+  test("offers the product's plans by period, in order, the newest price of a period", async () => {
     const { billing } = setup();
-    expect(await billing.createCheckout(USER_ID)).toEqual({ sessionId: "ch_1" });
+    expect(await billing.getPaywallOffers()).toEqual([
+      { key: "monthly", price: 18.99, currency: "eur" },
+      { key: "annual", price: 69.99, currency: "eur" },
+    ]);
+  });
+
+  test("a product without a 1, 3 or 12-month plan has no offer", async () => {
+    const { billing } = setup({ kind: "product", productId: "prod_empty" });
+    await expect(billing.getPaywallOffers()).rejects.toMatchObject({ status: 503 });
+  });
+
+  test("a product Whop cannot list has no offer, to retry", async () => {
+    const { billing } = setup(undefined, { whopDown: true });
+    await expect(billing.getPaywallOffers()).rejects.toMatchObject({ status: 502 });
+  });
+
+  test("a single plan is the monthly offer, without a price when Whop fails", async () => {
+    expect(await setup({ kind: "plan", planId: PLAN_ID }).billing.getPaywallOffers()).toEqual([
+      { key: "monthly", price: 18.99, currency: "eur" },
+    ]);
+    expect(await setup({ kind: "plan", planId: PLAN_ID }, { whopDown: true }).billing.getPaywallOffers()).toEqual([
+      { key: "monthly", price: null, currency: null },
+    ]);
   });
 });

@@ -20,8 +20,6 @@ export const dialogContentClass =
 export const dialogMobileSheetClass =
   "max-sm:!bottom-0 max-sm:!left-0 max-sm:!right-0 max-sm:!top-auto max-sm:!w-full max-sm:!max-w-none max-sm:!translate-x-0 max-sm:!translate-y-0"
 
-export const dialogHandleClass = "mx-auto -mt-1 h-1.5 w-12 rounded-full bg-foreground/15 sm:hidden"
-
 export const dialogHeaderClass = "flex flex-col gap-1.5 pr-8 text-left"
 
 export const dialogFooterClass =
