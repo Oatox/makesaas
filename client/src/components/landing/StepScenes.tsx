@@ -13,30 +13,39 @@ import { EASE_OUT } from "@/lib/motion";
 type Still = { still: boolean };
 
 /**
- * Frame of a scene. Mounts the scene the first time it scrolls into view, then remounts it every
- * `period` seconds while visible (a new key), so it plays again right away: each period is the
- * scene's own length plus a short beat on its last frame, and the take only fades out in its last
- * FADE seconds.
+ * Frame of a scene. Plays a take (the scene, mounted under a new key) once it is well into view;
+ * each take lasts `period` seconds (the scene's own length plus a short beat on its last frame)
+ * and only fades out in its last FADE seconds. The next take starts when one ends, as long as
+ * part of the scene is still on screen; otherwise the scene waits, faded out, and plays a new
+ * take as soon as it is back in view. Chaining the takes on their end (not on a timer) keeps
+ * the scene from staying blank after a scroll away or a background tab.
  */
 // Fade between two takes, in seconds.
 const FADE = 0.3;
 
 function Scene({ period, children }: { period: number; children: (still: boolean) => ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Well into view: starts a take. Any part on screen: keeps the takes coming.
   const inView = useInView(ref, { amount: 0.4 });
+  const onScreen = useInView(ref);
+  const onScreenRef = useRef(onScreen);
+  onScreenRef.current = onScreen;
   const still = !!useReducedMotion();
-  const [seen, setSeen] = useState(false);
   const [take, setTake] = useState(0);
+  // A take on, or the last one over and faded out (none before the scene is first seen).
+  const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
-    if (inView) setSeen(true);
-  }, [inView]);
+    if (inView && !playing) {
+      setTake((t) => t + 1);
+      setPlaying(true);
+    }
+  }, [inView, playing]);
 
-  useEffect(() => {
-    if (!inView || still) return;
-    const timer = window.setInterval(() => setTake((t) => t + 1), period * 1000);
-    return () => window.clearInterval(timer);
-  }, [inView, still, period]);
+  const ended = () => {
+    if (onScreenRef.current) setTake((t) => t + 1);
+    else setPlaying(false);
+  };
 
   return (
     <div
@@ -46,12 +55,13 @@ function Scene({ period, children }: { period: number; children: (still: boolean
     >
       {/* Warm light from the top, like the hero. */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_70%_at_50%_0%,hsl(var(--primary)/0.12),transparent_65%)]" />
-      {(seen || still) && (
+      {(take > 0 || still) && (
         <motion.div
           key={take}
           className="relative h-full"
           animate={still ? undefined : { opacity: [1, 1, 0] }}
           transition={{ duration: period, times: [0, 1 - FADE / period, 1], ease: "linear" }}
+          onAnimationComplete={ended}
         >
           {children(still)}
         </motion.div>
