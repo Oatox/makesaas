@@ -1961,9 +1961,30 @@ body::after {
   display: block;
 }
 
-.spider-on .controls #btnSpider {
+.spider-on .controls #btnSpider,
+.turned .controls #btnTurn {
   border-color: hsl(var(--primary) / 0.6);
   color: hsl(var(--primary));
+}
+
+/* Inside the turned phone, the holder is in fullscreen (turn.js): the buttons leave the video too. */
+.filming .controls {
+  display: none;
+}
+
+/* Turned (turn.js): this page only holds the onboarding, in a phone-sized frame turned and enlarged. */
+.phone-holder body > :not(iframe.phone),
+.phone-holder body::after {
+  display: none;
+}
+
+iframe.phone {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  border: 0;
+  background: var(--bg);
+  transform-origin: center;
 }
 
 @media (min-width: 768px) {

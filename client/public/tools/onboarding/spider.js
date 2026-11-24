@@ -13,6 +13,8 @@
 (() => {
   "use strict";
 
+  if (window.FO_TURN.holder) return; // this page only holds the onboarding, turned (turn.js)
+
   const TAU = Math.PI * 2;
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -924,7 +926,7 @@
   function resize() {
     W = window.innerWidth;
     H = window.innerHeight;
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    const ratio = Math.min(window.FO_TURN.pixelRatio(), 4);
     canvas.width = Math.round(W * ratio);
     canvas.height = Math.round(H * ratio);
     shade.width = Math.ceil(W * SHADE_RES);
