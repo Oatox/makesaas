@@ -91,6 +91,12 @@ export type RevenueSnapshot = {
   recentPayments: RecentPayment[];
   /** The account has more history than a sync reads: the oldest figures may be incomplete. */
   truncated: boolean;
+  /**
+   * ISO 8601: when a checkout first went through on the account (a subscription taken, even free with
+   * a 100 % code, or a payment), which checks the roadmap's payment test; null: none yet. Missing
+   * from the snapshots synced before it: none until the next sync.
+   */
+  firstCheckoutAt?: string | null;
 };
 
 /** A connected account, as the client sees it (the encrypted key never leaves the server). */

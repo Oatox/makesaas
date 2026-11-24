@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { SERIES_DAYS, type RevenueSnapshot } from "@shared/revenue";
-import { buildOverview, buildSnapshot, DAY_MS, type NormalizedSubscription } from "./metrics";
+import { buildOverview, buildSnapshot, DAY_MS, earliest, type NormalizedSubscription } from "./metrics";
 import { normalizeStripeCharge, normalizeStripeSubscription } from "./providers/stripe";
 import { monthsForDays } from "./providers/types";
 
@@ -76,6 +76,19 @@ describe("buildSnapshot", () => {
     expect(snapshot.recentPayments.map((payment) => payment.amount)).toEqual([19.99, 10, 50, 99]);
     expect(snapshot.truncated).toBe(true);
   });
+
+  test("keeps when a checkout first went through (the payment test), even a free one", () => {
+    const empty = { subscriptions: [], payments: [], truncated: false };
+    expect(buildSnapshot(empty, NOW).firstCheckoutAt).toBeNull();
+    expect(buildSnapshot({ ...empty, firstCheckoutAt: null }, NOW).firstCheckoutAt).toBeNull();
+    expect(buildSnapshot({ ...empty, firstCheckoutAt: daysAgo(2) }, NOW).firstCheckoutAt).toBe(new Date(daysAgo(2)).toISOString());
+  });
+});
+
+test("earliest: the first of the valid times", () => {
+  expect(earliest([])).toBeNull();
+  expect(earliest([Number.NaN])).toBeNull();
+  expect(earliest([30, Number.NaN, 10, 20])).toBe(10);
 });
 
 describe("buildOverview", () => {

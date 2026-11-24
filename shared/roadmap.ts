@@ -46,6 +46,11 @@ export type MissionCheck =
   | { kind: "payment_link" }
   /** A Stripe / Whop account is connected to the SaaS. */
   | { kind: "payment_account" }
+  /**
+   * A checkout went through on the SaaS's live connected account (a subscription taken, even free with
+   * a 100 % code, or a payment): its payment test. Never ticked by hand.
+   */
+  | { kind: "test_payment" }
   | { kind: "tiktok_accounts"; min: number }
   /** Videos posted on the SaaS's TikTok accounts. */
   | { kind: "videos"; min: number }
@@ -75,7 +80,9 @@ export type StepAction =
   /** The field where the member adds a TikTok account by its @ (followed on the Statistiques page). */
   | { kind: "tiktok_account" }
   /** The field where the member pastes the Whop payment link of their app. */
-  | { kind: "payment_link" };
+  | { kind: "payment_link" }
+  /** Reads the connected payment account again now, to see the payment test (its task gets checked). */
+  | { kind: "test_payment" };
 
 /**
  * One step of a mission: a short sentence starting with a verb (Gus's Markdown: **bold**,

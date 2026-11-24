@@ -134,6 +134,9 @@ function stepLine(step: MissionStep, index: number): string {
     case "tiktok_account":
       button = " [champ où il ajoute son compte TikTok avec son @]";
       break;
+    case "test_payment":
+      button = " [bouton « Vérifier mon paiement test » : MakeSaaS relit son compte Whop connecté, et la tâche se coche dès qu'il y voit le paiement]";
+      break;
   }
   return `${index + 1}. ${step.text}${button}`;
 }

@@ -1,9 +1,10 @@
 import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, ChevronDown, Copy, ExternalLink, ImagePlus, Loader2, MessageCircle, SquareTerminal } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Copy, ExternalLink, ImagePlus, Loader2, MessageCircle, RefreshCw, SquareTerminal } from "lucide-react";
 import { APP_URL_MAX_LENGTH, PAYMENT_LINK_MAX_LENGTH, type RoadmapState, type StepAction as Action } from "@shared/roadmap";
 import type { RevenueProvider } from "@shared/revenue";
+import { roadmapStagesFor } from "@shared/roadmap-missions";
 import { chatGptUrl, missionPromptText, PROMPT_TARGET } from "@shared/roadmap-prompts";
 import type { Saas } from "@shared/saas";
 import { IMAGE_TYPES, IMAGE_TYPES_LABEL } from "@shared/storage";
@@ -14,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTikTokAccounts } from "@/hooks/use-acquisition";
 import { useAskGus } from "@/hooks/use-ask-gus";
+import { useRefreshRevenue } from "@/hooks/use-revenue";
 import { roadmapKeys, useSaveAppUrl, useSetPaymentLink } from "@/hooks/use-roadmap";
 import { useSaasLogo } from "@/hooks/use-saas";
 import { useToast } from "@/hooks/use-toast";
@@ -266,6 +268,53 @@ function ConnectPaymentAccount({ saasId, provider }: { saasId: string; provider:
 }
 
 /**
+ * The payment test, checked right in its task: reads the connected payment account again now, then the
+ * roadmap, whose task gets checked once a checkout went through on that account. Never ticked by hand:
+ * until then, says what is missing.
+ */
+function TestPaymentCheck({ saasId, quiet }: { saasId: string; quiet: boolean }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const refresh = useRefreshRevenue(saasId);
+  const [busy, setBusy] = useState(false);
+
+  const check = async () => {
+    setBusy(true);
+    try {
+      const dashboard = await refresh.mutateAsync();
+      await queryClient.refetchQueries({ queryKey: roadmapKeys.state(saasId) });
+      const state = queryClient.getQueryData<RoadmapState>(roadmapKeys.state(saasId));
+      const keys = roadmapStagesFor(state?.goal ?? 0)
+        .flatMap((stage) => stage.missions)
+        .filter((mission) => mission.check.kind === "test_payment")
+        .map((mission) => mission.key);
+      if (state && keys.some((key) => state.done[key])) return;
+      const failure = dashboard.connections.find((connection) => connection.last_error)?.last_error;
+      toast({
+        variant: "destructive",
+        title: "Pas encore de paiement test",
+        description:
+          failure ??
+          (dashboard.connections.some((connection) => connection.livemode)
+            ? "MakeSaaS ne le voit pas encore sur ton compte Whop : va jusqu'au bout du paiement dans ton app, puis réessaie dans une minute."
+            : "Connecte d'abord le compte Whop de ton app (la tâche d'avant), puis réessaie."),
+      });
+    } catch {
+      // useRefreshRevenue already said why.
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button variant={quiet ? "secondary" : "default"} className="w-full" onClick={check} disabled={busy}>
+      {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+      Vérifier mon paiement test
+    </Button>
+  );
+}
+
+/**
  * The SaaS's logo, right in its task: an image dropped on the zone, or picked by clicking it (the same
  * upload as the SaaS's settings: resized in the browser, stored by the server). Once saved, the
  * roadmap is read again: its task is checked from the logo.
@@ -398,5 +447,7 @@ export function StepActionButton({ action, saas, state, quiet = false }: { actio
       return <TikTokAccountForm saasId={saas.id} />;
     case "payment_link":
       return <PaymentLinkForm saasId={saas.id} paymentLink={state.project.paymentLink ?? null} />;
+    case "test_payment":
+      return <TestPaymentCheck saasId={saas.id} quiet={quiet} />;
   }
 }

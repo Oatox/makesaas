@@ -270,31 +270,19 @@ const BASE_STAGES: RoadmapStage[] = [
         check: { kind: "manual" },
       },
       {
-        key: "payment:test",
-        title: "Fais un paiement test",
-        why: "La preuve que tout marche, avant de montrer ton app au monde.",
-        minutes: 15,
-        steps: [
-          { text: "Dans Whop, crée un code promo à 100 % pour toi." },
-          { text: "Ouvre ton app en ligne, crée un compte avec une autre adresse e-mail, va jusqu'au paiement et utilise ton code." },
-          { text: "De retour dans ton app, ce compte passe Pro tout seul en quelques secondes. Pas le cas ? Décris-le à Base44 : il corrige." },
-          { text: "Annule ensuite cet abonnement test avec **Gérer mon abonnement** : il ne sera pas renouvelé." },
-        ],
-        check: { kind: "manual" },
-      },
-      {
+        // Before the payment test: MakeSaaS checks it on this account.
         key: "payment:connect",
         title: "Connecte tes paiements à MakeSaaS",
-        why: "Tes revenus et ta roadmap se mettent à jour tout seuls.",
+        why: "MakeSaaS voit ton paiement test, puis tes revenus, tout seul.",
         minutes: 5,
         steps: [
           {
             text: "Connecte ton compte Whop avec une clé en lecture seule : la fenêtre t'explique où la trouver.",
             action: { kind: "payment_account", provider: "whop" },
           },
-          { text: "Retrouve tes revenus dans ton tableau de bord : ton MRR et tes abonnés s'y mettent à jour tout seuls.", action: REVENUE },
+          { text: "Ton tableau de bord suit tes revenus tout seul : ton MRR et tes abonnés s'y mettent à jour à chaque vente.", action: REVENUE },
           {
-            text: "Demande à Gus d'analyser tes chiffres : il les voit déjà.",
+            text: "Une question sur tes chiffres ? Demande à Gus : il les voit déjà.",
             action: {
               kind: "gus",
               label: "Analyser avec Gus",
@@ -303,6 +291,22 @@ const BASE_STAGES: RoadmapStage[] = [
           },
         ],
         check: { kind: "payment_account" },
+      },
+      {
+        key: "payment:test",
+        title: "Fais un paiement test",
+        why: "La preuve que tout marche, avant de montrer ton app au monde.",
+        minutes: 15,
+        steps: [
+          { text: "Dans Whop, crée un code promo à 100 % pour toi." },
+          { text: "Ouvre ton app en ligne, crée un compte avec une autre adresse e-mail, va jusqu'au paiement et utilise ton code." },
+          { text: "De retour dans ton app, ce compte passe Pro tout seul en quelques secondes. Pas le cas ? Décris-le à Base44 : il corrige." },
+          {
+            text: "Annule cet abonnement test avec **Gérer mon abonnement**, puis vérifie que MakeSaaS le voit sur ton compte Whop.",
+            action: { kind: "test_payment" },
+          },
+        ],
+        check: { kind: "test_payment" },
       },
     ],
   },
@@ -675,6 +679,8 @@ export function missionCheckText(check: RoadmapMission["check"]): string {
       return "Se coche dès que tu colles le lien de paiement Whop de ton app.";
     case "payment_account":
       return "Se coche dès que ton compte de paiement est connecté.";
+    case "test_payment":
+      return "Se coche dès que MakeSaaS voit ton paiement test sur ton compte Whop connecté.";
     case "tiktok_accounts":
       return check.min > 1
         ? `Se coche dès que ${check.min} comptes TikTok sont suivis sur MakeSaaS.`

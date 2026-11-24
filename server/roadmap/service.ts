@@ -19,6 +19,8 @@ export type MissionFacts = {
   hasPaymentLink: boolean;
   /** A Stripe / Whop account is connected (live or test). */
   hasPaymentAccount: boolean;
+  /** When a checkout first went through on the live connected account (its payment test); null: none seen. */
+  firstCheckoutAt: string | null;
   tiktokAccounts: number;
   /** When the SaaS's TikTok videos were posted, oldest first. */
   videoDates: string[];
@@ -81,6 +83,9 @@ export function observedMissions(facts: MissionFacts, stages: RoadmapStage[]): R
         break;
       case "payment_account":
         result = facts.hasPaymentAccount ? { at: facts.now, source: "observed" } : null;
+        break;
+      case "test_payment":
+        result = facts.firstCheckoutAt ? seen(facts.firstCheckoutAt) : null;
         break;
       case "tiktok_accounts":
         result = facts.tiktokAccounts >= check.min ? { at: facts.now, source: "observed" } : null;
@@ -203,6 +208,12 @@ export class RoadmapService {
         hasLogo: !!saas.logo_url,
         hasPaymentLink: !!saas.payment_link,
         hasPaymentAccount: (connections.data ?? []).length > 0,
+        // The payment test is made on the app's real store: a sandbox account does not count.
+        firstCheckoutAt:
+          live
+            .map((row) => row.snapshot.firstCheckoutAt ?? null)
+            .filter((at): at is string => !!at)
+            .sort()[0] ?? null,
         tiktokAccounts: tiktok.count ?? 0,
         videoDates: (videos.data ?? []).map((video) => video.posted_at),
         revenue: overview,

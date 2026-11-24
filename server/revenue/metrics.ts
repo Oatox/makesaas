@@ -39,7 +39,19 @@ export type RevenueData = {
   truncated: boolean;
   /** The account, when the data names it (for keys that cannot read the account itself). */
   account?: { id: string; name: string | null };
+  /**
+   * When a checkout first went through on the account: a subscription taken (even a free one, with a
+   * 100 % code) or a payment. The roadmap's payment test is seen there. Undefined: not read.
+   */
+  firstCheckoutAt?: number | null;
 };
+
+/** The earliest of these times (ms); null when there is none. */
+export function earliest(times: number[]): number | null {
+  let first: number | null = null;
+  for (const time of times) if (Number.isFinite(time) && (first === null || time < first)) first = time;
+  return first;
+}
 
 /** Units of a currency per euro (ECB reference rates), EUR included at 1. */
 export type ExchangeRates = Record<string, number>;
@@ -141,6 +153,7 @@ export function buildSnapshot(data: RevenueData, now = Date.now()): RevenueSnaps
     trialing,
     recentPayments,
     truncated: data.truncated,
+    firstCheckoutAt: data.firstCheckoutAt == null ? null : new Date(data.firstCheckoutAt).toISOString(),
   };
 }
 

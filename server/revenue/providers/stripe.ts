@@ -1,4 +1,4 @@
-import type { NormalizedPayment, NormalizedSubscription, RevenueData } from "../metrics";
+import { earliest, type NormalizedPayment, type NormalizedSubscription, type RevenueData } from "../metrics";
 import { ProviderError, type ProviderAccount, type RevenueSource } from "./types";
 
 const STRIPE_API = "https://api.stripe.com/v1";
@@ -180,6 +180,13 @@ export class StripeSource implements RevenueSource {
       subscriptions: subscriptions.items.map(normalizeStripeSubscription),
       payments: charges.items.flatMap((charge) => normalizeStripeCharge(charge) ?? []),
       truncated: subscriptions.truncated || charges.truncated,
+      // An incomplete subscription is a checkout left before the end; any other one went through.
+      firstCheckoutAt: earliest([
+        ...subscriptions.items
+          .filter((subscription) => subscription.status !== "incomplete" && subscription.status !== "incomplete_expired")
+          .map((subscription) => subscription.start_date * 1000),
+        ...charges.items.filter((charge) => charge.paid && charge.status === "succeeded").map((charge) => charge.created * 1000),
+      ]),
     };
   }
 }

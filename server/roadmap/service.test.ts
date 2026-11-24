@@ -35,6 +35,7 @@ const facts = (overrides: Partial<MissionFacts> = {}): MissionFacts => ({
   hasLogo: false,
   hasPaymentLink: false,
   hasPaymentAccount: false,
+  firstCheckoutAt: null,
   tiktokAccounts: 0,
   videoDates: [],
   revenue: null,
@@ -116,6 +117,14 @@ describe("observedMissions", () => {
     const done = observedMissions(facts({ hasCustomDomain: true }), STAGES);
     expect(done["build:domain"]).toEqual({ at: NOW, source: "declared" });
     expect(done["build:online"]).toBeUndefined();
+  });
+
+  test("the payment test: seen on the live account's first checkout, never ticked by hand", () => {
+    expect(observedMissions(facts({ hasPaymentAccount: true }), STAGES)["payment:test"]).toBeUndefined();
+    const at = "2026-11-25T09:30:00.000Z";
+    expect(observedMissions(facts({ hasPaymentAccount: true, firstCheckoutAt: at }), STAGES)["payment:test"]).toEqual({ at, source: "observed" });
+    // A store that already sold before MakeSaaS.
+    expect(observedMissions(facts({ firstCheckoutAt: "2026-10-01T00:00:00.000Z" }), STAGES)["payment:test"]?.source).toBe("before");
   });
 
   test("the accounts and the videos, dated by the Nth video", () => {
@@ -355,9 +364,9 @@ describe("prompts", () => {
     expect(prompt).not.toContain("nouvel onglet");
   });
 
-  test("the payment tasks: the Whop shop, the prompt, the webhook before the test, then the revenue", () => {
+  test("the payment tasks: the Whop shop, the prompt, the webhook, the account connected, then the test it checks", () => {
     const payment = STAGES.find((stage) => stage.key === "payment")!.missions;
-    expect(payment.map((mission) => mission.key)).toEqual(["payment:whop", "payment:in_app", "payment:webhook", "payment:test", "payment:connect"]);
+    expect(payment.map((mission) => mission.key)).toEqual(["payment:whop", "payment:in_app", "payment:webhook", "payment:connect", "payment:test"]);
     const steps = (key: string) => payment.find((mission) => mission.key === key)!.steps.map((step) => step.text).join("\n");
     expect(steps("payment:whop")).toContain("**Use Whop for payment processing only**");
     // The shop's task asks for its payment link, and is done once it is given.
@@ -376,6 +385,10 @@ describe("prompts", () => {
     // The Whop account connected right in its task, then its revenue on the dashboard and with Gus.
     const connect = payment.find((mission) => mission.key === "payment:connect")!;
     expect(connect.steps.map((step) => step.action?.kind)).toEqual(["payment_account", "page", "gus"]);
+    // The payment test is checked on that account, from its own button: never ticked by hand.
+    const test = payment.find((mission) => mission.key === "payment:test")!;
+    expect(test.check).toEqual({ kind: "test_payment" });
+    expect(test.steps.at(-1)?.action).toEqual({ kind: "test_payment" });
   });
 
   test("the review prompt checks the whole app before publishing, and lets Base44 fix it", () => {

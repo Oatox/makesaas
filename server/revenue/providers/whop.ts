@@ -1,5 +1,5 @@
 import { WhopClient, WhopEnvironment, WhopError, WhopTimeoutError, type Whop } from "@whop/sdk";
-import type { NormalizedPayment, NormalizedSubscription, RevenueData } from "../metrics";
+import { earliest, type NormalizedPayment, type NormalizedSubscription, type RevenueData } from "../metrics";
 import { monthsForDays, ProviderError, type ProviderAccount, type RevenueSource } from "./types";
 
 export type WhopEnvironmentName = "production" | "sandbox";
@@ -169,6 +169,11 @@ export class WhopSource implements RevenueSource {
         payments: payments.items.flatMap((payment) => normalizeWhopPayment(payment) ?? []),
         truncated: memberships.truncated || payments.truncated,
         account: seller ? { id: seller.id, name: seller.title || null } : undefined,
+        // A drafted membership is a checkout left before the end; any other one went through.
+        firstCheckoutAt: earliest([
+          ...memberships.items.filter((membership) => membership.status !== "drafted").map((membership) => Date.parse(membership.created_at)),
+          ...payments.items.map((payment) => Date.parse(payment.paid_at ?? payment.created_at)),
+        ]),
       };
     } catch (err) {
       throw toProviderError(err);
