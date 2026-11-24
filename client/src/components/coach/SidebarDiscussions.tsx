@@ -5,7 +5,7 @@ import type { CoachConversation } from "@shared/coach";
 import type { NavGroupContentProps } from "@/components/layout/AppSidebar";
 import { navLinkClass, navSubLinkClass } from "@/components/layout/nav-styles";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSkeleton } from "@/components/ui/sidebar";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { COACH_PATH, conversationPath, useCoachConversations, useLiveTurn } from "@/hooks/use-coach";
 import { cn } from "@/lib/utils";
 import { DiscussionDialogs, type DiscussionDialogState } from "./DiscussionDialogs";
@@ -68,7 +68,8 @@ function RecentDiscussion({
  * each renamable and deletable from its "…" menu; the open one stays listed even when it is older,
  * and "Voir tout" opens every discussion (searchable, by date) when there are more. A new discussion
  * starts from "Discuter avec Gus" at the top of the sidebar (AppSidebar) or in the header
- * (TalkToGusButton). Collapsed to icons, a single icon opens every discussion.
+ * (TalkToGusButton). Collapsed to icons, a single icon opens every discussion. AppSidebar renders it
+ * only once the active SaaS has a discussion, so the list is never loading nor empty here.
  */
 export function SidebarDiscussions({ isCollapsed, currentPath }: NavGroupContentProps) {
   const conversations = useCoachConversations();
@@ -107,19 +108,9 @@ export function SidebarDiscussions({ isCollapsed, currentPath }: NavGroupContent
       {/* The latest discussions, straight under the category label (a new one starts from
           "Discuter avec Gus" in the header). */}
       <SidebarMenu aria-label="Discussions récentes" className="gap-0.5">
-        {conversations.isLoading
-          ? [0, 1, 2].map((i) => (
-              <SidebarMenuItem key={i}>
-                <SidebarMenuSkeleton className="h-9" />
-              </SidebarMenuItem>
-            ))
-          : recent.map((conversation) => (
-              <RecentDiscussion key={conversation.id} conversation={conversation} active={conversation === open} onOpenDialog={setDialog} />
-            ))}
-
-        {!conversations.isLoading && recent.length === 0 && (
-          <li className="px-3 py-2 text-sm text-sidebar-foreground/40">Aucune discussion</li>
-        )}
+        {recent.map((conversation) => (
+          <RecentDiscussion key={conversation.id} conversation={conversation} active={conversation === open} onOpenDialog={setDialog} />
+        ))}
 
         {list.length > RECENT_DISCUSSIONS && (
           <SidebarMenuItem>

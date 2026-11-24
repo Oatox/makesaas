@@ -97,7 +97,16 @@ export function useGenerateCarousel() {
       const body: GenerateCarouselBody = { ...input, saasId };
       return apiRequest<Carousel>(carouselApi.generate.path, { method: "POST", body });
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: carouselKeys.all }),
+    // Its card appears at once in the library, then the list and the quota are read again. Not
+    // awaited: the caller's onSuccess (closing the dialog) does not wait for the reads.
+    onSuccess: (carousel) => {
+      queryClient.setQueryData<Carousel[]>(carouselKeys.list(carousel.saas_id), (previous) =>
+        previous && !previous.some((item) => item.id === carousel.id) ? [carousel, ...previous] : previous,
+      );
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: carouselKeys.all });
+    },
   });
 }
 

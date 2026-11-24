@@ -1,4 +1,8 @@
 import { useCallback, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { onboardingFinishedHere } from "@/components/onboarding/steps";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/lib/supabase";
 import {
   clearOnboardingProgress,
   emptyOnboardingProgress,
@@ -65,4 +69,29 @@ export function useOnboardingProgress(stepCount: (answers: OnboardingAnswers) =>
   }, []);
 
   return { progress, answer, next, back, reset };
+}
+
+/**
+ * Whether the signed-in user went through the onboarding: to its end on this device, or on another
+ * one (the paywall then saved their answers on their profile, profiles.onboarding_profile). Accounts
+ * are created in it, but one can still be opened elsewhere (Google on the sign-in page): the paywall
+ * sends those who never answered it back there. A profile that cannot be read does not block them.
+ */
+export function useOnboardingAnswered(): { answered: boolean; isLoading: boolean } {
+  const { user } = useAuth();
+  const [finishedHere] = useState(onboardingFinishedHere);
+  const query = useQuery({
+    queryKey: ["onboarding-answered", user?.id],
+    enabled: !!user && !finishedHere,
+    queryFn: async () => {
+      // The first answer is enough to know there are some.
+      const { data, error } = await supabase.from("profiles").select("first:onboarding_profile->0").eq("id", user!.id).maybeSingle();
+      if (error) throw error;
+      return data?.first != null;
+    },
+    staleTime: Infinity,
+  });
+
+  if (finishedHere) return { answered: true, isLoading: false };
+  return { answered: query.isError || query.data === true, isLoading: query.isLoading };
 }

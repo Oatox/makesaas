@@ -14,6 +14,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import AuthPage from "@/pages/Auth";
 import OnboardingPage from "@/pages/Onboarding";
+import { onboardingFinishedHere } from "@/components/onboarding/steps";
 // Private pages are loaded on demand: visitors of the public pages never download their code.
 const Dashboard = React.lazy(() => import("@/pages/Dashboard"));
 const Acquisition = React.lazy(() => import("@/pages/Acquisition"));
@@ -32,6 +33,7 @@ import CGV from "@/pages/CGV";
 import Confidentialite from "@/pages/Confidentialite";
 import { Loader2 } from "lucide-react";
 import { AUTH_CONFIG } from "@/config/auth";
+import { launchFinished } from "@shared/launch";
 
 /**
  * Pages a subscriber reaches without a SaaS yet: the ideas that create it, their account (to manage
@@ -41,11 +43,12 @@ const isOpenWithoutSaas = (path: string) =>
   path === AUTH_CONFIG.LAUNCH_PATH || path.startsWith("/settings") || path.startsWith("/admin");
 
 // Protected Route Wrapper: the app is reserved to subscribers (there is no free plan). Visitors go
-// to the onboarding (sign-up is asked during it), signed-in users without a subscription to the paywall,
-// and subscribers without a SaaS to Gus's ideas (/lancement): the app starts with a project.
+// to the onboarding (sign-up is asked during it), signed-in users without a subscription to the paywall
+// (which sends those who never answered the onboarding back to it), and subscribers whose launch is not
+// over (no SaaS yet, or its last steps: shared/launch.ts) to /lancement: the app starts with a project.
 // `bare`: full screen, without the sidebar and header (the ideas of /lancement).
 function ProtectedRoute({ component: Component, bare = false }: { component: React.ComponentType; bare?: boolean }) {
-  const { user, hasAccess, isLoading, isProfileError, retryProfile } = useAuth();
+  const { user, profile, hasAccess, isLoading, isProfileError, retryProfile } = useAuth();
   const { saasList, isLoading: saasLoading, isError: saasError } = useSaas();
   const [location] = useLocation();
   const gated = hasAccess && !isOpenWithoutSaas(location);
@@ -73,8 +76,11 @@ function ProtectedRoute({ component: Component, bare = false }: { component: Rea
 
   if (!hasAccess) return <Redirect to={user ? AUTH_CONFIG.SUBSCRIBE_PATH : AUTH_CONFIG.ONBOARDING_PATH} />;
 
-  // No SaaS yet (a list that failed to load does not lock the member out).
-  if (gated && !saasError && saasList.length === 0) return <Redirect to={AUTH_CONFIG.LAUNCH_PATH} />;
+  // No SaaS yet, or the launch's last steps to finish: back to them (a list that failed to load does not
+  // lock the member out).
+  if (gated && !saasError && !launchFinished(profile?.launch_step ?? null, saasList.length > 0)) {
+    return <Redirect to={AUTH_CONFIG.LAUNCH_PATH} />;
+  }
 
   if (bare) {
     return (
@@ -144,8 +150,15 @@ function Router() {
       <Route path={AUTH_CONFIG.LOGIN_PATH}>
         {user ? <Redirect to={AUTH_CONFIG.REDIRECT_PATH} /> : <AuthPage />}
       </Route>
+      {/* Accounts are created in the onboarding: this form only once it is answered on this device. */}
       <Route path={AUTH_CONFIG.REGISTER_PATH}>
-        {user ? <Redirect to={AUTH_CONFIG.REDIRECT_PATH} /> : <AuthPage />}
+        {user ? (
+          <Redirect to={AUTH_CONFIG.REDIRECT_PATH} />
+        ) : onboardingFinishedHere() ? (
+          <AuthPage />
+        ) : (
+          <Redirect to={AUTH_CONFIG.ONBOARDING_PATH} replace />
+        )}
       </Route>
 
       {/* Protected Routes */}

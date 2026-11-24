@@ -7,6 +7,7 @@ import { queryClient } from "@/lib/queryClient";
 import { AUTH_CONFIG } from "@/config/auth";
 import { syncSignupSource } from "@/lib/attribution";
 import { grantsAccess, SUBSCRIPTION_SUMMARY_COLUMNS, type SubscriptionSummary } from "@shared/billing";
+import type { LaunchStep } from "@shared/launch";
 import { translateSupabaseError } from "@/lib/error-translator";
 
 export type AuthProfile = {
@@ -17,6 +18,12 @@ export type AuthProfile = {
   role: "user" | "admin";
   /** Active SaaS (see useSaas); null: none chosen yet, the oldest one is used. */
   current_saas_id: string | null;
+  /** Monthly goal from the onboarding, in euros (null: not saved yet). */
+  monthly_goal: number | null;
+  /** Where the member is on /lancement (shared/launch.ts, saved by useSaveLaunchStep). */
+  launch_step: LaunchStep | null;
+  /** The idea chosen at the launch step `project`. */
+  launch_idea_id: string | null;
   /** Row of public.subscriptions (null: never subscribed). Access is read with grantsAccess(status). */
   subscription: SubscriptionSummary | null;
 };
@@ -26,7 +33,7 @@ export const profileKeys = {
 };
 
 // The subscription is embedded (subscriptions.user_id references profiles.id, one row per user).
-const PROFILE_COLUMNS = `id, email, full_name, avatar_url, role, current_saas_id, subscription:subscriptions(${SUBSCRIPTION_SUMMARY_COLUMNS})`;
+const PROFILE_COLUMNS = `id, email, full_name, avatar_url, role, current_saas_id, monthly_goal, launch_step, launch_idea_id, subscription:subscriptions(${SUBSCRIPTION_SUMMARY_COLUMNS})`;
 
 type AuthContextType = {
   session: Session | null;
@@ -116,6 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           avatar_url: null,
           role: "user",
           current_saas_id: null,
+          monthly_goal: null,
+          launch_step: null,
+          launch_idea_id: null,
           subscription: null,
         }
       );

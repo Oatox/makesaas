@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RevenueOverview, RevenueProvider, RevenueSnapshot } from "@shared/revenue";
-import { monthlyGoalOf, type MissionDone, type RoadmapStage, type RoadmapState } from "@shared/roadmap";
+import { isCustomDomain, monthlyGoalOf, type MissionDone, type RoadmapStage, type RoadmapState } from "@shared/roadmap";
 import { roadmapStagesFor } from "@shared/roadmap-missions";
 import type { MissionProject } from "@shared/roadmap-prompts";
 import { HttpError } from "../lib/http";
@@ -13,6 +13,8 @@ export type MissionFacts = {
   saasCreatedAt: string;
   /** The member gave the address of their app. */
   hasAppUrl: boolean;
+  /** That address is on their own domain (isCustomDomain). */
+  hasCustomDomain: boolean;
   /** The SaaS has a logo. */
   hasLogo: boolean;
   /** A Stripe / Whop account is connected (live or test). */
@@ -52,6 +54,9 @@ export function observedMissions(facts: MissionFacts, stages: RoadmapStage[]): R
         break;
       case "app_url":
         result = facts.hasAppUrl ? { at: facts.now, source: "declared" } : null;
+        break;
+      case "custom_domain":
+        result = facts.hasCustomDomain ? { at: facts.now, source: "declared" } : null;
         break;
       case "logo":
         result = facts.hasLogo ? { at: facts.now, source: "observed" } : null;
@@ -123,7 +128,8 @@ export function projectOf(saas: SaasRow): MissionProject {
 export class RoadmapService {
   constructor(private readonly db: SupabaseClient) {}
 
-  async state(userId: string, saasId: string): Promise<RoadmapState> {
+  /** `save: false` checks without saving what it sees (an admin looking at a member's roadmap). */
+  async state(userId: string, saasId: string, { save = true }: { save?: boolean } = {}): Promise<RoadmapState> {
     const saas = await this.ownSaas(userId, saasId);
     const profile = await this.db.from("profiles").select("monthly_goal").eq("id", userId).maybeSingle();
     if (profile.error) throw this.loadError(profile.error, saasId);
@@ -170,6 +176,7 @@ export class RoadmapService {
       {
         saasCreatedAt: saas.created_at,
         hasAppUrl: !!saas.app_url,
+        hasCustomDomain: isCustomDomain(saas.app_url),
         hasLogo: !!saas.logo_url,
         hasPaymentAccount: (connections.data ?? []).length > 0,
         tiktokAccounts: tiktok.count ?? 0,
@@ -182,14 +189,14 @@ export class RoadmapService {
     );
 
     const fresh = Object.entries(observed).filter(([key]) => !done[key]);
-    if (fresh.length) {
+    if (fresh.length && save) {
       const { error } = await this.db.from("roadmap_missions").upsert(
         fresh.map(([key, value]) => ({ saas_id: saasId, user_id: userId, key, done_at: value.at, source: value.source })),
         { onConflict: "saas_id,key", ignoreDuplicates: true },
       );
       if (error) logger.error({ err: error, saasId }, "Failed to save the missions done");
-      for (const [key, value] of fresh) done[key] = value;
     }
+    for (const [key, value] of fresh) done[key] = value;
 
     return {
       goal,

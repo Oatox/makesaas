@@ -249,11 +249,11 @@ function Workspace({ carousel, initialDocument, onExit }: { carousel: Carousel; 
             aria-label="Titre du carrousel"
             className="min-w-0 max-w-xs flex-1 truncate rounded-md bg-transparent px-2 py-1 font-display text-sm outline-none ring-primary/40 hover:bg-white/5 focus:bg-white/5 focus:ring-2 sm:text-base"
           />
-          <div className="hidden sm:block">
-            <SaveIndicator state={saveState} onRetry={() => void flush()} />
-          </div>
-
-          <div className="ml-auto flex items-center gap-1">
+          {/* On the right, the save state by the download. */}
+          <div className="ml-auto flex items-center gap-3">
+            <div className="hidden sm:block">
+              <SaveIndicator state={saveState} onRetry={() => void flush()} />
+            </div>
             <Button onClick={() => void download()} disabled={downloading} data-testid="button-download-carousel">
               {downloading ? <Loader2 className="animate-spin" /> : <Download />}
               <span className="hidden sm:inline">Télécharger</span>

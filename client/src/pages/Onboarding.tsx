@@ -3,7 +3,7 @@ import { Link, Redirect } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { detailKey, ONBOARDING_STEPS, type OnboardingStep } from "@/components/onboarding/steps";
+import { detailKey, visibleSteps, type OnboardingStep } from "@/components/onboarding/steps";
 import { SingleChoiceStep } from "@/components/onboarding/SingleChoiceStep";
 import { MultiChoiceStep } from "@/components/onboarding/MultiChoiceStep";
 import { SliderStep } from "@/components/onboarding/SliderStep";
@@ -46,8 +46,6 @@ const stepMotion = {
 const singleAnswer = (value: string | string[] | undefined) => (typeof value === "string" ? value : undefined);
 const multiAnswer = (value: string | string[] | undefined) => (Array.isArray(value) ? value : []);
 
-/** Steps shown to the visitor: those whose condition holds with the answers given so far. */
-const visibleSteps = (answers: OnboardingAnswers) => ONBOARDING_STEPS.filter((step) => !step.when || step.when(answers));
 const countSteps = (answers: OnboardingAnswers) => visibleSteps(answers).length;
 
 function ProgressBar({ value }: { value: number }) {

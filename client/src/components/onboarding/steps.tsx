@@ -53,7 +53,7 @@ import {
 } from "lucide-react";
 import { COACH_NAME } from "@/components/brand/Coach";
 import { LEGAL } from "@/config/legal";
-import type { OnboardingAnswers } from "@/lib/onboarding-storage";
+import { loadOnboardingProgress, type OnboardingAnswers } from "@/lib/onboarding-storage";
 
 /** Free text field shown once an option is picked ("Autre" → the visitor writes the answer). */
 export type AnswerInput = {
@@ -794,3 +794,12 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   { id: "projection", type: "projection" },
 ];
 
+
+/** Steps shown to the visitor: those whose condition holds with the answers given so far. */
+export const visibleSteps = (answers: OnboardingAnswers) => ONBOARDING_STEPS.filter((step) => !step.when || step.when(answers));
+
+/** The onboarding kept on this device was answered to its end (the account is created on the way). */
+export function onboardingFinishedHere(): boolean {
+  const { stepIndex, answers } = loadOnboardingProgress();
+  return stepIndex >= visibleSteps(answers).length;
+}

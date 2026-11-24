@@ -2,13 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatOnboardingProfile, onboardingProfileSchema } from "@shared/onboarding-profile";
 import type { RevenueOverview, RevenueProvider, RevenueSnapshot } from "@shared/revenue";
 import {
+  type Milestone,
   type MissionDone,
   type MissionStep,
   type RoadmapStage,
   type RoadmapState,
 } from "@shared/roadmap";
 import { milestonesFor, missionCheckText, roadmapStagesFor } from "@shared/roadmap-missions";
-import { currentObjective, dayKey, launchTasks, milestoneCounter, objectiveProgress, objectivesOf, todayPlan } from "@shared/today";
+import { currentObjective, dayKey, launchTasks, milestoneCounter, milestoneTasks, objectiveProgress, objectivesOf, todayPlan } from "@shared/today";
 import { missionPromptText, PROMPT_TARGET } from "@shared/roadmap-prompts";
 import { logger } from "../lib/logger";
 import { getExchangeRates } from "../revenue/exchange-rates";
@@ -129,43 +130,53 @@ function stepLine(step: MissionStep, index: number): string {
 }
 
 /**
- * Where the member is: the milestones of their Roadmap, which are the objectives of Accueil (launching
- * the SaaS, then each MRR tier; checked from their data), with the steps of the one in progress and its
- * figure, the phase (launch or growth), and their tasks of `day` on Accueil, with the steps and prompts
- * of the next one.
+ * Where the member is: the objectives of their Roadmap (the one in progress at the top of Accueil:
+ * launching the SaaS, the first video, the first customer, then each amount per month up to their
+ * goal, the last one; checked from their data), with the steps of the one in progress and their figure
+ * or tasks done, the phase (launch or growth), and their tasks of `day` on Accueil, with the
+ * instructions and prompts of the next one.
  */
 export function formatRoadmap(stages: RoadmapStage[], state: Pick<RoadmapState, "done" | "project" | "progress" | "goal">, day: string): string {
   const done: Record<string, MissionDone> = state.done;
-  const objectives = objectivesOf(milestonesFor(state.goal));
+  const milestones = milestonesFor(state.goal);
+  const objectives = objectivesOf(milestones);
   const current = currentObjective(objectives, done);
   const reached = objectives.filter((objective) => objectiveProgress(objective, done, state.progress).complete).length;
+  // Where a step in progress stands: its figure, or else its tasks done.
+  const figureOf = (milestone: Milestone) => {
+    const counter = milestoneCounter(milestone, state.progress);
+    const tasks = milestoneTasks(stages, milestones, milestone.key);
+    return counter?.label ?? (tasks.length ? `${tasks.filter((task) => done[task.key]).length} / ${tasks.length} tâches` : null);
+  };
 
   const lines = [
-    `Ses paliers (sa page Roadmap, et l'objectif en haut de son Accueil ; constatés dans ses données) : ${reached} atteint${reached > 1 ? "s" : ""} sur ${objectives.length}.`,
+    `Ses objectifs, le dernier étant son objectif final (sa page Roadmap, et l'objectif en cours en haut de son Accueil ; constatés dans ses données) : ${reached} atteint${reached > 1 ? "s" : ""} sur ${objectives.length}.`,
   ];
   for (const objective of objectives) {
     const progress = objectiveProgress(objective, done, state.progress);
     const isCurrent = objective === current;
-    const status = progress.complete
-      ? `atteint le ${dateOf(progress.reachedAt?.at ?? "")}`
-      : isCurrent
-        ? `EN COURS (${progress.total === 1 && progress.counter ? progress.counter.label : `${progress.reached} / ${progress.total} étapes`})`
-        : "à venir";
+    const single = objective.milestones.length === 1;
+    let status = "à venir";
+    if (progress.complete) status = `atteint le ${dateOf(progress.reachedAt?.at ?? "")}`;
+    else if (isCurrent) {
+      const figure = single ? figureOf(objective.milestones[0]) : `${progress.reached} / ${progress.total} étapes`;
+      status = `EN COURS${figure ? ` (${figure})` : ""}`;
+    }
     lines.push(`- [${progress.complete ? "x" : " "}] ${objective.title} : ${status}`);
-    // The steps of the milestone in progress, when it has several.
-    if (!isCurrent || objective.milestones.length < 2) continue;
+    // The steps of the objective in progress, when it has several.
+    if (!isCurrent || single) continue;
     for (const milestone of objective.milestones) {
       const record = done[milestone.key];
-      const counter = milestone === progress.current ? milestoneCounter(milestone, state.progress) : null;
-      const step = record
-        ? `atteinte le ${dateOf(record.at)}`
-        : milestone === progress.current
-          ? `EN COURS${counter ? ` (${counter.label})` : ""}`
-          : "à venir";
+      let step = "à venir";
+      if (record) step = `passée le ${dateOf(record.at)}`;
+      else if (milestone === progress.current) {
+        const figure = figureOf(milestone);
+        step = `EN COURS${figure ? ` (${figure})` : ""}`;
+      }
       lines.push(`  - [${record ? "x" : " "}] ${milestone.title} : ${step}`);
     }
   }
-  if (!current) lines.push("", "Il a atteint son objectif.");
+  if (!current) lines.push("", "Il a atteint son objectif final.");
 
   const plan = todayPlan(stages, done, day);
   const launch = launchTasks(stages);
@@ -188,7 +199,7 @@ export function formatRoadmap(stages: RoadmapStage[], state: Pick<RoadmapState, 
     lines.push("", "Il a fait toutes ses tâches du jour.");
     return lines.join("\n");
   }
-  lines.push("", `Sa prochaine tâche : « ${next.title} ». ${next.why}`, "Les étapes qu'il voit, chacune avec son bouton :");
+  lines.push("", `Sa prochaine tâche : « ${next.title} ». ${next.why}`, "Les consignes qu'il voit, une à la fois, chacune avec son bouton :");
   next.steps.forEach((step, index) => lines.push(stepLine(step, index)));
   lines.push(missionCheckText(next.check));
   for (const step of next.steps) {

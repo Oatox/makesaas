@@ -70,6 +70,13 @@ export function useIdeas() {
 
   const series = useMemo(() => revealedSeries(query.data?.batches ?? [], query.data?.ideas ?? []), [query.data]);
   const latest = query.data?.batches[0] ?? null;
+  // Ideas of the latest written request not shown yet (the client reads them all): the server shows
+  // them first, at once, so "D'autres idées" needs no loader.
+  const hasStock = useMemo(() => {
+    const stock = query.data?.batches.find((batch) => batch.status === "succeeded");
+    if (!stock) return false;
+    return (query.data?.ideas ?? []).filter((idea) => idea.batch_id === stock.id).length > stock.revealed;
+  }, [query.data]);
 
   const nextMutation = useMutation({
     mutationFn: (body: NextIdeasBody) => apiRequest<NextIdeasResult>(ideasApi.next.path, { method: "POST", body }),
@@ -85,6 +92,8 @@ export function useIdeas() {
     isError: query.isError,
     retry: () => void query.refetch(),
     next: nextMutation.mutate,
+    /** The next series is already written: "D'autres idées" shows it at once. */
+    hasStock,
     /** The next series is on its way: asked by this page, or a request running elsewhere. */
     isWriting: nextMutation.isPending || isRunning(latest),
     /** Why the last request failed; a 409 is not a failure (another request is running, its ideas will show up). */

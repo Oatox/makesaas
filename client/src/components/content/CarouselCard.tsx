@@ -40,7 +40,11 @@ export function CarouselCard({ carousel, onOpen, onPreview }: { carousel: Carous
         aria-label={`Ouvrir ${carousel.title}`}
       >
         {document ? (
-          <ScaledSlide slide={document.slides[0]} ratio={document.ratio} />
+          // Every card in 9:16, whatever the carousel's format: a shorter slide (4:5, 1:1) sits in the
+          // middle, between black bars.
+          <div className="flex aspect-[9/16] flex-col justify-center bg-black">
+            <ScaledSlide slide={document.slides[0]} ratio={document.ratio} className="w-full" />
+          </div>
         ) : (
           <div className="aspect-[9/16]" />
         )}

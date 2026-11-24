@@ -15,6 +15,12 @@ export const SAAS_MAX_PER_USER = 20;
 /** Message of the exception raised by enforce_saas_limit once SAAS_MAX_PER_USER is reached. */
 export const SAAS_LIMIT_ERROR = "saas_limit";
 
+/**
+ * Message of the exception raised by enforce_saas_from_idea: an idea gives the member's first SaaS
+ * only, so keeping one is refused once they have a SaaS (the project chosen on /lancement is locked).
+ */
+export const SAAS_IDEA_TAKEN_ERROR = "saas_idea_taken";
+
 /** Mirrored by saas_description_check and saas_audience_check in supabase_setup.sql. */
 export const SAAS_DESCRIPTION_MAX_LENGTH = 200;
 export const SAAS_AUDIENCE_MAX_LENGTH = 200;
@@ -31,11 +37,16 @@ export type Saas = {
   audience: string | null;
   /** The idea it was created from on /lancement (shared/ideas.ts); null when created by its name only. */
   idea_id: string | null;
+  /**
+   * Address of its app, written by the server (PUT /api/roadmap/app-url, from its roadmap task or its
+   * settings); null until the member gives it.
+   */
+  app_url: string | null;
   created_at: string;
   updated_at: string;
 };
 
-export const SAAS_COLUMNS = "id, name, logo_url, description, audience, idea_id, created_at, updated_at";
+export const SAAS_COLUMNS = "id, name, logo_url, description, audience, idea_id, app_url, created_at, updated_at";
 
 export const saasInputSchema = z.object({
   name: z.string().trim().min(1, "Donne un nom à ton SaaS").max(SAAS_NAME_MAX_LENGTH),

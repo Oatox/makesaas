@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { Check, ImageUp, Loader2, Trash2, X } from "lucide-react";
+import { Check, ExternalLink, ImageUp, Loader2, Trash2, X } from "lucide-react";
+import { APP_URL_MAX_LENGTH } from "@shared/roadmap";
 import { SAAS_NAME_MAX_LENGTH, type Saas } from "@shared/saas";
 import { IMAGE_TYPES, IMAGE_TYPES_LABEL } from "@shared/storage";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useSaveAppUrl } from "@/hooks/use-roadmap";
 import { saasErrorMessage, useSaas, useSaasLogo } from "@/hooks/use-saas";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { SaasAvatar } from "./SaasAvatar";
@@ -20,7 +22,69 @@ type SaasGeneralSettingsProps = {
   onDeleted: () => void;
 };
 
-/** "Général" tab of the SaaS settings: its logo, rename it, or delete it with everything it holds. */
+/**
+ * The address of the SaaS's app (given in its "Mets ton app en ligne" task), to change it when the app
+ * moves, to its own domain for instance. Saved like in the task: it must answer first. Like the name,
+ * "Enregistrer" only once it changed; "Ouvrir" otherwise.
+ */
+function AppUrlSetting({ saas }: { saas: Saas }) {
+  const { toast } = useToast();
+  const { save, busy } = useSaveAppUrl();
+  const [url, setUrl] = useState(saas.app_url ?? "");
+  const value = url.trim();
+  const isDirty = !!value && value !== (saas.app_url ?? "");
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isDirty || busy) return;
+    const saved = await save(saas.id, value);
+    if (!saved) return;
+    setUrl(saved);
+    toast({ title: "Adresse enregistrée", description: "Ta roadmap et Gus utilisent maintenant celle-ci." });
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-2">
+      <Label htmlFor="saas-app-url">Adresse de l'app</Label>
+      <div className="flex items-center gap-3">
+        <Input
+          id="saas-app-url"
+          inputMode="url"
+          value={url}
+          onChange={(event) => setUrl(event.target.value)}
+          placeholder="https://mon-app.base44.app"
+          maxLength={APP_URL_MAX_LENGTH}
+          autoComplete="off"
+          data-testid="input-saas-app-url"
+        />
+        {isDirty ? (
+          <Button
+            type="submit"
+            disabled={busy}
+            aria-label="Enregistrer l'adresse"
+            className="shrink-0 animate-in fade-in-0 zoom-in-95 duration-150 max-sm:px-3"
+            data-testid="button-saas-app-url-submit"
+          >
+            {busy ? <Loader2 className="animate-spin" /> : <Check />}
+            <span className="hidden sm:inline">Enregistrer</span>
+          </Button>
+        ) : (
+          saas.app_url && (
+            <Button asChild variant="outline" className="shrink-0 max-sm:px-3">
+              <a href={saas.app_url} target="_blank" rel="noreferrer" aria-label="Ouvrir l'app">
+                <ExternalLink />
+                <span className="hidden sm:inline">Ouvrir</span>
+              </a>
+            </Button>
+          )
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">Là où tes clients ouvrent ton app. Elle doit répondre pour être enregistrée.</p>
+    </form>
+  );
+}
+
+/** "Général" tab of the SaaS settings: its logo, rename it, its app's address, or delete it with everything it holds. */
 export function SaasGeneralSettings({ saas, name, onNameChange, onDeleted }: SaasGeneralSettingsProps) {
   const { updateSaas, isUpdating, deleteSaas, isDeleting } = useSaas();
   const { uploadLogo, isUploading, removeLogo, isRemoving } = useSaasLogo();
@@ -155,6 +219,8 @@ export function SaasGeneralSettings({ saas, name, onNameChange, onDeleted }: Saa
         </div>
         {!trimmed && <p className="text-xs text-destructive">Le nom ne peut pas être vide.</p>}
       </form>
+
+      <AppUrlSetting saas={saas} />
 
       <section className="flex flex-col items-start gap-3 border-t border-border/70 pt-5 sm:flex-row sm:items-center sm:gap-6 md:pt-6">
         <div className="min-w-0 flex-1 space-y-0.5">

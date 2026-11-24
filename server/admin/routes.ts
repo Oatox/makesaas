@@ -7,9 +7,12 @@ import { logger } from "../lib/logger";
 import { supabaseAdmin } from "../lib/supabase-admin";
 import { removeUserFiles } from "../storage/files";
 import { mapProviders, mapSessionRow, type AdminSessionPayload } from "./mappers";
+import { JOURNEY_PROFILE_COLUMNS, readDiscussion, readJourney, readSaasDetail } from "./member";
 
 const userParamsSchema = z.object({ id: z.string().uuid() });
 const sessionParamsSchema = userParamsSchema.extend({ sessionId: z.string().uuid() });
+const saasParamsSchema = userParamsSchema.extend({ saasId: z.string().uuid() });
+const discussionParamsSchema = userParamsSchema.extend({ conversationId: z.string().uuid() });
 
 const updateUserBodySchema = z
   .object({
@@ -23,7 +26,7 @@ const updateUserBodySchema = z
     message: "Aucune modification fournie",
   });
 
-const PROFILE_COLUMNS = "id,email,full_name,avatar_url,role,created_at,last_active_at,signup_source";
+const PROFILE_COLUMNS = `id,email,full_name,avatar_url,role,created_at,last_active_at,signup_source,${JOURNEY_PROFILE_COLUMNS}`;
 
 /**
  * Admin access change: a grant activates the existing row (a Whop one keeps its billing data) or
@@ -79,6 +82,7 @@ export function registerAdminRoutes(app: Express) {
         logger.warn({ err: sessionsResult.error, userId }, "Failed to fetch auth sessions");
       }
 
+      const journey = await readJourney(db(), userId, profile);
       const authUser = authUserResult.data.user;
       const metadataName = authUser?.user_metadata?.full_name;
       const sessions: AdminSessionPayload[] = sessionsResult.error
@@ -101,7 +105,28 @@ export function registerAdminRoutes(app: Express) {
         sessions,
         sessionsUnavailable: Boolean(sessionsResult.error),
         providers: mapProviders(authUser),
+        journey,
       });
+    }),
+  );
+
+  // One SaaS of the member and where it stands; looking writes nothing (shared/admin.ts).
+  app.get(
+    "/api/admin/users/:id/saas/:saasId",
+    requireAdmin,
+    asyncRoute(async (req, res) => {
+      const { id: userId, saasId } = parseInput(saasParamsSchema, req.params);
+      res.json(await readSaasDetail(db(), userId, saasId));
+    }),
+  );
+
+  // A discussion of the member with Gus, to read it as they did.
+  app.get(
+    "/api/admin/users/:id/discussions/:conversationId",
+    requireAdmin,
+    asyncRoute(async (req, res) => {
+      const { id: userId, conversationId } = parseInput(discussionParamsSchema, req.params);
+      res.json(await readDiscussion(db(), userId, conversationId));
     }),
   );
 

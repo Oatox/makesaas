@@ -35,7 +35,7 @@ describe("coach context", () => {
 
   const PROGRESS = { videos: 0, tiktokAccounts: 0, mrr: null };
 
-  test("the roadmap: the milestones (objectives) with the steps of the one in progress, the phase, the day's tasks, and the next one's steps with its prompt", () => {
+  test("the roadmap: the objectives, the steps of the one in progress with their tasks done, the phase, the day's tasks, and the next one's instructions with its prompt", () => {
     const text = formatRoadmap(
       roadmapStagesFor(5_000),
       {
@@ -48,20 +48,21 @@ describe("coach context", () => {
       },
       "2026-11-23",
     );
-    expect(text).toContain("0 atteint sur 5.");
-    expect(text).toContain("- [ ] Lancer ton SaaS : EN COURS (2 / 6 étapes)");
-    expect(text).toContain("  - [x] Ton logo : atteinte le");
-    expect(text).toContain("  - [ ] Ton app en ligne : EN COURS");
-    expect(text).toMatch(/- \[ \] Atteindre 100\s€ par mois : à venir/);
+    expect(text).toContain("0 atteint sur 7.");
+    expect(text).toContain("- [ ] Lancer ton SaaS : EN COURS (2 / 4 étapes)");
+    expect(text).toContain("  - [x] Ton logo : passée le");
+    expect(text).toContain("  - [ ] Ton app en ligne : EN COURS (1 / 5 tâches)");
+    expect(text).toContain("- [ ] Première vidéo : à venir");
+    expect(text).toMatch(/- \[ \] 100\s€ par mois : à venir/);
     expect(text).not.toContain("7 vidéos");
-    expect(text).toContain("Phase : lancement de son SaaS (2 tâches de lancement faites sur 12).");
+    expect(text).toContain("Phase : lancement de son SaaS (2 tâches de lancement faites sur 14).");
     expect(text).toContain("- [ ] Construis la première version (il la coche lui-même)");
     expect(text).toContain("Sa prochaine tâche : « Construis la première version ».");
     expect(text).toContain("Le prompt à coller dans Base44 que sa tâche lui donne :");
     expect(text).toContain("Crée une app web appelée Fitlo");
   });
 
-  test("the logo task gives Gus its ChatGPT prompt, and a milestone in progress its figure", () => {
+  test("the logo task gives Gus its ChatGPT prompt, and a step in progress its figure", () => {
     const at = "2026-11-21T10:00:00Z";
     const done = Object.fromEntries(["idea:chosen"].map((key) => [key, { at, source: "declared" as const }]));
     const text = formatRoadmap(roadmapStagesFor(5_000), { goal: 5_000, project: PROJECT, progress: PROGRESS, done }, "2026-11-23");
@@ -81,9 +82,10 @@ describe("coach context", () => {
       },
       "2026-11-23",
     );
-    expect(growing).toContain("1 atteint sur 5.");
+    expect(growing).toContain("2 atteints sur 7.");
     expect(growing).toContain("- [x] Lancer ton SaaS : atteint le");
-    expect(growing).toMatch(/- \[ \] Atteindre 100\s€ par mois : EN COURS \(0 \/ 3 étapes\)/);
+    expect(growing).toContain("- [x] Première vidéo : atteint le");
+    expect(growing).toContain("- [ ] Premier client : EN COURS (0 / 2 étapes)");
     expect(growing).toContain("  - [ ] 7 vidéos : EN COURS (3 / 7 vidéos)");
   });
 

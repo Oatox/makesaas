@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { ArrowRight, Check, ChevronRight, Clock, Loader2, Lock, PartyPopper, Undo2, Zap } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowLeft, ArrowRight, Check, ChevronRight, Clock, Loader2, Lock, PartyPopper, Undo2, Zap } from "lucide-react";
 import type { MissionDone, RoadmapMission, RoadmapState } from "@shared/roadmap";
 import { missionCheckText, missionTime } from "@shared/roadmap-missions";
 import type { Saas } from "@shared/saas";
-import { dayKey, illustrationOf, type DoneTask } from "@shared/today";
+import { dayKey, type DoneTask } from "@shared/today";
 import { COACH_NAME, CoachAvatar } from "@/components/brand/Coach";
 import { CoachMarkdown } from "@/components/coach/CoachMarkdown";
 import { Button } from "@/components/ui/button";
@@ -12,101 +13,19 @@ import { useTickMission } from "@/hooks/use-roadmap";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { StepActionButton } from "./StepAction";
-import { TaskBanner } from "./TaskBanner";
-import { taskIcon } from "./task-icons";
 
 const dayFormatter = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long" });
 const shortDayFormatter = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
 
-/**
- * One task of the day (pages/Today.tsx), as a sober card: a small icon and its state on one line
- * ("À faire maintenant", "Faite", what a locked one waits for), its title and why it matters, and
- * "Commencer" on the one to do now (outlined in orange). Done ones are dimmed. The whole card opens it
- * (TaskDetail, in the page's drawer).
- */
-export function QuestTile({
-  task,
-  isNext,
-  blocker,
-  state,
-  onOpen,
-}: {
-  task: RoadmapMission;
-  /** The task to do now. */
-  isNext: boolean;
-  blocker: RoadmapMission | null;
-  state: RoadmapState;
-  onOpen: () => void;
-}) {
-  const done = state.done[task.key];
-  const locked = !done && !!blocker;
-  const current = isNext && !done && !locked;
-  const time = missionTime(task);
-  const Icon = done ? Check : locked ? Lock : taskIcon(task.key);
+/** A step slides in from the side it comes from: `direction` 1 forward, -1 back. */
+const stepMotion = {
+  enter: (direction: number) => ({ opacity: 0, x: direction * 16 }),
+  center: { opacity: 1, x: 0 },
+  exit: (direction: number) => ({ opacity: 0, x: direction * -16 }),
+};
 
-  return (
-    <li className="h-full">
-      {/* The whole card opens the task; its button, or the card itself, is what keyboards reach. */}
-      <div
-        role={current ? undefined : "button"}
-        tabIndex={current ? undefined : 0}
-        aria-haspopup="dialog"
-        onClick={onOpen}
-        onKeyDown={(event) => {
-          if (!current && (event.key === "Enter" || event.key === " ")) {
-            event.preventDefault();
-            onOpen();
-          }
-        }}
-        className={cn(
-          "flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
-          current ? "border-primary/60" : "border-border hover:border-foreground/20",
-          done && "opacity-60 hover:opacity-90",
-        )}
-      >
-        <TaskBanner illustration={illustrationOf(task)} muted={locked} className="border-b border-border" />
-        <div className="flex flex-1 flex-col p-6 sm:p-7">
-          <p className={cn("flex items-center gap-2 text-xs", current ? "font-medium text-primary" : "text-muted-foreground")}>
-            <Icon className="h-4 w-4 shrink-0" strokeWidth={done ? 3 : 2} />
-            <span className="min-w-0 truncate">
-              {done
-                ? done.source === "before"
-                  ? "Faite avant MakeSaaS"
-                  : `Faite le ${dayFormatter.format(new Date(done.at))}`
-                : locked && blocker
-                  ? `Après « ${blocker.title} »`
-                  : current
-                    ? "À faire maintenant"
-                    : "Ensuite"}
-            </span>
-            {!done && time && <span className="ml-auto shrink-0 text-muted-foreground">{time}</span>}
-          </p>
-
-          <p className={cn("mt-5 font-medium leading-snug", locked && "text-foreground/60")}>{task.title}</p>
-          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{task.why}</p>
-
-          {current && (
-            <div className="mt-auto pt-7">
-              <Button
-                className="w-full"
-                aria-haspopup="dialog"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onOpen();
-                }}
-              >
-                Commencer <ArrowRight />
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    </li>
-  );
-}
-
-/** How many tasks done the list shows before "Voir les … autres". */
-const DONE_SHOWN = 5;
+/** How many tasks done the list shows before "Voir … autres". */
+const DONE_SHOWN = 3;
 
 /**
  * The tasks already done (pages/Today.tsx, under the day's; shared/today.ts: doneTasks): a quiet list,
@@ -151,7 +70,7 @@ export function DoneTaskList({ items, onOpen }: { items: DoneTask[]; onOpen: (ke
       </ul>
       {items.length > DONE_SHOWN && (
         <Button variant="ghost" className="w-full" onClick={() => setAll((value) => !value)}>
-          {all ? "Voir moins" : `Voir les ${items.length - DONE_SHOWN} autres`}
+          {all ? "Voir moins" : `Voir ${items.length - DONE_SHOWN} autre${items.length - DONE_SHOWN > 1 ? "s" : ""}`}
         </Button>
       )}
     </section>
@@ -160,16 +79,18 @@ export function DoneTaskList({ items, onOpen }: { items: DoneTask[]; onOpen: (ke
 
 /**
  * An open task, in the page's drawer (pages/Today.tsx): its place in the day (or "Tâche accomplie" for
- * one opened from the tasks done), title, time and why, then its steps, each with its button, and
- * "C'est fait" (or what the data waits for). A launch task waits for the one before it (`blocker`,
- * "Y aller"). Done, it says when, with "Annuler" for one the member ticked (and the launch tasks ticked
- * after it, `later`, after a confirmation), and, in the day, leads to the next task.
+ * one opened from the tasks done) and time, its title, why it matters in Gus's words, then its
+ * instructions (its `steps`) one at a time, numbered and with no other name (a segment per instruction
+ * to go back to it), each with its button and "Suivant"; on the last one,
+ * "Tâche suivante", which ticks it and opens the day's next task ("C'est fait" for the day's last;
+ * what the data waits for when it checks it). A launch task waits for the one before it (`blocker`,
+ * "Y aller"). Done, it says when, with "Pas encore faite" for one the member ticked (that one only: the
+ * tasks ticked after it stay done), all its steps at once, and, in the day, leads to the next task.
  */
 export function TaskDetail({
   task,
   place,
   blocker,
-  later,
   next,
   onGoTo,
   onClose,
@@ -180,8 +101,7 @@ export function TaskDetail({
   /** Its place in the day's tasks; null for one opened from the tasks done. */
   place: { number: number; total: number } | null;
   blocker: RoadmapMission | null;
-  later: string[];
-  /** The day's next task still to do, offered once this one is done. */
+  /** The day's task to do after this one: "Tâche suivante" ticks this one and opens it; offered again once this one is done. */
   next: RoadmapMission | null;
   /** Opens another task (the one to finish first, the next one). */
   onGoTo: (key: string) => void;
@@ -192,31 +112,80 @@ export function TaskDetail({
   const { toast } = useToast();
   const askGus = useAskGus();
   const tick = useTickMission(saas.id);
-  const done = state.done[task.key];
+  // Ticked on the way to the next task: shown as still to do until it opens.
+  const [advancing, setAdvancing] = useState(false);
+  const done = advancing ? undefined : state.done[task.key];
   const manual = task.check.kind === "manual";
   const locked = !done && !!blocker;
   const time = missionTime(task);
-  const [confirming, setConfirming] = useState(false);
+  // The step shown, and the side it came from.
+  const [[stepIndex, direction], setStep] = useState<[number, number]>([0, 1]);
+  const steps = task.steps;
+  const step = steps[stepIndex];
+  const lastStep = stepIndex >= steps.length - 1;
+  const stepsTop = useRef<HTMLDivElement>(null);
+  const goToStep = (index: number) => setStep([index, index > stepIndex ? 1 : -1]);
+
+  // A new instruction: its segments back in view, should the member have scrolled down to its buttons.
+  const firstStep = useRef(true);
+  useEffect(() => {
+    if (firstStep.current) {
+      firstStep.current = false;
+      return;
+    }
+    stepsTop.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [stepIndex]);
 
   const onError = () => toast({ variant: "destructive", title: "Impossible d'enregistrer", description: "Réessaie dans un instant." });
-  const tickIt = () => tick.mutate({ mission: task.key, done: true }, { onError });
-  const untick = () => tick.mutate({ mission: task.key, done: false, also: later }, { onError, onSettled: () => setConfirming(false) });
+  // Ticked (optimistically), then on to the day's next task once saved.
+  const tickIt = () => {
+    if (next) setAdvancing(true);
+    tick.mutate(
+      { mission: task.key, done: true },
+      {
+        onError: () => {
+          setAdvancing(false);
+          onError();
+        },
+        onSuccess: () => next && onGoTo(next.key),
+      },
+    );
+  };
+  const untick = () => tick.mutate({ mission: task.key, done: false }, { onError });
+  const busy = tick.isPending || advancing;
 
   return (
     <section>
-      <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-        {place ? `Tâche ${place.number} sur ${place.total} · Aujourd'hui` : "Tâche accomplie"}
-      </p>
-      <h2 className="mt-2 pr-10 font-display text-2xl font-light leading-tight sm:text-[28px]">{task.title}</h2>
-      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-        {time && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground/80">
-            <Clock className="h-3.5 w-3.5" />
-            {time}
-          </span>
+      {/* Where the task stands in the day and how long it takes (when it was done, once done), on one
+          quiet line above its title. */}
+      <p className="flex items-center gap-2 pr-20 text-sm text-muted-foreground">
+        {place && <span>{`Tâche ${place.number} sur ${place.total}`}</span>}
+        {done ? (
+          <>
+            {place && <span aria-hidden className="h-1 w-1 rounded-full bg-muted-foreground/50" />}
+            <span className="inline-flex items-center gap-1.5 font-medium text-primary">
+              <Check className="h-3.5 w-3.5" strokeWidth={3} />
+              {done.source === "before" ? "Faite avant MakeSaaS" : `Faite le ${dayFormatter.format(new Date(done.at))}`}
+            </span>
+          </>
+        ) : (
+          time && (
+            <>
+              {place && <span aria-hidden className="h-1 w-1 rounded-full bg-muted-foreground/50" />}
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                {time}
+              </span>
+            </>
+          )
         )}
-        {task.why}
       </p>
+      <h2 className="mt-2 pr-20 font-display text-[26px] font-light leading-tight sm:text-3xl">{task.title}</h2>
+      {/* Why it matters, in Gus's words. */}
+      <div className="mt-4 flex items-start gap-3">
+        <CoachAvatar className="h-7 w-7 shrink-0" />
+        <p className="pt-1 text-sm leading-relaxed text-muted-foreground">{task.why}</p>
+      </div>
 
       {locked && blocker ? (
         <div className="mt-6 rounded-2xl bg-secondary/50 px-5 py-8 text-center">
@@ -232,96 +201,140 @@ export function TaskDetail({
         </div>
       ) : (
         <>
-          {done && (
-            <div className="mt-6 rounded-2xl border border-primary/25 bg-primary/[0.07] p-4">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Check className="h-5 w-5" strokeWidth={3} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">
-                    {done.source === "before" ? "Faite avant MakeSaaS" : `Faite le ${dayFormatter.format(new Date(done.at))}`}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{done.source === "declared" ? "Cochée par toi" : "Vue dans tes données"}</p>
-                </div>
-                {manual && done.source === "declared" && !confirming && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => (later.length ? setConfirming(true) : untick())}
-                    disabled={tick.isPending}
-                  >
-                    {tick.isPending ? <Loader2 className="animate-spin" /> : <Undo2 />} Annuler
+          {done ? (
+            <>
+              {/* What was done, to read again and reuse its buttons; "Annuler" stays discreet. */}
+              <div className="mt-7 flex min-h-8 items-center justify-between gap-3">
+                <p className="text-xs font-semibold text-muted-foreground">Ce que tu as fait</p>
+                {manual && done.source === "declared" ? (
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-muted-foreground" onClick={untick} disabled={tick.isPending}>
+                    {tick.isPending ? <Loader2 className="animate-spin" /> : <Undo2 />} Pas encore faite
                   </Button>
+                ) : (
+                  done.source !== "before" && <span className="text-xs text-muted-foreground">Vue dans tes données</span>
                 )}
               </div>
-              {confirming && (
-                <div className="mt-3 space-y-3 border-t border-primary/20 pt-3">
-                  <p className="text-sm text-muted-foreground">
-                    {later.length > 1
-                      ? `Tu as coché ${later.length} tâches après celle-ci : elles seront annulées aussi.`
-                      : "Tu as coché une tâche après celle-ci : elle sera annulée aussi."}
-                  </p>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button variant="destructive" size="sm" onClick={untick} disabled={tick.isPending}>
-                      {tick.isPending ? <Loader2 className="animate-spin" /> : <Undo2 />}
-                      Annuler les {later.length + 1} tâches
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={tick.isPending}>
-                      Garder
-                    </Button>
-                  </div>
-                </div>
-              )}
-              {next ? (
-                <Button className="mt-4 w-full" onClick={() => onGoTo(next.key)}>
-                  Tâche suivante : {next.title} <ArrowRight />
-                </Button>
-              ) : (
-                place && (
-                  <div className="mt-4 flex flex-col items-center gap-3 pt-1 text-center">
-                    <p className="inline-flex items-center gap-2 text-sm font-medium">
-                      <PartyPopper className="h-4 w-4 text-primary" /> C'est tout pour aujourd'hui
-                    </p>
-                    <Button variant="secondary" className="w-full" onClick={onClose}>
-                      Fermer
-                    </Button>
-                  </div>
-                )
-              )}
-            </div>
-          )}
+              <ol className="mt-3">
+                {steps.map((item, index) => (
+                  <li key={index} className="relative flex gap-3.5 pb-6 last:pb-0">
+                    {/* The line down to the next instruction. */}
+                    {index < steps.length - 1 && <span aria-hidden className="absolute bottom-0 left-[13px] top-8 w-px bg-border" />}
+                    <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                    </span>
+                    <div className="min-w-0 flex-1 space-y-3 pt-0.5">
+                      <CoachMarkdown text={item.text} className="text-sm leading-6 text-foreground/85" />
+                      {item.action && <StepActionButton action={item.action} saas={saas} state={state} quiet />}
+                    </div>
+                  </li>
+                ))}
+              </ol>
 
-          <p className="mt-7 text-xs font-semibold text-muted-foreground">{done ? "Ce que tu as fait" : "Comment faire"}</p>
-          <ol className="mt-3">
-            {task.steps.map((step, index) => (
-              <li key={index} className="relative flex gap-3.5 pb-6 last:pb-0">
-                {/* The line down to the next step. */}
-                {index < task.steps.length - 1 && <span aria-hidden className="absolute bottom-0 left-[13px] top-8 w-px bg-border" />}
-                <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-xs font-semibold tabular-nums text-primary">
-                  {index + 1}
-                </span>
-                <div className="min-w-0 flex-1 space-y-3 pt-0.5">
-                  <CoachMarkdown text={step.text} className="text-sm leading-6" />
-                  {step.action && <StepActionButton action={step.action} saas={saas} state={state} />}
+              {/* Then on: the next task, where the task in progress has its main button; pinned to the
+                  bottom of the drawer while a long recap scrolls under it (its solid shadow hides the
+                  recap in the drawer's bottom padding, which the pinning leaves below it). */}
+              {(next || place) && (
+                <div className="sticky bottom-0 z-10 mt-8 border-t border-border bg-card pb-1 pt-5 shadow-[0_48px_0_0_hsl(var(--card))]">
+                  {next ? (
+                    <Button className="w-full" onClick={() => onGoTo(next.key)}>
+                      <span className="min-w-0 truncate">Tâche suivante : {next.title}</span>
+                      <ArrowRight />
+                    </Button>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 text-center">
+                      <p className="inline-flex items-center gap-2 text-sm font-medium">
+                        <PartyPopper className="h-4 w-4 text-primary" /> C'est tout pour aujourd'hui
+                      </p>
+                      <Button variant="secondary" className="w-full" onClick={onClose}>
+                        Fermer
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              </li>
-            ))}
-          </ol>
+              )}
+            </>
+          ) : (
+            step && (
+              <div ref={stepsTop} className="mt-7 scroll-mt-6">
+                {/* A segment per instruction: the ones seen in orange; each goes back to its instruction. */}
+                <div className="-my-2 flex gap-1.5">
+                  {steps.map((_, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      aria-label={`Consigne ${index + 1} sur ${steps.length}`}
+                      aria-current={index === stepIndex ? "step" : undefined}
+                      onClick={() => goToStep(index)}
+                      className="group flex-1 py-2 focus-visible:outline-none"
+                    >
+                      <span
+                        className={cn(
+                          "block h-1.5 rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-primary/60",
+                          index <= stepIndex ? "bg-primary" : "bg-secondary group-hover:bg-foreground/20",
+                        )}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <AnimatePresence mode="wait" initial={false} custom={direction}>
+                  <motion.div
+                    key={stepIndex}
+                    custom={direction}
+                    variants={stepMotion}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    className="mt-4 space-y-4"
+                  >
+                    {/* The instruction by its number; its button under both, the full width. */}
+                    <div className="flex gap-3.5">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-xs font-semibold tabular-nums text-primary">
+                        {stepIndex + 1}
+                      </span>
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <CoachMarkdown text={step.text} className="text-[15px] leading-6" />
+                      </div>
+                    </div>
+                    {step.action && <StepActionButton action={step.action} saas={saas} state={state} />}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            )
+          )}
 
           {!done && (
             <div className="mt-8 space-y-4 border-t border-border pt-5">
-              {manual ? (
-                <Button onClick={tickIt} disabled={tick.isPending} className="w-full">
-                  {tick.isPending ? <Loader2 className="animate-spin" /> : <Check />}
-                  C'est fait
-                </Button>
-              ) : (
-                <p className="flex items-center gap-2 rounded-xl bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
-                  <Zap className="h-4 w-4 shrink-0 text-primary" />
-                  {missionCheckText(task.check)}
-                </p>
-              )}
+              <div className="flex gap-2">
+                {stepIndex > 0 && (
+                  <Button variant="secondary" onClick={() => goToStep(stepIndex - 1)} disabled={busy}>
+                    <ArrowLeft /> Retour
+                  </Button>
+                )}
+                {!lastStep ? (
+                  // Quieter when the step has its own button: that one comes first.
+                  <Button variant={step?.action ? "secondary" : "default"} className="flex-1" onClick={() => goToStep(stepIndex + 1)}>
+                    Suivant <ArrowRight />
+                  </Button>
+                ) : manual ? (
+                  next ? (
+                    <Button onClick={tickIt} disabled={busy} className="flex-1">
+                      Tâche suivante
+                      {busy ? <Loader2 className="animate-spin" /> : <ArrowRight />}
+                    </Button>
+                  ) : (
+                    <Button onClick={tickIt} disabled={busy} className="flex-1">
+                      {busy ? <Loader2 className="animate-spin" /> : <Check />}
+                      C'est fait
+                    </Button>
+                  )
+                ) : (
+                  <p className="flex flex-1 items-center gap-2 rounded-xl bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
+                    <Zap className="h-4 w-4 shrink-0 text-primary" />
+                    {missionCheckText(task.check)}
+                  </p>
+                )}
+              </div>
               <div className="flex">
                 <button
                   type="button"

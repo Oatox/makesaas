@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   SAAS_COLUMNS,
+  SAAS_IDEA_TAKEN_ERROR,
   SAAS_LIMIT_ERROR,
   SAAS_LOGO_SIZE,
   SAAS_LOGO_SOURCE_MAX_BYTES,
@@ -19,14 +20,23 @@ import { translateSupabaseError } from "@/lib/error-translator";
 import { profileKeys, useAuth, type AuthProfile } from "./use-auth";
 
 export const saasKeys = {
+  all: ["saas"] as const,
   list: (userId: string | undefined) => ["saas", userId] as const,
 };
 
-/** French toast for a failed SaaS operation, including the database limit on the number of SaaS. */
+/** Keeping an idea refused by the database: the member already has their project (enforce_saas_from_idea). */
+export function isSaasIdeaTaken(error: unknown) {
+  return ((error as { message?: string } | null)?.message ?? "").includes(SAAS_IDEA_TAKEN_ERROR);
+}
+
+/** French toast for a failed SaaS operation, including the database rules on creating a SaaS. */
 export function saasErrorMessage(error: unknown, fallbackTitle: string) {
   const message = (error as { message?: string } | null)?.message ?? "";
   if (message.includes(SAAS_LIMIT_ERROR)) {
     return { title: "Limite atteinte", description: `Tu peux avoir jusqu'à ${SAAS_MAX_PER_USER} SaaS.` };
+  }
+  if (isSaasIdeaTaken(error)) {
+    return { title: "Ton projet est déjà choisi", description: "Tu le retrouves sur Accueil." };
   }
   return translateSupabaseError(error, fallbackTitle);
 }

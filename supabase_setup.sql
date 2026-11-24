@@ -1180,6 +1180,57 @@ GRANT ALL ON public.saas_idea_batches, public.saas_ideas TO service_role;
 -- Keeping an idea creates the SaaS straight from the browser (section 8 grants the other columns).
 GRANT INSERT (idea_id) ON public.saas TO authenticated;
 
+-- An idea gives the member's first SaaS only: once the project is chosen, keeping an idea again
+-- (/lancement reopened, reloaded, or in another tab) is refused. Raises 'saas_idea_taken'
+-- (SAAS_IDEA_TAKEN_ERROR in shared/saas.ts), matched by the client. Same lock as enforce_saas_limit,
+-- so two tabs confirming at once cannot both pass.
+CREATE OR REPLACE FUNCTION public.enforce_saas_from_idea()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+    IF current_user NOT IN ('authenticated', 'anon') OR NEW.idea_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    PERFORM pg_advisory_xact_lock(hashtextextended('saas_user:' || NEW.user_id::text, 0));
+
+    IF EXISTS (SELECT 1 FROM public.saas WHERE user_id = NEW.user_id) THEN
+        RAISE EXCEPTION 'saas_idea_taken' USING ERRCODE = 'P0001';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS enforce_saas_from_idea ON public.saas;
+CREATE TRIGGER enforce_saas_from_idea
+    BEFORE INSERT ON public.saas
+    FOR EACH ROW
+    EXECUTE FUNCTION public.enforce_saas_from_idea();
+
+REVOKE ALL ON FUNCTION public.enforce_saas_from_idea() FROM PUBLIC, anon, authenticated;
+
+-- Where the member is on /lancement (LAUNCH_STEPS in shared/launch.ts), so they resume there after a
+-- reload, a new sign-in or on another device. NULL: choosing among the ideas (or, with a SaaS, a launch
+-- finished before this column). launch_idea_id: the idea chosen, at the step 'project' (an idea of the
+-- same user). Self-service: it only decides which screen of their own launch they see.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS launch_step TEXT;
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_launch_step_check;
+ALTER TABLE public.profiles
+    ADD CONSTRAINT profiles_launch_step_check
+    CHECK (launch_step IS NULL OR launch_step IN ('project', 'plan', 'tour', 'mission', 'done'));
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS launch_idea_id UUID;
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_launch_idea_fkey;
+ALTER TABLE public.profiles
+    ADD CONSTRAINT profiles_launch_idea_fkey FOREIGN KEY (launch_idea_id, id)
+    REFERENCES public.saas_ideas (id, user_id) ON DELETE SET NULL (launch_idea_id);
+-- Covers the composite key (deleting an idea looks up the profiles pointing to it).
+CREATE INDEX IF NOT EXISTS profiles_launch_idea_idx ON public.profiles (launch_idea_id, id);
+GRANT UPDATE (launch_step, launch_idea_id) ON public.profiles TO authenticated;
+
 -- 14. ROADMAP
 -- The roadmap of a SaaS (/roadmap, server/roadmap/, shared/roadmap.ts): stages from the idea to the
 -- member's monthly goal, each made of missions with their tutorial (shared/roadmap-missions.ts). A

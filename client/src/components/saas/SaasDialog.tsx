@@ -137,7 +137,7 @@ const TABS: { value: SaasSettingsTab; label: string; icon: LucideIcon | typeof S
     label: "Général",
     icon: SlidersHorizontal,
     title: "Général",
-    description: "Le nom et le logo du SaaS, tels qu'ils apparaissent dans la barre latérale.",
+    description: "Le nom et le logo du SaaS, tels qu'ils apparaissent dans la barre latérale, et l'adresse de son app.",
   },
   {
     value: "tiktok",

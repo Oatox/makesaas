@@ -2,6 +2,7 @@ import { pgTable, text, timestamp, uuid, boolean, jsonb, bigint, integer, date, 
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import type { IdeaContent } from "./ideas";
+import { LAUNCH_STEPS } from "./launch";
 import type { OnboardingProfile } from "./onboarding-profile";
 
 // First-touch acquisition data captured in the browser before signup.
@@ -33,6 +34,10 @@ export const profiles = pgTable("profiles", {
   current_saas_id: uuid("current_saas_id"),
   /** Onboarding answers as question/answer lines (shared/onboarding-profile.ts), written by the server. */
   onboarding_profile: jsonb("onboarding_profile").$type<OnboardingProfile>(),
+  /** Where the member is on /lancement (shared/launch.ts); null: choosing among the ideas. */
+  launch_step: text("launch_step", { enum: LAUNCH_STEPS }),
+  /** The idea chosen at the launch step `project` (see supabase_setup.sql, section 13). */
+  launch_idea_id: uuid("launch_idea_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });

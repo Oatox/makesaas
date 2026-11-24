@@ -27,7 +27,7 @@ function pageAction(location: string): PageAction | null {
   if (location === "/roadmap") {
     return {
       label: `Faire le point avec ${COACH_NAME}`,
-      prompt: "Fais le point sur ma roadmap : les paliers que j'ai atteints, celui que je vise maintenant, et ce qui m'en rapprochera le plus vite.",
+      prompt: "Fais le point sur ma roadmap : les objectifs que j'ai atteints, celui en cours, et ce qui m'en rapprochera le plus vite.",
     };
   }
   return null;

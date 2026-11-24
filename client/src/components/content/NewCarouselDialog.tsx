@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import {
   ArrowLeft,
+  GalleryHorizontalEnd,
   Image as ImageIcon,
   LayoutGrid,
   Loader2,
@@ -403,7 +404,7 @@ export function NewCarouselDialog({
                 className="w-full sm:w-auto"
                 data-testid="button-generate-carousel"
               >
-                {generate.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                {generate.isPending ? <Loader2 className="animate-spin" /> : <GalleryHorizontalEnd />}
                 Générer
               </Button>
             </div>

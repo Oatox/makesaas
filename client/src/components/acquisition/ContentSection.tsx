@@ -160,9 +160,11 @@ function CarouselLibrary() {
   }
   if (!carousels.data) return <LibrarySkeleton />;
 
-  if (carousels.data.length === 0) {
-    return (
-      <>
+  // The dialogs stay at the same place whatever is shown: the first carousel turns the empty state
+  // into the list, which must not mount the "Nouveau carrousel" dialog again while it is closing.
+  return (
+    <>
+      {carousels.data.length === 0 ? (
         <EmptyState
           size="large"
           icon={GalleryHorizontalEnd}
@@ -171,33 +173,30 @@ function CarouselLibrary() {
           description="Donne un sujet : l'IA écrit chaque slide et crée ses images. Ou pars d'une page blanche."
           action={action}
         />
-        {dialog}
-      </>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1">
-          <h2 className="font-display text-xl font-light">Carrousels</h2>
-          <p className="text-sm text-muted-foreground">Clique sur un carrousel pour modifier son texte, ses images et sa mise en page.</p>
+      ) : (
+        <div className="space-y-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="space-y-1">
+              <h2 className="font-display text-xl font-light">Carrousels</h2>
+              <p className="text-sm text-muted-foreground">Clique sur un carrousel pour modifier son texte, ses images et sa mise en page.</p>
+            </div>
+            {action}
+          </div>
+          <div className={`${GRID_CLASS} gap-x-3 gap-y-6 sm:gap-x-4`}>
+            {carousels.data.map((carousel) => (
+              <CarouselCard
+                key={carousel.id}
+                carousel={carousel}
+                onOpen={() => navigate(carouselEditorPath(carousel.id))}
+                onPreview={() => setPreviewId(carousel.id)}
+              />
+            ))}
+          </div>
         </div>
-        {action}
-      </div>
-      <div className={`${GRID_CLASS} gap-x-3 gap-y-6 sm:gap-x-4`}>
-        {carousels.data.map((carousel) => (
-          <CarouselCard
-            key={carousel.id}
-            carousel={carousel}
-            onOpen={() => navigate(carouselEditorPath(carousel.id))}
-            onPreview={() => setPreviewId(carousel.id)}
-          />
-        ))}
-      </div>
+      )}
       {dialog}
       {preview}
-    </div>
+    </>
   );
 }
 

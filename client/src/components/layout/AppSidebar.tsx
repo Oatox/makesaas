@@ -21,19 +21,14 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  Gauge,
-  House,
-  Route,
   ShieldCheck,
   Users,
   LogOut,
   ChevronRight,
+  ChevronsUpDown,
   Settings as SettingsIcon,
   Workflow,
   Megaphone,
-  TrendingUp,
-  ChartColumn,
-  Clapperboard,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -46,8 +41,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/format";
 import type { LucideIcon } from "lucide-react";
 import { SidebarDiscussions } from "@/components/coach/SidebarDiscussions";
+import { APP_PAGES } from "@/config/app-pages";
 import { COACH_NAME, CoachAvatar } from "@/components/brand/Coach";
-import { COACH_PATH } from "@/hooks/use-coach";
+import { COACH_PATH, useCoachConversations } from "@/hooks/use-coach";
 import { cn } from "@/lib/utils";
 import { navLinkClass, navSubPageLinkClass } from "./nav-styles";
 import { SaasSwitcher } from "./SaasSwitcher";
@@ -73,23 +69,11 @@ type NavGroup = { label: string; adminOnly?: boolean } & (
 const NAV_GROUPS: NavGroup[] = [
   {
     label: "Application",
-    items: [
-      { href: "/accueil", label: "Accueil", icon: House },
-      { href: "/roadmap", label: "Roadmap", icon: Route },
-      { href: "/dash", label: "Tableau de bord", icon: Gauge, matchPrefix: true },
-      {
-        href: "/acquisition",
-        label: "Acquisition",
-        icon: TrendingUp,
-        matchPrefix: true,
-        children: [
-          { href: "/acquisition", label: "Statistiques", icon: ChartColumn },
-          { href: "/acquisition/contenu", label: "Création de contenu", icon: Clapperboard },
-        ],
-      },
-    ],
+    // The app's pages (config/app-pages.ts), also presented by Gus at the end of /lancement.
+    items: APP_PAGES,
   },
-  // The active SaaS's discussions with Gus (a new one starts from the header, TalkToGusButton).
+  // The active SaaS's discussions with Gus (a new one starts from the header, TalkToGusButton);
+  // hidden until the first one (AppSidebar).
   { label: "Discussions", Content: SidebarDiscussions },
   {
     label: "Administration",
@@ -102,6 +86,26 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
 ];
+
+// The account menu at the bottom of the sidebar, in the look of its links (navLinkClass): muted at
+// rest, a light wash on hover (and on keyboard focus, instead of the blue focus ring), and while its
+// menu is open the active link's fill. The avatar's initials sit on the same neutral wash, without
+// the orange kept for the active link.
+const userMenuClass =
+  "h-12 gap-3 rounded-[10px] border border-transparent px-2.5 text-sm font-medium text-sidebar-foreground/75 transition-colors duration-150 " +
+  "hover:bg-white/[0.045] hover:text-sidebar-foreground " +
+  "focus-visible:ring-0 focus-visible:bg-white/[0.045] focus-visible:text-sidebar-foreground " +
+  "data-[state=open]:border-white/[0.09] data-[state=open]:bg-white/[0.07] data-[state=open]:text-sidebar-foreground " +
+  "data-[state=open]:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] data-[state=open]:hover:bg-white/[0.07] data-[state=open]:hover:text-sidebar-foreground";
+
+// Collapsed to icons: the avatar alone, ringed on hover and while its menu is open (like the SaaS tile
+// of SaasSwitcher).
+const userMenuCollapsedClass =
+  "flex size-8 shrink-0 items-center justify-center rounded-full outline-none ring-offset-2 ring-offset-sidebar " +
+  "transition-[box-shadow,transform] duration-150 hover:ring-2 hover:ring-white/15 active:scale-95 " +
+  "data-[state=open]:ring-2 data-[state=open]:ring-white/25 focus-visible:ring-2 focus-visible:ring-white/25";
+
+const userAvatarFallbackClass = "rounded-full bg-white/[0.08] text-xs font-medium text-sidebar-foreground/80";
 
 function NavLink({ item, active, isCollapsed }: { item: NavItem; active: boolean; isCollapsed: boolean }) {
   return (
@@ -243,6 +247,14 @@ export function AppSidebar() {
   const isActive = ({ href, matchPrefix }: NavItem) =>
     currentPath === href || (!!matchPrefix && currentPath.startsWith(`${href}/`));
 
+  // The Discussions category appears with the first discussion of the active SaaS (not while they
+  // load either, so it never shows empty). Same query as its list, read from the cache.
+  const hasDiscussions = (useCoachConversations().data?.length ?? 0) > 0;
+  const groups = NAV_GROUPS.filter(
+    (group) =>
+      (!group.adminOnly || isAdmin) && !("Content" in group && group.Content === SidebarDiscussions && !hasDiscussions),
+  );
+
   return (
     <Sidebar variant="inset" collapsible="icon">
       {/* The active SaaS, to switch to another one or create one (in place of the MakeSaaS logo). */}
@@ -257,7 +269,7 @@ export function AppSidebar() {
 
         {/* One category per group, stacked from the top: a small label (hidden when the sidebar is
             collapsed to icons), then its links. */}
-        {NAV_GROUPS.filter((group) => !group.adminOnly || isAdmin).map((group) => (
+        {groups.map((group) => (
           <SidebarGroup key={group.label} className="py-1">
             <SidebarGroupLabel className="text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground/60">
               {group.label}
@@ -287,38 +299,27 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="items-center border-t border-border/20 p-2.5 overflow-hidden group-data-[collapsible=icon]:p-2">
+      <SidebarFooter className="items-center overflow-hidden border-t border-white/[0.06] p-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {isCollapsed ? (
-              <button
-                type="button"
-                className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full p-0 outline-hidden ring-sidebar-ring transition-colors hover:bg-sidebar-accent focus-visible:ring-2 data-[state=open]:bg-sidebar-accent"
-                aria-label="Menu utilisateur"
-              >
-                <Avatar className="h-8 w-8 rounded-full">
+              <button type="button" className={userMenuCollapsedClass} aria-label="Menu utilisateur">
+                <Avatar className="size-8 rounded-full">
                   {avatarUrl ? <AvatarImage src={avatarUrl} alt={profile?.email || "Avatar utilisateur"} referrerPolicy="no-referrer" /> : null}
-                  <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs">
-                    {avatarInitials}
-                  </AvatarFallback>
+                  <AvatarFallback className={userAvatarFallbackClass}>{avatarInitials}</AvatarFallback>
                 </Avatar>
               </button>
             ) : (
-              <SidebarMenuButton
-                size="lg"
-                className="group/user-menu !h-16 rounded-[12px] data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground flex items-center justify-start gap-3.5 px-3 cursor-pointer"
-              >
-                <Avatar className="h-11 w-11 shrink-0 rounded-full">
+              <SidebarMenuButton size="lg" className={userMenuClass}>
+                <Avatar className="size-8 shrink-0 rounded-full">
                   {avatarUrl ? <AvatarImage src={avatarUrl} alt={profile?.email || "Avatar utilisateur"} referrerPolicy="no-referrer" /> : null}
-                  <AvatarFallback className="rounded-full bg-primary/10 text-primary">
-                    {avatarInitials}
-                  </AvatarFallback>
+                  <AvatarFallback className={userAvatarFallbackClass}>{avatarInitials}</AvatarFallback>
                 </Avatar>
-                <div className="grid min-w-0 flex-1 gap-0.5 text-left leading-tight animate-in fade-in duration-300">
-                  <span className="truncate text-base font-semibold">{displayName}</span>
-                  <span className="truncate text-sm text-sidebar-foreground/70">{displayEmail}</span>
+                <div className="grid min-w-0 flex-1 text-left leading-tight animate-in fade-in duration-300">
+                  <span className="truncate">{displayName}</span>
+                  <span className="truncate text-xs font-normal text-sidebar-foreground/45">{displayEmail}</span>
                 </div>
-                <ChevronRight className="ml-auto !size-5 shrink-0 transition-transform duration-200 group-data-[state=open]/user-menu:-rotate-90" />
+                <ChevronsUpDown className="!size-4 shrink-0 opacity-60" />
               </SidebarMenuButton>
             )}
           </DropdownMenuTrigger>
@@ -328,6 +329,9 @@ export function AppSidebar() {
             className={isCollapsed ? "w-60" : "w-[--radix-dropdown-menu-trigger-width] min-w-0"}
             side={isCollapsed ? "right" : "top"}
             align={isCollapsed ? "end" : "center"}
+            // Closing the menu would give the focus back to its trigger, which then keeps a focus
+            // style as if reached with the keyboard.
+            onCloseAutoFocus={(event) => event.preventDefault()}
           >
             <DropdownMenuItem asChild>
               <Link href="/settings">

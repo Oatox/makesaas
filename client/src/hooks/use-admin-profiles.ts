@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Profile, SignupSource } from "@shared/schema";
+import { adminApi, type AdminDiscussion, type AdminMemberJourney, type AdminSaasDetail } from "@shared/admin";
 import { ACCESS_STATUSES, type SubscriptionSummary } from "@shared/billing";
 import { profileKeys, useAuth } from "./use-auth";
 import { toast } from "./use-toast";
@@ -14,6 +15,8 @@ export const adminKeys = {
   growth: ["admin", "growth"] as const,
   profilesPage: (params: UsePaginatedProfilesParams) => ["admin", "profiles", params] as const,
   userDetails: (userId: string | undefined) => ["admin", "user-details", userId] as const,
+  saas: (userId: string, saasId: string | undefined) => ["admin", "user-saas", userId, saasId] as const,
+  discussion: (userId: string, conversationId: string | undefined) => ["admin", "user-discussion", userId, conversationId] as const,
 };
 
 export type AdminUserDetailsResponse = {
@@ -45,6 +48,7 @@ export type AdminUserDetailsResponse = {
     connectedAt: string | null;
     lastSignInAt: string | null;
   }[];
+  journey: AdminMemberJourney;
 };
 
 /** Columns shown in the users table. */
@@ -121,8 +125,30 @@ export function useAdminUserDetails(userId?: string) {
 
   return useQuery({
     queryKey: adminKeys.userDetails(userId),
-    queryFn: ({ signal }) => apiRequest<AdminUserDetailsResponse>(`/api/admin/users/${userId}/details`, { signal }),
+    queryFn: ({ signal }) => apiRequest<AdminUserDetailsResponse>(adminApi.userDetails(userId!), { signal }),
     enabled: isAdmin && !!userId,
+  });
+}
+
+/** One SaaS of a member and where it stands (its roadmap, figures, use of the app). */
+export function useAdminSaasDetail(userId: string, saasId: string | undefined) {
+  const { isAdmin } = useAuth();
+
+  return useQuery({
+    queryKey: adminKeys.saas(userId, saasId),
+    queryFn: ({ signal }) => apiRequest<AdminSaasDetail>(adminApi.saas(userId, saasId!), { signal }),
+    enabled: isAdmin && !!saasId,
+  });
+}
+
+/** A discussion of a member with Gus, to read it. */
+export function useAdminDiscussion(userId: string, conversationId: string | undefined) {
+  const { isAdmin } = useAuth();
+
+  return useQuery({
+    queryKey: adminKeys.discussion(userId, conversationId),
+    queryFn: ({ signal }) => apiRequest<AdminDiscussion>(adminApi.discussion(userId, conversationId!), { signal }),
+    enabled: isAdmin && !!conversationId,
   });
 }
 

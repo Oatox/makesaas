@@ -10,10 +10,19 @@ import { MRR_TIERS, monthlyGoalOf, type Milestone, type MissionDone, type Roadma
 const euros = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
 /**
- * ⚠️ PLACEHOLDER: Base44's sign-up page, where members build their app. Put your affiliate link here:
- * the "Créer mon compte Base44" button of its task opens it.
+ * Base44's sign-up page, where members build their app: our referral link, which gives them 30 free
+ * credits. The "Créer mon compte Base44" button of its task opens it.
  */
-export const BASE44_URL = "https://base44.com";
+export const BASE44_URL = "https://app.base44.com/register?ref=A3KZZ2DZZ85WHDJB&source=referral_program";
+
+/** Base44's plans: connecting a domain needs Starter or higher (the "Achète ton nom de domaine" task). */
+const BASE44_PRICING_URL = "https://base44.com/pricing";
+
+/**
+ * Where members buy their domain, before connecting it in Base44 ("Connect existing domain", which
+ * sets Namecheap's DNS itself once they sign in there).
+ */
+const NAMECHEAP_URL = "https://www.namecheap.com";
 
 const STATS: StepAction = { kind: "page", label: "Ouvrir mes statistiques", href: "/acquisition" };
 const CONTENT: StepAction = { kind: "page", label: "Créer un carrousel", href: "/acquisition/contenu" };
@@ -70,7 +79,7 @@ const BASE_STAGES: RoadmapStage[] = [
         why: "Base44 construit ton app pendant que tu la décris, et l'héberge pour toi.",
         minutes: 2,
         steps: [
-          { text: "Crée ton compte Base44 : c'est gratuit pour commencer.", action: { kind: "open", label: "Créer mon compte Base44", url: BASE44_URL } },
+          { text: "Crée ton compte Base44 avec ce lien : tu reçois 30 crédits offerts pour commencer.", action: { kind: "open", label: "Créer mon compte Base44", url: BASE44_URL } },
           { text: "Garde l'onglet ouvert : tu y construis ton app juste après." },
         ],
         check: { kind: "manual" },
@@ -89,6 +98,26 @@ const BASE_STAGES: RoadmapStage[] = [
         check: { kind: "manual" },
       },
       {
+        key: "build:customize",
+        title: "Modifie ton app comme tu veux",
+        why: "C'est ton app : Base44 change ce que tu veux dès que tu lui demandes, sans une ligne de code.",
+        minutes: 20,
+        steps: [
+          { text: "Parcours ton app dans l'aperçu de Base44 et note ce que tu veux changer : un texte, une couleur, un écran." },
+          { text: "Demande chaque changement à Base44 avec tes mots, un à la fois : il modifie ton app tout seul." },
+          { text: "Vérifie le résultat dans l'aperçu. Pas ce que tu voulais ? Dis-lui ce qui ne va pas : il corrige." },
+          {
+            text: "En panne d'idées ? Demande à Gus ce qui rendrait ton app plus convaincante.",
+            action: {
+              kind: "gus",
+              label: "Demander à Gus",
+              message: "Qu'est-ce que je pourrais changer dans mon app pour qu'elle donne plus envie de payer, avant de la mettre en ligne ?",
+            },
+          },
+        ],
+        check: { kind: "manual" },
+      },
+      {
         key: "build:online",
         title: "Mets ton app en ligne",
         why: "Sans adresse, personne ne peut l'essayer ni la payer.",
@@ -99,6 +128,25 @@ const BASE_STAGES: RoadmapStage[] = [
           { text: "Colle l'adresse de ton app ici.", action: { kind: "app_url" } },
         ],
         check: { kind: "app_url" },
+      },
+      {
+        key: "build:domain",
+        title: "Achète ton nom de domaine",
+        why: "Une adresse à ton nom fait pro et rassure ceux qui vont payer.",
+        minutes: 15,
+        steps: [
+          {
+            text: "Achète ton nom de domaine sur Namecheap : un nom court, au nom de ton app, en **.com** si possible.",
+            action: { kind: "open", label: "Ouvrir Namecheap", url: NAMECHEAP_URL },
+          },
+          {
+            text: "Passe Base44 au plan **Starter** : il faut ce plan pour y connecter ton domaine.",
+            action: { kind: "open", label: "Voir les plans Base44", url: BASE44_PRICING_URL },
+          },
+          { text: "Dans Base44, ouvre **Dashboard**, **Domains**, **Connect existing domain**, entre ton domaine, puis connecte ton compte Namecheap." },
+          { text: "Quand ton domaine passe en **Verified** (quelques minutes, parfois jusqu'à 48 h), colle ta nouvelle adresse ici.", action: { kind: "app_url" } },
+        ],
+        check: { kind: "custom_domain" },
       },
     ],
   },
@@ -523,6 +571,8 @@ export function missionCheckText(check: RoadmapMission["check"]): string {
       return "Se coche dès que ton projet est créé.";
     case "app_url":
       return "Se coche dès que tu colles l'adresse de ton app et qu'elle répond.";
+    case "custom_domain":
+      return "Se coche dès que tu colles l'adresse de ton app sur ton nom de domaine et qu'elle répond.";
     case "logo":
       return "Se coche dès que ton projet a son logo.";
     case "payment_account":

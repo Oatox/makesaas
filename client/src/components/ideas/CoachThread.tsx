@@ -1,10 +1,10 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { COACH_NAME, CoachAvatar } from "@/components/brand/Coach";
 import { cn } from "@/lib/utils";
 
-/** One message of the thread: Gus's, or the member's. */
-export type ThreadLine = { id: number; from: "coach" | "you"; text: string };
+/** One message of the thread: Gus's, or the member's; Gus's can be a card (`card`, in his bubble instead of text). */
+export type ThreadLine = { id: number; from: "coach" | "you"; text: string; card?: ReactNode };
 
 const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 /** Gus "types" for a time that follows the length of what he says. */
@@ -22,12 +22,16 @@ export function useCoachThread() {
   const [queued, setQueued] = useState(0);
   const chain = useRef<Promise<void>>(Promise.resolve());
   const nextId = useRef(0);
+  // Bumped by `clear`: messages queued before it are dropped.
+  const generation = useRef(0);
 
   const say = useCallback(
     (from: ThreadLine["from"], texts: string[]) => {
       setQueued((count) => count + 1);
+      const queuedIn = generation.current;
       chain.current = chain.current.then(async () => {
         for (const text of texts) {
+          if (queuedIn !== generation.current) break;
           if (!reduceMotion) {
             if (from === "coach") {
               setTyping(true);
@@ -37,6 +41,7 @@ export function useCoachThread() {
               await wait(250);
             }
           }
+          if (queuedIn !== generation.current) break;
           setLines((previous) => [...previous, { id: nextId.current++, from, text }]);
           if (!reduceMotion) await wait(250);
         }
@@ -47,8 +52,32 @@ export function useCoachThread() {
     [reduceMotion],
   );
 
-  /** Nothing left to play: dots shown now mean Gus is working (the ideas are being written). */
-  return { lines, typing, idle: queued === 0, say };
+  /** Gus shows a card in the thread, after what is queued: the next messages come under it. */
+  const show = useCallback(
+    (card: ReactNode) => {
+      setQueued((count) => count + 1);
+      const queuedIn = generation.current;
+      chain.current = chain.current.then(async () => {
+        if (queuedIn === generation.current) {
+          if (!reduceMotion) await wait(300);
+          if (queuedIn === generation.current) setLines((previous) => [...previous, { id: nextId.current++, from: "coach", text: "", card }]);
+          // Time to look at it before Gus goes on.
+          if (!reduceMotion) await wait(900);
+        }
+        setQueued((count) => count - 1);
+      });
+      return chain.current;
+    },
+    [reduceMotion],
+  );
+
+  /** A new conversation: the messages shown go, and those still queued are not played. */
+  const clear = useCallback(() => {
+    generation.current += 1;
+    setLines([]);
+  }, []);
+
+  return { lines, typing, idle: queued === 0, say, show, clear };
 }
 
 const bubbleIn = { initial: { opacity: 0, y: 8, scale: 0.97 }, animate: { opacity: 1, y: 0, scale: 1 }, transition: { duration: 0.25 } };
@@ -95,9 +124,13 @@ export function CoachThread({ lines, typing }: { lines: ThreadLine[]; typing: bo
                 <span className={cn(!lastOfRun && "invisible")}>
                   <CoachAvatar />
                 </span>
-                <p className="max-w-[80%] rounded-2xl rounded-bl-md border border-border bg-card px-4 py-2.5 text-[15px] leading-relaxed">
-                  {line.text}
-                </p>
+                {line.card ? (
+                  <div className="min-w-0 max-w-[85%] rounded-2xl rounded-bl-md border border-border bg-card px-4 py-3.5">{line.card}</div>
+                ) : (
+                  <p className="max-w-[80%] rounded-2xl rounded-bl-md border border-border bg-card px-4 py-2.5 text-[15px] leading-relaxed">
+                    {line.text}
+                  </p>
+                )}
               </div>
             </motion.div>
           );

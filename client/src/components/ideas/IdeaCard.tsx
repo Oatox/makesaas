@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Loader2, Sparkles, Target, UserRound } from "lucide-react";
+import { ChevronDown, Loader2, Puzzle, Target, UserRound } from "lucide-react";
 import type { IdeaContent, SaasIdea } from "@shared/ideas";
 import { COACH_NAME, CoachAvatar } from "@/components/brand/Coach";
 import { stepAppear } from "@/components/onboarding/StepHeader";
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 const DETAILS: { key: keyof IdeaContent; label: string; icon: typeof Target }[] = [
   { key: "problem", label: "Le problème", icon: Target },
   { key: "audience", label: "Pour qui", icon: UserRound },
-  { key: "whyYou", label: "Pourquoi toi", icon: Sparkles },
+  { key: "whyYou", label: "Pourquoi toi", icon: Puzzle },
 ];
 
 /**

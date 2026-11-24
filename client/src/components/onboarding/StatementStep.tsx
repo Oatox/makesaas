@@ -10,8 +10,22 @@ const avatarPop = {
   visible: { opacity: 1, scale: 1, transition: { type: "spring", stiffness: 260, damping: 18 } },
 };
 
-/** One sentence from the coach, alone on screen under his face, typed out; the button wakes up once it is read. */
-export function StatementStep({ title, onContinue }: { title: string; onContinue: () => void }) {
+/**
+ * One sentence from the coach, alone on screen under his face, typed out; the button wakes up once it
+ * is read. A `subtitle` appears under it once typed (the first mission of /lancement uses both).
+ */
+export function StatementStep({
+  title,
+  subtitle,
+  label,
+  onContinue,
+}: {
+  title: string;
+  subtitle?: string;
+  /** The button, "Continuer" by default. */
+  label?: string;
+  onContinue: () => void;
+}) {
   const [typed, setTyped] = useState(false);
 
   return (
@@ -24,8 +38,18 @@ export function StatementStep({ title, onContinue }: { title: string; onContinue
         <h1 className={`${STEP_TITLE_CLASS} max-w-[600px] text-balance md:text-[48px]`}>
           <TypewriterText text={title} startDelayMs={400} onDone={() => setTyped(true)} />
         </h1>
+        {subtitle && (
+          <motion.p
+            variants={stepAppear}
+            initial="hidden"
+            animate={typed ? "visible" : "hidden"}
+            className="mt-4 max-w-[480px] text-balance text-base text-muted-foreground md:text-lg"
+          >
+            {subtitle}
+          </motion.p>
+        )}
       </div>
-      <ContinueButton onClick={onContinue} variants={stepAppear} disabled={!typed} />
+      <ContinueButton onClick={onContinue} variants={stepAppear} disabled={!typed} label={label} />
     </motion.div>
   );
 }

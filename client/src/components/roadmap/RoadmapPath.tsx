@@ -8,10 +8,10 @@ const ROW = 156;
 /** Diameter of a node, in px. */
 const NODE = 76;
 
-/** A node of the path: a milestone of the Roadmap page (pages/Roadmap.tsx). */
+/** A node of the path: an objective of the Roadmap page (pages/Roadmap.tsx). */
 export type PathNode = {
   key: string;
-  /** Small caps above the title ("Lancement", "Ton objectif"). */
+  /** Small caps above the title ("Objectif 2", "Objectif final"). */
   kicker: string;
   title: string;
   /** Under the title: when it was reached, its figure, or "À venir". */
@@ -55,7 +55,7 @@ function ProgressRing({ value, active }: { value: number; active: boolean }) {
 }
 
 /**
- * The roadmap drawn as a winding path, one big node per milestone: reached ones in orange, the one in
+ * The roadmap drawn as a winding path, one big node per objective: reached ones in orange, the one in
  * progress marked "Tu es ici" with a ring of its figure, the goal at the end. Clicking a node (or its
  * label) opens what the milestone means and where the member stands (pages/Roadmap.tsx).
  */
@@ -117,7 +117,7 @@ export function RoadmapPath({
               strokeLinecap="round"
               initial={reduceMotion ? false : { pathLength: 0, opacity: 0 }}
               animate={{ pathLength: 1, opacity: 1 }}
-              transition={{ duration: 0.45, delay: 0.15 + index * 0.25, ease: "easeInOut" }}
+              transition={{ duration: 0.45, delay: 0.15 + index * 0.12, ease: "easeInOut" }}
             />
           ))}
         </svg>

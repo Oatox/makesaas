@@ -86,6 +86,9 @@ export class IdeasService {
    * steer), the first ones of a new request. Throws an HttpError (French): see writeBatch.
    */
   async next(userId: string, options: NextIdeasOptions = {}): Promise<{ ideas: SaasIdea[]; fromStock: boolean }> {
+    // The ideas lead to the member's first SaaS only: once it exists, the project is chosen (the
+    // database refuses another SaaS from an idea, enforce_saas_from_idea).
+    if (await this.hasSaas(userId)) throw new HttpError(409, "Ton projet est déjà choisi : tu le retrouves sur Accueil.");
     if (!options.steer?.trim()) {
       const fromStock = await this.revealFromStock(userId);
       if (fromStock) return { ideas: fromStock, fromStock: true };
@@ -191,12 +194,12 @@ export class IdeasService {
    */
   async startWelcomeIdeas(userId: string): Promise<void> {
     try {
-      const [saas, batches] = await Promise.all([
-        this.db.from("saas").select("id", { count: "exact", head: true }).eq("user_id", userId),
+      const [hasSaas, batches] = await Promise.all([
+        this.hasSaas(userId),
         this.db.from("saas_idea_batches").select("id", { count: "exact", head: true }).eq("user_id", userId).neq("status", "failed"),
       ]);
-      if (saas.error || batches.error) throw saas.error ?? batches.error;
-      if ((saas.count ?? 0) > 0 || (batches.count ?? 0) > 0) return;
+      if (batches.error) throw batches.error;
+      if (hasSaas || (batches.count ?? 0) > 0) return;
 
       await this.writeBatch(userId);
       logger.info({ userId }, "Welcome SaaS ideas written");
@@ -205,6 +208,12 @@ export class IdeasService {
       if (err instanceof HttpError && err.status === 409) return;
       logger.error({ err, userId }, "Failed to write the welcome SaaS ideas");
     }
+  }
+
+  private async hasSaas(userId: string): Promise<boolean> {
+    const { count, error } = await this.db.from("saas").select("id", { count: "exact", head: true }).eq("user_id", userId);
+    if (error) throw error;
+    return (count ?? 0) > 0;
   }
 
   private async pipeline(): Promise<AiPipelineUpdate> {

@@ -39,6 +39,8 @@ export type MissionCheck =
   | { kind: "saas" }
   /** The member gave the address of their app, and it answered. */
   | { kind: "app_url" }
+  /** That address is on the member's own domain, not a free one like *.base44.app (isCustomDomain). */
+  | { kind: "custom_domain" }
   /** The SaaS has a logo (added from its settings). */
   | { kind: "logo" }
   /** A Stripe / Whop account is connected to the SaaS. */
@@ -74,13 +76,6 @@ export type StepAction =
  */
 export type MissionStep = { text: string; action?: StepAction };
 
-/**
- * The banners a task can wear on Accueil (client/src/components/roadmap/TaskBanner.tsx), one per kind of
- * work. Gus picks one of them for each task he writes, so that his tasks look like the others.
- */
-export const TASK_ILLUSTRATIONS = ["brand", "build", "launch", "account", "payment", "video", "community", "growth", "strategy"] as const;
-export type TaskIllustration = (typeof TASK_ILLUSTRATIONS)[number];
-
 export type RoadmapMission = {
   /** Stable: saved in roadmap_missions. "<stage>:<mission>". */
   key: string;
@@ -91,8 +86,6 @@ export type RoadmapMission = {
   minutes?: number;
   /** How long it takes otherwise ("7 jours"); neither: it happens on its own (a payment, an MRR). */
   span?: string;
-  /** Its banner on Accueil; by default the one of its kind of work, from its key (illustrationOf). */
-  illustration?: TaskIllustration;
   steps: MissionStep[];
   check: MissionCheck;
 };
@@ -214,6 +207,36 @@ export function canUntickMission(stages: RoadmapStage[], done: Record<string, Mi
 export const MISSION_KEY_MAX_LENGTH = 60;
 
 export const APP_URL_MAX_LENGTH = 300;
+
+/**
+ * The free addresses app builders and hosts give (Base44's first, where members build; the others for
+ * apps built before): an app there is not on its own domain yet.
+ */
+const FREE_APP_HOSTS = [
+  "base44.app",
+  "base44.com",
+  "netlify.app",
+  "vercel.app",
+  "pages.dev",
+  "github.io",
+  "onrender.com",
+  "web.app",
+  "firebaseapp.com",
+  "lovable.app",
+  "replit.app",
+];
+
+/** The app's address is on a domain of its own ("monapp.com"), not a free one ("monapp.base44.app"). */
+export function isCustomDomain(url: string | null): boolean {
+  if (!url) return false;
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return host.includes(".") && !FREE_APP_HOSTS.some((free) => host === free || host.endsWith(`.${free}`));
+}
 
 export const roadmapSaasQuerySchema = z.object({ saasId: z.string().uuid("SaaS invalide") });
 

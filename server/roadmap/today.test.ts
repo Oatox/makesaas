@@ -6,13 +6,11 @@ import {
   currentObjective,
   dayKey,
   doneTasks,
-  illustrationOf,
   launchTasks,
   milestoneCounter,
   milestoneTasks,
   objectivesOf,
   taskBlocker,
-  tasksTickedAfter,
   todayPlan,
 } from "@shared/today";
 
@@ -36,13 +34,30 @@ describe("the day's tasks", () => {
   test("the tasks done today stay in the day; once it is full, one more on demand", () => {
     const done = { ...doneAt(BEFORE, ["idea:chosen"]), ...doneAt(TODAY, ["brand:logo", "build:claude", "build:first_version"]) };
     expect(keysOf(todayPlan(STAGES, done, DAY))).toEqual(["brand:logo", "build:claude", "build:first_version"]);
-    expect(keysOf(todayPlan(STAGES, done, DAY, 1))).toEqual(["brand:logo", "build:claude", "build:first_version", "build:online"]);
+    expect(keysOf(todayPlan(STAGES, done, DAY, 1))).toEqual(["brand:logo", "build:claude", "build:first_version", "build:customize"]);
     // The next day starts on what is left.
-    expect(keysOf(todayPlan(STAGES, done, "2026-11-24"))[0]).toBe("build:online");
+    expect(keysOf(todayPlan(STAGES, done, "2026-11-24"))[0]).toBe("build:customize");
+  });
+
+  test("new tasks on demand: those done before leave the list, the next ones come", () => {
+    const done = { ...doneAt(BEFORE, ["idea:chosen"]), ...doneAt(TODAY, ["brand:logo", "build:claude", "build:first_version"]) };
+    const since = "2026-11-23T10:00:00";
+    const plan = todayPlan(STAGES, done, DAY, 0, since);
+    expect(keysOf(plan)).toEqual(["build:customize", "build:online", "build:domain"]);
+    expect(plan.more).toBe(true);
+    // Those done after it stay in the series.
+    const later = { ...done, ...doneAt("2026-11-23T10:30:00", ["build:customize"]) };
+    expect(keysOf(todayPlan(STAGES, later, DAY, 0, since))).toEqual(["build:customize", "build:online", "build:domain"]);
+  });
+
+  test("once launched, new tasks: the day's own ones done leave, the tier's next ones come", () => {
+    const launched = doneAt(BEFORE, ["idea:chosen", ...launchTasks(STAGES).map((task) => task.key)]);
+    const done = { ...launched, ...doneAt(TODAY, [`daily:video:${DAY}`, `daily:comments:${DAY}`, "mrr_100:format"]) };
+    expect(keysOf(todayPlan(STAGES, done, DAY, 0, "2026-11-23T10:00:00"))).toEqual(["mrr_100:paywall"]);
   });
 
   test("about an hour a day: a long task ends the day", () => {
-    const done = doneAt(BEFORE, ["idea:chosen", "brand:logo", "build:claude", "build:first_version", "build:online", "payment:whop"]);
+    const done = doneAt(BEFORE, ["idea:chosen", "brand:logo", "build:claude", "build:first_version", "build:customize", "build:online", "build:domain", "payment:whop"]);
     // In-app payment (15), payment test (10), connect (5): 30 minutes, 3 tasks.
     expect(keysOf(todayPlan(STAGES, done, DAY))).toEqual(["payment:in_app", "payment:test", "payment:connect"]);
   });
@@ -59,14 +74,11 @@ describe("the day's tasks", () => {
     ]);
   });
 
-  test("a launch task waits for the one before it; unticking one unticks those ticked after", () => {
+  test("a launch task waits for the one before it", () => {
     const done = doneAt(BEFORE, ["idea:chosen"]);
     expect(taskBlocker(STAGES, done, "build:claude")?.key).toBe("brand:logo");
     expect(taskBlocker(STAGES, done, "brand:logo")).toBeNull();
     expect(taskBlocker(STAGES, done, `daily:video:${DAY}`)).toBeNull();
-    const ticked = { ...done, ...doneAt(BEFORE, ["brand:logo"], "observed"), ...doneAt(BEFORE, ["build:claude", "build:first_version"]) };
-    expect(tasksTickedAfter(STAGES, ticked, "build:claude")).toEqual(["build:first_version"]);
-    expect(tasksTickedAfter(STAGES, ticked, "build:first_version")).toEqual([]);
   });
 
   test("a day is the member's own: late at night in Paris is already the next day", () => {
@@ -102,7 +114,7 @@ describe("the milestones", () => {
 
   test("the tasks that lead to each: its stage's, without the other milestones and the outcomes", () => {
     const keys = (key: string) => milestoneTasks(STAGES, milestones, key).map((task) => task.key);
-    expect(keys("build:online")).toEqual(["build:claude", "build:first_version", "build:online"]);
+    expect(keys("build:online")).toEqual(["build:claude", "build:first_version", "build:customize", "build:online", "build:domain"]);
     expect(keys("payment:connect")).toEqual(["payment:whop", "payment:in_app", "payment:test", "payment:connect"]);
     expect(keys("video:posted")).toEqual(["video:account", "video:prepare", "video:posted"]);
     expect(keys("mrr_100:reached")).toEqual(["mrr_100:format", "mrr_100:paywall"]);
@@ -125,20 +137,25 @@ describe("the objectives", () => {
   const milestones = milestonesFor(5_000);
   const objectives = objectivesOf(milestones);
 
-  test("launching the SaaS, then one per MRR tier up to the goal, with the milestones that lead to it", () => {
-    expect(objectives.map((objective) => objective.key)).toEqual(["launch", "mrr_100", "mrr_1000", "mrr_2500", "mrr_5000"]);
-    expect(objectives[0].title).toBe("Lancer ton SaaS");
-    expect(objectives[0].milestones.map((milestone) => milestone.key)).toEqual([
-      "idea:chosen",
-      "brand:logo",
-      "build:online",
-      "payment:connect",
-      "video:track",
-      "video:posted",
+  test("launching the SaaS, the first video, the first customer, then one per MRR tier up to the goal", () => {
+    expect(objectives.map((objective) => objective.key)).toEqual([
+      "launch",
+      "first_video",
+      "first_customer",
+      "mrr_100",
+      "mrr_1000",
+      "mrr_2500",
+      "mrr_5000",
     ]);
-    expect(objectives[1].milestones.map((milestone) => milestone.key)).toEqual(["customer:7_videos", "customer:first_payment", "mrr_100:reached"]);
+    expect(objectives.slice(0, 3).map((objective) => objective.title)).toEqual(["Lancer ton SaaS", "Première vidéo", "Premier client"]);
+    const keysOf = (index: number) => objectives[index].milestones.map((milestone) => milestone.key);
+    expect(keysOf(0)).toEqual(["idea:chosen", "brand:logo", "build:online", "payment:connect"]);
+    expect(keysOf(1)).toEqual(["video:track", "video:posted"]);
+    expect(keysOf(2)).toEqual(["customer:7_videos", "customer:first_payment"]);
+    expect(keysOf(3)).toEqual(["mrr_100:reached"]);
     // Intl puts a narrow no-break space before the euro sign.
-    expect(objectives[1].title).toMatch(/^Atteindre 100\s€ par mois$/);
+    expect(objectives[3].title).toMatch(/^100\s€ par mois$/);
+    expect(objectives.at(-1)?.milestones.at(-1)?.isGoal).toBe(true);
     // Every milestone is in one objective, once.
     expect(objectives.flatMap((objective) => objective.milestones)).toEqual(milestones);
   });
@@ -146,24 +163,8 @@ describe("the objectives", () => {
   test("the one in progress: the first with a milestone not reached", () => {
     expect(currentObjective(objectives, doneAt(BEFORE, ["idea:chosen", "brand:logo"]))?.key).toBe("launch");
     const launched = doneAt(BEFORE, objectives[0].milestones.map((milestone) => milestone.key), "observed");
-    expect(currentObjective(objectives, launched)?.key).toBe("mrr_100");
+    expect(currentObjective(objectives, launched)?.key).toBe("first_video");
     const all = doneAt(BEFORE, milestones.map((milestone) => milestone.key), "observed");
     expect(currentObjective(objectives, all)).toBeNull();
-  });
-});
-
-describe("the banners", () => {
-  test("each task wears the one of its kind of work; one it carries (Gus's) wins", () => {
-    const byKey = Object.fromEntries(launchTasks(STAGES).map((task) => [task.key, illustrationOf(task)]));
-    expect(byKey["brand:logo"]).toBe("brand");
-    expect(byKey["build:first_version"]).toBe("build");
-    expect(byKey["build:online"]).toBe("launch");
-    expect(byKey["payment:test"]).toBe("payment");
-    expect(byKey["video:posted"]).toBe("video");
-    const growth = todayPlan(STAGES, doneAt(BEFORE, ["idea:chosen", ...launchTasks(STAGES).map((task) => task.key)]), DAY).tasks;
-    expect(growth.map(illustrationOf)).toEqual(["video", "community", "video"]);
-    const fromGus = { ...growth[0], key: "gus:2026-11-23:1", illustration: "growth" as const };
-    expect(illustrationOf(fromGus)).toBe("growth");
-    expect(illustrationOf({ ...growth[0], key: "gus:2026-11-23:2", illustration: undefined })).toBe("strategy");
   });
 });

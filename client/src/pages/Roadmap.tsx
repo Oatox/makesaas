@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Flag, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Clapperboard, Flag, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
 import { milestonesFor, roadmapStagesFor } from "@shared/roadmap-missions";
-import { currentObjective, objectiveProgress, objectivesOf, type Objective } from "@shared/today";
+import { currentObjective, milestoneTasks, objectiveProgress, objectivesOf, type Objective } from "@shared/today";
 import { ObjectiveDetail } from "@/components/roadmap/ObjectiveDetail";
 import { RoadmapBackdrop } from "@/components/roadmap/RoadmapBackdrop";
 import { MILESTONE_PANEL_ID, RoadmapPath, type PathNode } from "@/components/roadmap/RoadmapPath";
@@ -17,22 +17,24 @@ import { useSaas } from "@/hooks/use-saas";
 import { blurIn } from "@/lib/motion";
 
 const fadeIn = blurIn({ blur: 8, duration: 0.6 });
-/** On phones, the milestone's drawer rises from the bottom, up to near the top, over the dimmed page. */
+/** On phones, the objective's drawer rises from the bottom, up to near the top, over the dimmed page. */
 const MOBILE_DRAWER = "max-h-[88dvh] overflow-y-auto rounded-t-[22px] border-x-0 border-[hsl(var(--line))] bg-card px-5 pt-7";
 const MOBILE_OVERLAY =
   "bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
 const dayFormatter = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
 
-/** The launch has its rocket, the MRR tiers share a curve, the goal has its flag. */
-const iconOf = (objective: Objective, isGoal: boolean): LucideIcon => (isGoal ? Flag : objective.key === "launch" ? Rocket : TrendingUp);
+/** The launch has its rocket, the first video and customer theirs, the amounts share a curve, the last one its flag. */
+const ICONS: Record<string, LucideIcon> = { launch: Rocket, first_video: Clapperboard, first_customer: BadgeCheck };
+const iconOf = (objective: Objective, isLast: boolean): LucideIcon => (isLast ? Flag : (ICONS[objective.key] ?? TrendingUp));
 
 /**
- * /roadmap: the active SaaS's milestones, from launching it to the member's goal, drawn as a winding
- * path: one per objective of Accueil (objectivesOf: launching the SaaS, then each MRR tier), made of
- * steps (the milestones of shared/roadmap-missions.ts). Nothing to do or tick here: each step is checked
- * from the SaaS's data (server/roadmap/); a milestone says when it was reached, or, in progress, how far
- * it is ("2 / 6 étapes", "64 € / 100 € par mois"). Clicking one opens its drawer (ObjectiveDetail): its
- * steps and where each stands. What to do is on Accueil, the day's tasks.
+ * /roadmap: the active SaaS's objectives (objectivesOf: "Lancer ton SaaS", "Première vidéo", "Premier
+ * client", then each amount per month up to the member's goal, the last one), drawn as a winding path,
+ * the same objective as the top of Accueil. Nothing to do or tick here: each objective is made of steps
+ * (the milestones of shared/roadmap-missions.ts) checked from the SaaS's data (server/roadmap/); an
+ * objective says when it was reached or, in progress, how far it is ("2 / 4 étapes", or the figure of its
+ * single step: "64 € / 100 € par mois"). Clicking one opens its drawer (ObjectiveDetail): its steps and
+ * where each stands. What to do is on Accueil, the day's tasks.
  */
 export default function Roadmap() {
   const { currentSaas, isLoading: saasLoading } = useSaas();
@@ -42,14 +44,14 @@ export default function Roadmap() {
   const stages = useMemo(() => (state ? roadmapStagesFor(state.goal) : []), [state?.goal]);
   const objectives = useMemo(() => objectivesOf(milestones), [milestones]);
   const isMobile = useIsMobile();
-  // The milestone (objective) whose drawer is open; null: closed.
+  // The objective whose drawer is open; null: closed.
   const [open, setOpen] = useState<number | null>(null);
 
   // Another SaaS: its own roadmap, drawer closed.
   useEffect(() => setOpen(null), [currentSaas?.id]);
 
   if (!saasLoading && !currentSaas) {
-    return <NoSaasState description="Ta roadmap suit ton SaaS, de ton idée jusqu'à ton objectif." />;
+    return <NoSaasState description="Ta roadmap suit ton SaaS, de ton idée jusqu'à ton objectif final." />;
   }
 
   const inProgress = state ? currentObjective(objectives, state.done) : null;
@@ -59,24 +61,28 @@ export default function Roadmap() {
   const nodes: PathNode[] = state
     ? objectives.map((objective, index) => {
         const progress = objectiveProgress(objective, state.done, state.progress);
-        const isGoal = index === objectives.length - 1;
+        const isLast = index === objectives.length - 1;
+        const single = objective.milestones.length === 1 ? objective.milestones[0] : null;
+        // A single step without its figure: how far its tasks are.
+        const tasks = single && index === current && !progress.counter ? milestoneTasks(stages, milestones, single.key) : [];
+        const tasksDone = tasks.filter((task) => state.done[task.key]).length;
         return {
           key: objective.key,
-          kicker: isGoal ? "Ton objectif" : `Palier ${index + 1}`,
+          kicker: isLast ? "Objectif final" : `Objectif ${index + 1}`,
           title: objective.title,
           status: progress.complete
             ? progress.reachedAt?.source === "before"
               ? "Avant MakeSaaS"
               : `Atteint le ${dayFormatter.format(new Date(progress.reachedAt?.at ?? Date.now()))}`
             : index === current
-              ? progress.total === 1 && progress.counter
-                ? progress.counter.label
+              ? single
+                ? (progress.counter?.label ?? (tasks.length ? `${tasksDone} / ${tasks.length} tâches` : "En cours"))
                 : `${progress.reached} / ${progress.total} étapes`
               : "À venir",
           done: progress.complete,
-          progress: progress.share,
-          icon: iconOf(objective, isGoal),
-          ...(isGoal ? { isGoal: true } : {}),
+          progress: tasks.length ? tasksDone / tasks.length : progress.share,
+          icon: iconOf(objective, isLast),
+          ...(isLast ? { isGoal: true } : {}),
         };
       })
     : [];
@@ -87,13 +93,13 @@ export default function Roadmap() {
         <div>
           <h2 className="font-display text-2xl font-light sm:text-[32px]">Ta roadmap</h2>
           <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-            Tes paliers, du lancement à ton objectif. Ils se valident tout seuls, à partir de tes données.
+            Tes objectifs, du lancement à ton objectif final. Ils se valident tout seuls, à partir de tes données.
           </p>
         </div>
         {state && (
           <div className="w-full sm:w-auto">
             <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{reached}</span> palier{reached > 1 ? "s" : ""} sur {objectives.length}
+              <span className="font-semibold text-foreground">{reached}</span> objectif{reached > 1 ? "s" : ""} atteint{reached > 1 ? "s" : ""} sur {objectives.length}
             </p>
             <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-secondary sm:w-40">
               <span
@@ -135,7 +141,7 @@ export default function Roadmap() {
           {open !== null && objectives[open] && state && currentSaas && (
             <>
               <SheetTitle className="sr-only">{objectives[open].title}</SheetTitle>
-              <SheetDescription className="sr-only">Ce palier, ses étapes et où tu en es.</SheetDescription>
+              <SheetDescription className="sr-only">Cet objectif, ses étapes et où tu en es.</SheetDescription>
               <ObjectiveDetail
                 key={objectives[open].key}
                 objective={objectives[open]}

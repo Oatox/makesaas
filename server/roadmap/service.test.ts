@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { canUntickMission, currentStageIndex, stageProgress, ticksAfter } from "@shared/roadmap";
+import { canUntickMission, currentStageIndex, isCustomDomain, stageProgress, ticksAfter } from "@shared/roadmap";
 import { missionTime, roadmapStagesFor, stageTimeLeft } from "@shared/roadmap-missions";
 import {
   buildAppPrompt,
@@ -28,6 +28,7 @@ const series = (days: Record<number, number>, carry = false) => {
 const facts = (overrides: Partial<MissionFacts> = {}): MissionFacts => ({
   saasCreatedAt: CREATED,
   hasAppUrl: false,
+  hasCustomDomain: false,
   hasLogo: false,
   hasPaymentAccount: false,
   tiktokAccounts: 0,
@@ -73,8 +74,8 @@ describe("roadmapStagesFor", () => {
     const stage = (key: string) => STAGES.find((item) => item.key === key)!;
     expect(missionTime(stage("brand").missions[0])).toBe("5 min");
     expect(stageTimeLeft(stage("brand"), {})).toBe("≈ 5 min");
-    expect(stageTimeLeft(stage("build"), {})).toBe("≈ 37 min");
-    expect(stageTimeLeft(stage("build"), { "build:claude": { at: NOW, source: "declared" } })).toBe("≈ 35 min");
+    expect(stageTimeLeft(stage("build"), {})).toBe("≈ 1 h 12");
+    expect(stageTimeLeft(stage("build"), { "build:claude": { at: NOW, source: "declared" } })).toBe("≈ 1 h 10");
     // A mission over days: no total.
     expect(stageTimeLeft(stage("customer"), {})).toBeNull();
     expect(missionTime(stage("customer").missions[0])).toBe("7 jours");
@@ -88,15 +89,37 @@ describe("roadmapStagesFor", () => {
   });
 });
 
+describe("isCustomDomain", () => {
+  test("a domain of its own, not the free address of Base44 or another host", () => {
+    expect(isCustomDomain("https://fitlo.com")).toBe(true);
+    expect(isCustomDomain("https://app.fitlo.fr/start")).toBe(true);
+    expect(isCustomDomain("https://fitlo-948908fb.base44.app")).toBe(false);
+    expect(isCustomDomain("https://FITLO.BASE44.APP")).toBe(false);
+    expect(isCustomDomain("https://fitlo.netlify.app")).toBe(false);
+    // A domain that only ends like a free host is still its own.
+    expect(isCustomDomain("https://mybase44.app")).toBe(true);
+    expect(isCustomDomain(null)).toBe(false);
+    expect(isCustomDomain("pas une adresse")).toBe(false);
+  });
+});
+
 describe("observedMissions", () => {
   test("a new SaaS: only its idea", () => {
     expect(observedMissions(facts(), STAGES)).toEqual({ "idea:chosen": { at: CREATED, source: "declared" } });
+  });
+
+  test("the app on its own domain: online, and its domain bought", () => {
+    const done = observedMissions(facts({ hasAppUrl: true, hasCustomDomain: true }), STAGES);
+    expect(done["build:online"]).toEqual({ at: NOW, source: "declared" });
+    expect(done["build:domain"]).toEqual({ at: NOW, source: "declared" });
   });
 
   test("the address, the accounts and the videos, dated by the Nth video", () => {
     const videoDates = Array.from({ length: 7 }, (_, i) => `2026-11-${String(19 + i).padStart(2, "0")}T18:00:00.000Z`);
     const done = observedMissions(facts({ hasAppUrl: true, hasPaymentAccount: true, tiktokAccounts: 1, videoDates }), STAGES);
     expect(done["build:online"]).toEqual({ at: NOW, source: "declared" });
+    // Still on its free Base44 address: no domain of its own yet.
+    expect(done["build:domain"]).toBeUndefined();
     expect(done["payment:connect"]).toEqual({ at: NOW, source: "observed" });
     expect(done["video:track"]?.source).toBe("observed");
     expect(done["video:posted"]).toEqual({ at: videoDates[0], source: "before" });
@@ -145,7 +168,7 @@ describe("stage progress", () => {
     const done = { "idea:chosen": { at: CREATED, source: "declared" as const }, "build:claude": { at: NOW, source: "declared" as const } };
     expect(stageProgress(STAGES[0], done)).toEqual({ done: 1, total: 1, complete: true });
     expect(stageProgress(STAGES[1], done)).toEqual({ done: 0, total: 1, complete: false });
-    expect(stageProgress(STAGES[2], done)).toEqual({ done: 1, total: 3, complete: false });
+    expect(stageProgress(STAGES[2], done)).toEqual({ done: 1, total: 5, complete: false });
     expect(currentStageIndex(STAGES, done)).toBe(1);
   });
 });

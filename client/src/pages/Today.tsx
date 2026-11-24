@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { PartyPopper, Plus } from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import type { Milestone, RoadmapState } from "@shared/roadmap";
 import { milestonesFor, roadmapStagesFor } from "@shared/roadmap-missions";
 import {
@@ -11,11 +11,11 @@ import {
   milestoneCounter,
   objectivesOf,
   taskBlocker,
-  tasksTickedAfter,
   todayPlan,
 } from "@shared/today";
 import { CoachAvatar } from "@/components/brand/Coach";
-import { DoneTaskList, QuestTile, TaskDetail } from "@/components/roadmap/TaskCard";
+import { DayTaskList } from "@/components/roadmap/DayTaskList";
+import { DoneTaskList, TaskDetail } from "@/components/roadmap/TaskCard";
 import { NoSaasState } from "@/components/saas/NoSaasState";
 import { ErrorState } from "@/components/StateCard";
 import { Button } from "@/components/ui/button";
@@ -29,37 +29,61 @@ import { blurIn } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 const fadeIn = blurIn({ blur: 8, duration: 0.6 });
+
+/** When the member asked new tasks on Accueil ("Demander de nouvelles tâches"), for each SaaS and day. */
+const seriesKey = (saasId: string) => `makesaas:today-series:${saasId}`;
+
+function loadSeries(saasId: string | undefined, day: string): string | null {
+  if (!saasId) return null;
+  try {
+    const saved = JSON.parse(localStorage.getItem(seriesKey(saasId)) ?? "null") as { day?: unknown; since?: unknown } | null;
+    return saved?.day === day && typeof saved.since === "string" ? saved.since : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSeries(saasId: string, day: string, since: string) {
+  try {
+    localStorage.setItem(seriesKey(saasId), JSON.stringify({ day, since }));
+  } catch {
+    // Storage unavailable (private mode): the series lasts until the page reloads.
+  }
+}
 /** On phones, the task's drawer rises from the bottom, up to near the top, over the dimmed page. */
 const MOBILE_DRAWER = "max-h-[88dvh] overflow-y-auto rounded-t-[22px] border-x-0 border-[hsl(var(--line))] bg-card px-5 pt-7";
 const MOBILE_OVERLAY =
   "bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
 
 /**
- * The objective the member works towards (objectivesOf: launching the SaaS, then each MRR tier), as
- * the page's subtitle: "Objectif : lancer ton SaaS" and how many of its milestones are reached, its
- * milestones as segments (reached ones full, the one in progress filled by its figure, each named on
- * hover), and the next step: the milestone in progress. The same objectives group the Roadmap's.
+ * The objective in progress, at the top of the page (objectivesOf: the same as the Roadmap's nodes):
+ * its place ("Objectif 1 sur 7", or "Objectif final"), its title and how many of its steps are passed,
+ * its steps as segments (passed ones full, the one in progress filled by its figure, each named on
+ * hover), and the step in progress with its figure. An objective of a single step (an amount per month)
+ * shows its figure instead.
  */
 function ObjectiveBar({ milestones, state }: { milestones: Milestone[]; state: RoadmapState }) {
   const objectives = objectivesOf(milestones);
   const objective = currentObjective(objectives, state.done);
   const shown = objective ?? objectives.at(-1);
   if (!shown) return null;
+  const index = objectives.indexOf(shown);
+  const isLast = index === objectives.length - 1;
   const current = objective ? currentMilestone(objective.milestones, state.done) : null;
   const counter = current ? milestoneCounter(current, state.progress) : null;
   const partial = counter ? Math.min(1, counter.value / counter.target) : 0;
   const reached = shown.milestones.filter((milestone) => state.done[milestone.key]).length;
-  // "Lancer ton SaaS" → "Objectif : lancer ton SaaS".
-  const lower = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+  const single = shown.milestones.length === 1;
 
   return (
     <section aria-label="Ton objectif" className="w-full min-w-0">
-      <div className="flex items-baseline justify-between gap-4">
-        <p className="min-w-0 truncate font-display text-xl font-light leading-tight">
-          {objective ? "Objectif" : "Objectif atteint"} : {lower(shown.title)}
-        </p>
+      <p className="text-sm text-muted-foreground">
+        {!objective ? "Objectif final atteint" : isLast ? "Objectif final" : `Objectif ${index + 1} sur ${objectives.length}`}
+      </p>
+      <div className="mt-1.5 flex items-baseline justify-between gap-4">
+        <p className="min-w-0 truncate font-display text-xl font-light leading-tight sm:text-2xl">{shown.title}</p>
         <p className="shrink-0 text-sm tabular-nums text-muted-foreground">
-          {reached} / {shown.milestones.length}
+          {single ? (counter?.label ?? "") : `${reached} / ${shown.milestones.length} étapes`}
         </p>
       </div>
 
@@ -81,9 +105,9 @@ function ObjectiveBar({ milestones, state }: { milestones: Milestone[]; state: R
         })}
       </div>
 
-      {current && (
+      {current && !single && (
         <p className="mt-3 truncate text-sm text-muted-foreground">
-          Prochaine étape : <span className="text-foreground">{lower(current.title)}</span>
+          Étape en cours : <span className="text-foreground">{current.title}</span>
           {counter && ` · ${counter.label}`}
         </p>
       )}
@@ -93,9 +117,10 @@ function ObjectiveBar({ milestones, state }: { milestones: Milestone[]; state: R
 
 /**
  * Accueil (/accueil): the day's tasks (shared/today.ts: todayPlan), the one thing a member does here.
- * Under the greeting, the objective in progress and its milestones (ObjectiveBar); then the day's
- * tasks as cards (QuestTile), the one to do now with "Commencer". A task opens in a drawer
- * (TaskDetail): its steps and "C'est fait", then the next one. Once all are done, one more on demand.
+ * At the top, the objective in progress and its steps (ObjectiveBar); then the day's
+ * tasks as one list (DayTaskList), the one to do now outlined in orange, and the time they still take.
+ * A task opens in a drawer (TaskDetail): its instructions one at a time, then "Tâche suivante". Once all
+ * are done, new ones on demand ("Demander de nouvelles tâches": those done go under the list).
  * Under them, the tasks done before (DoneTaskList), each opening again in the same drawer.
  */
 export default function Today() {
@@ -106,19 +131,29 @@ export default function Today() {
   const stages = useMemo(() => (state ? roadmapStagesFor(state.goal) : []), [state?.goal]);
   const milestones = useMemo(() => (state ? milestonesFor(state.goal) : []), [state?.goal]);
   const day = dayKey(new Date());
-  // Tasks asked on top of the day's ("Une tâche de plus"), until the page reloads.
+  // Tasks added to the day's (the one to finish first, from "Y aller"), until the page reloads.
   const [extra, setExtra] = useState(0);
+  // When the member last asked new tasks today ("Demander de nouvelles tâches"): kept on this device.
+  const [since, setSince] = useState<string | null>(() => loadSeries(currentSaas?.id, day));
   // The task open in the drawer; null: closed.
   const [openKey, setOpenKey] = useState<string | null>(null);
+  // The drawer opened in full screen (its corner button), until it closes.
+  const [expanded, setExpanded] = useState(false);
+  const closeTask = () => {
+    setOpenKey(null);
+    setExpanded(false);
+  };
   const isMobile = useIsMobile();
 
   // Another SaaS: its own day.
   useEffect(() => {
     setExtra(0);
+    setSince(loadSeries(currentSaas?.id, day));
     setOpenKey(null);
-  }, [currentSaas?.id]);
+    setExpanded(false);
+  }, [currentSaas?.id, day]);
 
-  const plan = state ? todayPlan(stages, state.done, day, extra) : null;
+  const plan = state ? todayPlan(stages, state.done, day, extra, since) : null;
   const tasks = plan?.tasks ?? [];
   const doneCount = state ? tasks.filter((task) => state.done[task.key]).length : 0;
   // The task to do now: the first one left that nothing holds back.
@@ -127,10 +162,30 @@ export default function Today() {
   const history = state ? doneTasks(stages, state.done).filter(({ task }) => !tasks.some((item) => item.key === task.key)) : [];
   const openIndex = openKey ? tasks.findIndex((task) => task.key === openKey) : -1;
   const openTask = openIndex >= 0 ? tasks[openIndex] : (history.find(({ task }) => task.key === openKey)?.task ?? null);
+  // The day's task to open after the open one: the first left that nothing holds back once it is done.
+  const afterOpen =
+    state && openIndex >= 0
+      ? (tasks.find((task) => {
+          if (task.key === openKey || state.done[task.key]) return false;
+          const blocker = taskBlocker(stages, state.done, task.key);
+          return !blocker || blocker.key === openKey;
+        }) ?? null)
+      : null;
   const goTo = (key: string) => {
     // The task to finish first is in the day's list, or added to it.
     if (!tasks.some((item) => item.key === key)) setExtra((count) => count + 1);
     setOpenKey(key);
+  };
+  // "Demander de nouvelles tâches": the tasks done so far go to "Tâches accomplies", the next ones
+  // come (todayPlan's `since`). Just after the latest done, whatever the clocks of the device and the
+  // server say, so all of them leave the list.
+  const startSeries = () => {
+    if (!state || !currentSaas) return;
+    const latest = Math.max(Date.now(), ...tasks.map((task) => Date.parse(state.done[task.key]?.at ?? "") || 0));
+    const at = new Date(latest + 1).toISOString();
+    saveSeries(currentSaas.id, day, at);
+    setSince(at);
+    setExtra(0);
   };
 
   // A task done while the page is open (ticked, or seen in the data): celebrated (its drawer offers the next one).
@@ -166,7 +221,7 @@ export default function Today() {
 
   return (
     <motion.div initial="hidden" animate="visible" variants={fadeIn} className="space-y-10 sm:space-y-14">
-      {/* The objective in progress, at the top of the page. */}
+      {/* The objective in progress and its steps, at the top of the page. */}
       {state && !roadmap.isError && <ObjectiveBar milestones={milestones} state={state} />}
 
       {roadmap.isError ? (
@@ -178,11 +233,7 @@ export default function Today() {
       ) : !state || !currentSaas || !plan ? (
         <div className="space-y-5">
           <Skeleton className="h-7 w-56 rounded-lg" />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 3 }, (_, index) => (
-              <Skeleton key={index} className="h-44 rounded-[18px]" />
-            ))}
-          </div>
+          <Skeleton className="h-72 rounded-2xl" />
         </div>
       ) : (
         <>
@@ -190,58 +241,48 @@ export default function Today() {
           <section className="space-y-6">
             <div className="flex items-center gap-3">
               <CoachAvatar className="h-10 w-10" online />
-              <h2 className="font-display text-xl font-light leading-none sm:text-2xl">Tes tâches du jour</h2>
+              <h2 className="min-w-0 flex-1 font-display text-xl font-light leading-none sm:text-2xl">Tes tâches du jour</h2>
             </div>
-            <ol className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
-              {tasks.map((task) => (
-                <QuestTile
-                  key={task.key}
-                  task={task}
-                  isNext={task === nextTask}
-                  blocker={taskBlocker(stages, state.done, task.key)}
-                  state={state}
-                  onOpen={() => setOpenKey(task.key)}
-                />
-              ))}
-              {allDone && plan.more && (
-                <li className="h-full">
-                  <button
-                    type="button"
-                    onClick={() => setExtra((count) => count + 1)}
-                    className="flex h-full min-h-40 w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border p-5 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-                  >
-                    <Plus className="h-5 w-5" />
-                    Une tâche de plus
-                  </button>
-                </li>
-              )}
-            </ol>
+            <DayTaskList
+              tasks={tasks}
+              stages={stages}
+              state={state}
+              nextTask={nextTask}
+              onOpen={setOpenKey}
+              onMore={allDone && plan.more ? startSeries : undefined}
+            />
           </section>
-
-          {allDone && (
-            <motion.p
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
-            >
-              <PartyPopper className="h-4 w-4 text-primary" />
-              {plan.phase === "launch" ? "Ton SaaS avance. Reviens demain pour la suite." : "Ton compte grandit vidéo après vidéo. Reviens demain."}
-            </motion.p>
-          )}
 
           {/* The tasks done before, to open again. */}
           {history.length > 0 && <DoneTaskList key={currentSaas.id} items={history} onOpen={setOpenKey} />}
         </>
       )}
 
-      <Sheet open={!!openTask} onOpenChange={(value) => !value && setOpenKey(null)}>
+      <Sheet open={!!openTask} onOpenChange={(value) => !value && closeTask()}>
         <SheetContent
           side={isMobile ? "bottom" : "right"}
           overlayClassName={isMobile ? MOBILE_OVERLAY : undefined}
-          className={isMobile ? MOBILE_DRAWER : "overflow-y-auto p-5 sm:max-w-xl sm:p-7"}
+          className={
+            isMobile
+              ? cn(MOBILE_DRAWER, expanded && "h-[100dvh] max-h-[100dvh] rounded-t-none")
+              : cn(
+                  "overflow-y-auto p-5 transition-[max-width] duration-300 ease-out sm:p-7",
+                  expanded ? "sm:max-w-[calc(100vw-1rem)] sm:p-10" : "sm:max-w-xl",
+                )
+          }
         >
           {openTask && state && currentSaas && (
-            <>
+            <div className={cn(expanded && "mx-auto max-w-2xl")}>
+              {/* Full screen, or back to the drawer: next to the close button. */}
+              <button
+                type="button"
+                onClick={() => setExpanded((value) => !value)}
+                aria-label={expanded ? "Réduire la tâche" : "Ouvrir la tâche en grand"}
+                title={expanded ? "Réduire" : "Ouvrir en grand"}
+                className="absolute right-[3.75rem] top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-secondary/60 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:top-4 sm:h-9 sm:w-9"
+              >
+                {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </button>
               <SheetTitle className="sr-only">{openTask.title}</SheetTitle>
               <SheetDescription className="sr-only">Comment faire cette tâche, étape par étape.</SheetDescription>
               <TaskDetail
@@ -249,14 +290,13 @@ export default function Today() {
                 task={openTask}
                 place={openIndex >= 0 ? { number: openIndex + 1, total: tasks.length } : null}
                 blocker={taskBlocker(stages, state.done, openTask.key)}
-                later={tasksTickedAfter(stages, state.done, openTask.key)}
-                next={openIndex >= 0 && nextTask && nextTask !== openTask ? nextTask : null}
+                next={afterOpen}
                 onGoTo={goTo}
-                onClose={() => setOpenKey(null)}
+                onClose={closeTask}
                 saas={currentSaas}
                 state={state}
               />
-            </>
+            </div>
           )}
         </SheetContent>
       </Sheet>

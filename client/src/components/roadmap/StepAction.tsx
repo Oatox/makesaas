@@ -5,14 +5,15 @@ import { ArrowRight, Check, ChevronDown, Copy, ExternalLink, ImagePlus, Loader2,
 import { APP_URL_MAX_LENGTH, type RoadmapState, type StepAction as Action } from "@shared/roadmap";
 import { chatGptUrl, missionPromptText, PROMPT_TARGET } from "@shared/roadmap-prompts";
 import type { Saas } from "@shared/saas";
+import { IMAGE_TYPES, IMAGE_TYPES_LABEL } from "@shared/storage";
 import { SaasAvatar } from "@/components/saas/SaasAvatar";
 import { SaasDialog, type SaasDialogState } from "@/components/saas/SaasDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAskGus } from "@/hooks/use-ask-gus";
-import { addressAnswers, roadmapKeys, useSetAppUrl } from "@/hooks/use-roadmap";
+import { roadmapKeys, useSaveAppUrl } from "@/hooks/use-roadmap";
+import { useSaasLogo } from "@/hooks/use-saas";
 import { useToast } from "@/hooks/use-toast";
-import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 const copyText = async (text: string) => {
@@ -29,7 +30,18 @@ const copyText = async (text: string) => {
  * button. `openInChatGpt`: "Ouvrir ChatGPT" opens it with the message already written, and copying
  * it stays possible (ChatGPT signed out, another app).
  */
-function PromptCopy({ text, into, openInChatGpt = false }: { text: string; into: string; openInChatGpt?: boolean }) {
+function PromptCopy({
+  text,
+  into,
+  openInChatGpt = false,
+  quiet = false,
+}: {
+  text: string;
+  into: string;
+  openInChatGpt?: boolean;
+  /** Secondary buttons (a task already done: its next task's button comes first). */
+  quiet?: boolean;
+}) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -90,17 +102,17 @@ function PromptCopy({ text, into, openInChatGpt = false }: { text: string; into:
       </div>
       <div className="flex flex-col gap-1 border-t border-border/60 p-2.5 sm:flex-row sm:items-center">
         {openInChatGpt && (
-          <Button asChild className="w-full sm:w-auto">
+          <Button asChild variant={quiet ? "secondary" : "default"} className="w-full sm:w-auto">
             <a href={chatGptUrl(text)} target="_blank" rel="noreferrer">
               Ouvrir ChatGPT <ExternalLink />
             </a>
           </Button>
         )}
         <Button
-          variant={openInChatGpt ? "ghost" : "default"}
+          variant={openInChatGpt ? "ghost" : quiet ? "secondary" : "default"}
           size={openInChatGpt ? "sm" : "default"}
           onClick={() => void copy()}
-          className={openInChatGpt ? "text-muted-foreground" : "w-full sm:w-auto"}
+          className={openInChatGpt ? "text-muted-foreground" : "w-full"}
         >
           {copied ? <Check /> : <Copy />}
           {copied ? "Copié" : "Copier le message"}
@@ -110,32 +122,19 @@ function PromptCopy({ text, into, openInChatGpt = false }: { text: string; into:
   );
 }
 
-/** The address of the member's app: checked from the browser, then saved (its mission gets done). */
+/**
+ * The address of the member's app: checked from the browser, then saved (its mission gets done: the
+ * drawer celebrates it). Also changed from the SaaS's settings (SaasGeneralSettings).
+ */
 function AppUrlForm({ saasId, appUrl }: { saasId: string; appUrl: string | null }) {
-  const { toast } = useToast();
-  const setAppUrl = useSetAppUrl();
+  const { save, busy } = useSaveAppUrl();
   const [url, setUrl] = useState(appUrl ?? "");
-  const [checking, setChecking] = useState(false);
-  const busy = checking || setAppUrl.isPending;
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const value = url.trim();
-    if (!value || busy) return;
-    const address = /^https?:\/\//i.test(value) ? value : `https://${value}`;
-    setChecking(true);
-    const answers = await addressAnswers(address);
-    setChecking(false);
-    if (!answers) {
-      toast({ variant: "destructive", title: "Ton app ne répond pas", description: "Vérifie l'adresse, et que ton app est bien publiée." });
-      return;
-    }
-    try {
-      // Its mission gets done: the drawer celebrates it.
-      await setAppUrl.mutateAsync({ saasId, url: address });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Adresse refusée", description: error instanceof ApiError ? error.message : "Réessaie dans un instant." });
-    }
+    if (!url.trim() || busy) return;
+    const saved = await save(saasId, url);
+    if (saved) setUrl(saved);
   };
 
   return (
@@ -147,7 +146,7 @@ function AppUrlForm({ saasId, appUrl }: { saasId: string; appUrl: string | null 
           value={url}
           maxLength={APP_URL_MAX_LENGTH}
           onChange={(event) => setUrl(event.target.value)}
-          placeholder="https://mon-app.netlify.app"
+          placeholder="https://mon-app.base44.app"
           className="h-11"
         />
         <Button type="submit" className="h-11 shrink-0" disabled={busy || !url.trim()}>
@@ -168,13 +167,14 @@ function AppUrlForm({ saasId, appUrl }: { saasId: string; appUrl: string | null 
  * Opens the SaaS's settings on a tab (its logo, its payment account). Closing them reads the roadmap
  * again, so the mission they complete gets checked at once.
  */
-function SettingsAction({ saas, tab, children }: { saas: Saas; tab: "general" | "payments"; children: ReactNode }) {
+function SettingsAction({ saas, tab, quiet, children }: { saas: Saas; tab: "general" | "payments"; quiet?: boolean; children: ReactNode }) {
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<SaasDialogState>(null);
   const [dialogKey, setDialogKey] = useState(0);
   return (
     <>
       <Button
+        variant={quiet ? "secondary" : "default"}
         className="w-full sm:w-auto"
         onClick={() => {
           setDialogKey((key) => key + 1);
@@ -195,14 +195,102 @@ function SettingsAction({ saas, tab, children }: { saas: Saas; tab: "general" | 
   );
 }
 
-/** The button of a mission's step, right under its text. */
-export function StepActionButton({ action, saas, state }: { action: Action; saas: Saas; state: RoadmapState }) {
+/**
+ * The SaaS's logo, right in its task: an image dropped on the zone, or picked by clicking it (the same
+ * upload as the SaaS's settings: resized in the browser, stored by the server). Once saved, the
+ * roadmap is read again: its task is checked from the logo.
+ */
+function LogoDrop({ saas }: { saas: Saas }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { uploadLogo, isUploading } = useSaasLogo();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+
+  const upload = async (file: File | undefined) => {
+    if (!file || isUploading) return;
+    try {
+      await uploadLogo({ saasId: saas.id, file });
+      toast({ title: "Logo enregistré" });
+      void queryClient.invalidateQueries({ queryKey: roadmapKeys.state(saas.id) });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Logo non enregistré", description: (error as Error).message });
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setOver(true);
+        }}
+        // Not when the drag only moves onto a child of the zone.
+        onDragLeave={(event) => !event.currentTarget.contains(event.relatedTarget as Node | null) && setOver(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setOver(false);
+          void upload(event.dataTransfer.files[0]);
+        }}
+        disabled={isUploading}
+        aria-label={saas.logo_url ? "Changer mon logo" : "Ajouter mon logo"}
+        className={cn(
+          "flex w-full items-center gap-4 rounded-xl border-2 border-dashed px-4 py-4 text-left transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-wait",
+          over ? "border-primary bg-primary/[0.06]" : "border-border hover:border-foreground/30 hover:bg-secondary/30",
+        )}
+        data-testid="logo-dropzone"
+      >
+        {saas.logo_url ? (
+          <SaasAvatar name={saas.name} seed={saas.id} logoUrl={saas.logo_url} className="size-14 shrink-0 rounded-xl" />
+        ) : (
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <ImagePlus className="size-6" />
+          </span>
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-medium">
+            {isUploading ? "Envoi de ton logo…" : over ? "Lâche-le ici" : saas.logo_url ? "Ton logo est ajouté" : "Dépose ton logo ici"}
+          </span>
+          <span className="mt-0.5 block text-sm text-muted-foreground">
+            {saas.logo_url ? "Glisse une autre image, ou clique pour le changer." : `Ou clique pour le choisir (${IMAGE_TYPES_LABEL}).`}
+          </span>
+        </span>
+        {isUploading ? (
+          <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
+        ) : (
+          saas.logo_url && <Check className="size-5 shrink-0 text-primary" strokeWidth={3} />
+        )}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={IMAGE_TYPES.join(",")}
+        className="hidden"
+        onChange={(event) => {
+          void upload(event.target.files?.[0]);
+          event.target.value = "";
+        }}
+        data-testid="input-logo-dropzone"
+      />
+    </>
+  );
+}
+
+/**
+ * The button of a mission's step, right under its text; `quiet`: secondary, for a task already done
+ * (its buttons stay there to be used again, after the next task's).
+ */
+export function StepActionButton({ action, saas, state, quiet = false }: { action: Action; saas: Saas; state: RoadmapState; quiet?: boolean }) {
   const askGus = useAskGus();
+  const variant = quiet ? "secondary" : "default";
 
   switch (action.kind) {
     case "open":
       return (
-        <Button asChild className="w-full sm:w-auto">
+        <Button asChild variant={variant} className="w-full sm:w-auto">
           <a href={action.url} target="_blank" rel="noreferrer">
             {action.label} <ExternalLink />
           </a>
@@ -210,19 +298,20 @@ export function StepActionButton({ action, saas, state }: { action: Action; saas
       );
     case "page":
       return (
-        <Button asChild className="w-full sm:w-auto">
+        <Button asChild variant={variant} className="w-full sm:w-auto">
           <Link href={action.href}>
             {action.label} <ArrowRight />
           </Link>
         </Button>
       );
     case "chatgpt":
-      return <PromptCopy text={missionPromptText(action.prompt, state.project)} into="ChatGPT" openInChatGpt />;
+      return <PromptCopy text={missionPromptText(action.prompt, state.project)} into="ChatGPT" openInChatGpt quiet={quiet} />;
     case "copy":
-      return <PromptCopy text={missionPromptText(action.prompt, state.project)} into={PROMPT_TARGET[action.prompt]} />;
+      return <PromptCopy text={missionPromptText(action.prompt, state.project)} into={PROMPT_TARGET[action.prompt]} quiet={quiet} />;
     case "gus":
       return (
         <Button
+          variant={variant}
           className="w-full sm:w-auto"
           onClick={() => askGus(saas.id, action.message)}
         >
@@ -230,16 +319,12 @@ export function StepActionButton({ action, saas, state }: { action: Action; saas
         </Button>
       );
     case "settings":
+      // The logo is dropped right in its task; the payment account opens the SaaS's settings.
+      if (action.tab === "general") return <LogoDrop saas={saas} />;
       return (
-        <div className="flex items-center gap-3">
-          {action.tab === "general" && saas.logo_url && (
-            <SaasAvatar name={saas.name} seed={saas.id} logoUrl={saas.logo_url} className="size-11 rounded-xl" />
-          )}
-          <SettingsAction saas={saas} tab={action.tab}>
-            {action.tab === "general" ? <ImagePlus /> : <Settings />}
-            {action.tab === "general" && saas.logo_url ? "Changer mon logo" : action.label}
-          </SettingsAction>
-        </div>
+        <SettingsAction saas={saas} tab={action.tab} quiet={quiet}>
+          <Settings /> {action.label}
+        </SettingsAction>
       );
     case "app_url":
       return <AppUrlForm saasId={saas.id} appUrl={state.appUrl} />;

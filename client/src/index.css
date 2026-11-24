@@ -107,6 +107,36 @@
   .glass {
     @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-lg;
   }
+
+  /* Discreet scrollbar for lists scrolling inside a panel (dialogs, menus): a faint rounded thumb,
+     no track nor arrows. Chrome, Edge and Safari read the ::-webkit-scrollbar rules (they would
+     ignore them once scrollbar-width is set, hence the @supports); Firefox the standard ones. */
+  .scroll-thin::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scroll-thin::-webkit-scrollbar-track,
+  .scroll-thin::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  .scroll-thin::-webkit-scrollbar-button {
+    display: none;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    background-color: hsl(0 0% 100% / 0.12);
+  }
+  .scroll-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(0 0% 100% / 0.22);
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    .scroll-thin {
+      scrollbar-width: thin;
+      scrollbar-color: hsl(0 0% 100% / 0.16) transparent;
+    }
+  }
   
   /* 3D push button: light top highlight, darker solid edge underneath (the "thickness"),
      faint glow below; presses down on click. A variant only sets --btn-color: the lighter
