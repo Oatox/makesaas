@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { roadmapApi, type AppUrlBody, type RoadmapState } from "@shared/roadmap";
+import { roadmapApi, type AppUrlBody, type PaymentLinkBody, type RoadmapState } from "@shared/roadmap";
 import type { Saas } from "@shared/saas";
 import { ApiError, apiRequest } from "@/lib/api-client";
 import { supabase } from "@/lib/supabase";
@@ -114,4 +114,16 @@ export function useSaveAppUrl() {
   };
 
   return { save, busy: checking || setAppUrl.isPending };
+}
+
+/**
+ * Saves the Whop payment link of the member's app (from its task): its task gets checked, and the
+ * payment prompt carries it at once (state.project.paymentLink).
+ */
+export function useSetPaymentLink() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: PaymentLinkBody) => apiRequest<RoadmapState>(roadmapApi.paymentLink.path, { method: "PUT", body }),
+    onSuccess: (state, body) => queryClient.setQueryData(roadmapKeys.state(body.saasId), state),
+  });
 }

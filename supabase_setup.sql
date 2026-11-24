@@ -1283,6 +1283,16 @@ ALTER TABLE public.saas
         app_url IS NULL OR (char_length(app_url) <= 300 AND app_url ~* '^https?://')
     );
 
+-- The Whop payment link of the member's app (a whop.com address), given in its roadmap task: the
+-- Base44 payment prompt carries it. Mirrored by isWhopLink in shared/roadmap.ts. Written by the server
+-- only, like app_url: no client grant.
+ALTER TABLE public.saas ADD COLUMN IF NOT EXISTS payment_link TEXT;
+ALTER TABLE public.saas DROP CONSTRAINT IF EXISTS saas_payment_link_check;
+ALTER TABLE public.saas
+    ADD CONSTRAINT saas_payment_link_check CHECK (
+        payment_link IS NULL OR (char_length(payment_link) <= 300 AND payment_link ~* '^https://([a-z0-9-]+\.)*whop\.com/')
+    );
+
 -- The member's monthly goal in euros, picked in the onboarding ("Combien tu veux gagner par mois ?"):
 -- the summit of their roadmap. Saved with the onboarding answers (self-service, like the name).
 -- Mirrored by MONTHLY_GOAL_RANGE in shared/roadmap.ts. Accounts that saved their answers before this

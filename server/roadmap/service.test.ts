@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { canUntickMission, currentStageIndex, isCustomDomain, stageProgress, ticksAfter } from "@shared/roadmap";
+import { canUntickMission, currentStageIndex, isCustomDomain, paymentLinkBodySchema, stageProgress, ticksAfter } from "@shared/roadmap";
 import { missionTime, roadmapStagesFor, stageTimeLeft } from "@shared/roadmap-missions";
 import {
   buildAccountsPrompt,
@@ -33,6 +33,7 @@ const facts = (overrides: Partial<MissionFacts> = {}): MissionFacts => ({
   saasCreatedAt: CREATED,
   hasCustomDomain: false,
   hasLogo: false,
+  hasPaymentLink: false,
   hasPaymentAccount: false,
   tiktokAccounts: 0,
   videoDates: [],
@@ -137,6 +138,23 @@ describe("observedMissions", () => {
   test("the logo, once the SaaS has one", () => {
     const done = observedMissions(facts({ hasLogo: true }), STAGES);
     expect(done["brand:logo"]).toEqual({ at: NOW, source: "observed" });
+  });
+
+  test("the Whop shop, once the member gave its payment link", () => {
+    expect(observedMissions(facts(), STAGES)["payment:whop"]).toBeUndefined();
+    expect(observedMissions(facts({ hasPaymentLink: true }), STAGES)["payment:whop"]).toEqual({ at: NOW, source: "declared" });
+  });
+
+  test("a payment link is a Whop address, written as pasted", () => {
+    const parse = (url: string) => paymentLinkBodySchema.safeParse({ saasId: "00000000-0000-4000-8000-000000000000", url });
+    expect(parse("https://whop.com/checkout/plan_abc123/").data?.url).toBe("https://whop.com/checkout/plan_abc123/");
+    expect(parse("whop.com/checkout/plan_abc123").data?.url).toBe("https://whop.com/checkout/plan_abc123");
+    expect(parse("http://whop.com/fitlo/").data?.url).toBe("https://whop.com/fitlo/");
+    expect(parse("https://WHOP.com").data?.url).toBe("https://whop.com/");
+    expect(parse("https://sandbox.whop.com/checkout/plan_abc").success).toBe(true);
+    expect(parse("https://whop.com.evil.example/checkout").success).toBe(false);
+    expect(parse("https://notwhop.com/checkout").success).toBe(false);
+    expect(parse("https://buy.stripe.com/abc").success).toBe(false);
   });
 
   test("the first payment and the MRR, compared in euros", () => {
@@ -253,7 +271,7 @@ describe("prompts", () => {
     expect(buildAppPrompt(project)).not.toContain("autant qu'il veut");
     expect(buildAccountsPrompt(project)).toContain("ne présente pas Gratuit comme une offre avec des fonctionnalités");
     // Pro users cancel on Whop, which deleting the account does not do.
-    expect(buildPaymentPrompt(project)).toContain("« Gérer mon abonnement » vers ses commandes Whop (https://whop.com/@me/settings/orders/)");
+    expect(buildPaymentPrompt(project)).toContain("« Gérer mon abonnement » vers son lien de gestion Whop (à défaut, ses commandes Whop : https://whop.com/@me/settings/orders/)");
     expect(buildPaymentPrompt(project)).toContain("supprimer ton compte ne l'arrête pas");
     // AI or an API goes through OneShotAPI, from a server function, with the member's key in the app's secrets.
     expect(buildAppPrompt(project)).toContain("utilise OneShotAPI");
@@ -307,6 +325,54 @@ describe("prompts", () => {
     const published = { at: CREATED, source: "declared" as const };
     expect(withEarlierBuildMissions({ "build:online": published })["build:review"]).toEqual({ at: CREATED, source: "observed" });
     expect(withEarlierBuildMissions({ "build:customize": published })["build:review"]).toBeUndefined();
+  });
+
+  test("the payment prompt: a checkout bound to the user, then the signed Whop webhook turns them Pro", () => {
+    const prompt = buildPaymentPrompt({ ...project, price: 9.99 });
+    expect(prompt).toMatch(/Mon offre sur Whop : un abonnement à 9,99\s€ par mois\. Son lien de paiement : \[COLLE TON LIEN DE PAIEMENT ICI\]/);
+    // Once given in the Whop shop's task, the member's link replaces the placeholder.
+    const linked = buildPaymentPrompt({ ...project, paymentLink: "https://whop.com/checkout/plan_abc123/" });
+    expect(linked).toContain("Son lien de paiement : https://whop.com/checkout/plan_abc123/\n");
+    expect(linked).not.toContain("[COLLE TON LIEN");
+    expect(prompt).toContain("L'identifiant de cette offre (plan_…) est dans ce lien ; s'il n'y est pas, demande-le-moi.");
+    // The server alone talks to Whop, with the member's key in the app's secrets.
+    expect(prompt).toContain("https://api.whop.com/api/v1");
+    expect(prompt).toContain("https://docs.whop.com/developer/guides/webhooks.md");
+    expect(prompt).toContain("sous le nom WHOP_API_KEY, jamais dans le code");
+    // The checkout carries the user, comes back to the app.
+    expect(prompt).toContain("une checkout configuration sur mon offre, avec son identifiant d'utilisateur dans les metadata et un retour vers /app");
+    // The webhook: signed, the membership read again, the access statuses of Whop.
+    expect(prompt).toContain("vérifie leur signature sur le corps brut de la requête avec le secret WHOP_WEBHOOK_SECRET");
+    expect(prompt).toContain("À chaque événement membership.updated");
+    expect(prompt).toContain("elle relit cet abonnement auprès de l'API Whop");
+    expect(prompt).toContain("met is_subscriber à oui si le statut est active, trialing, past_due ou completed, et à non sinon");
+    expect(prompt).toContain("« Paiement reçu, on active ton accès… »");
+    // The member gets the key now; the webhook once the app is published, its secret added by hand.
+    expect(prompt).toContain("sur https://whop.com/dashboard/developer, dans Account API Keys");
+    expect(prompt).toContain("donne-moi l'adresse exacte de ton webhook");
+    expect(prompt).toContain("ne me le demande pas maintenant");
+    // Nobody is turned Pro by hand anymore.
+    expect(prompt).not.toContain("nouvel onglet");
+  });
+
+  test("the payment tasks: the Whop shop, the prompt, then the webhook before the test", () => {
+    const payment = STAGES.find((stage) => stage.key === "payment")!.missions;
+    expect(payment.map((mission) => mission.key)).toEqual(["payment:whop", "payment:in_app", "payment:webhook", "payment:test", "payment:connect"]);
+    const steps = (key: string) => payment.find((mission) => mission.key === key)!.steps.map((step) => step.text).join("\n");
+    expect(steps("payment:whop")).toContain("**Use Whop for payment processing only**");
+    // The shop's task asks for its payment link, and is done once it is given.
+    const shop = payment.find((mission) => mission.key === "payment:whop")!;
+    expect(shop.steps.at(-1)?.action).toEqual({ kind: "payment_link" });
+    expect(shop.check).toEqual({ kind: "payment_link" });
+    expect(steps("payment:in_app")).toContain("ton lien de paiement Whop est déjà dedans");
+    expect(steps("payment:webhook")).toContain("coche **membership.updated**");
+    expect(steps("payment:webhook")).toContain("nomme-le **WHOP_WEBHOOK_SECRET**");
+    expect(steps("payment:test")).toContain("ce compte passe Pro tout seul");
+    expect(steps("payment:in_app")).not.toContain("Passer en Pro");
+    // Those who tested their payment before the webhook task existed have it done.
+    const tested = { at: CREATED, source: "declared" as const };
+    expect(withEarlierBuildMissions({ "payment:test": tested })["payment:webhook"]).toEqual({ at: CREATED, source: "observed" });
+    expect(withEarlierBuildMissions({ "payment:in_app": tested })["payment:webhook"]).toBeUndefined();
   });
 
   test("the review prompt checks the whole app before publishing, and lets Base44 fix it", () => {

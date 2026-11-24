@@ -41,6 +41,8 @@ export type MissionCheck =
   | { kind: "custom_domain" }
   /** The SaaS has a logo (added from its settings). */
   | { kind: "logo" }
+  /** The member gave the Whop payment link of their app (in its task): the payment prompt carries it. */
+  | { kind: "payment_link" }
   /** A Stripe / Whop account is connected to the SaaS. */
   | { kind: "payment_account" }
   | { kind: "tiktok_accounts"; min: number }
@@ -66,7 +68,9 @@ export type StepAction =
   /** Opens the SaaS's settings on one of its tabs (its logo, its payment account). */
   | { kind: "settings"; tab: "general" | "payments"; label: string }
   /** The field where the member pastes the address of their app. */
-  | { kind: "app_url" };
+  | { kind: "app_url" }
+  /** The field where the member pastes the Whop payment link of their app. */
+  | { kind: "payment_link" };
 
 /**
  * One step of a mission: a short sentence starting with a verb (Gus's Markdown: **bold**,
@@ -257,9 +261,44 @@ export const appUrlBodySchema = z.object({
 });
 export type AppUrlBody = z.input<typeof appUrlBodySchema>;
 
+export const PAYMENT_LINK_MAX_LENGTH = 300;
+
+/** A Whop address ("https://whop.com/checkout/plan_…"), as Whop gives payment links. Mirrored by saas_payment_link_check. */
+export function isWhopLink(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    const host = hostname.toLowerCase();
+    return protocol === "https:" && (host === "whop.com" || host.endsWith(".whop.com"));
+  } catch {
+    return false;
+  }
+}
+
+/** PUT roadmapApi.paymentLink: the Whop payment link of the member's app. */
+export const paymentLinkBodySchema = z.object({
+  saasId: z.string().uuid("SaaS invalide"),
+  url: z
+    .string()
+    .trim()
+    .max(PAYMENT_LINK_MAX_LENGTH, "Lien trop long")
+    .transform((value) => {
+      const typed = /^https?:\/\//i.test(value) ? value.replace(/^http:/i, "https:") : `https://${value}`;
+      // Written in full ("https://whop.com" becomes "https://whop.com/"), as the database checks it.
+      try {
+        return new URL(typed).href;
+      } catch {
+        return typed;
+      }
+    })
+    .refine(isWhopLink, "Colle le lien de paiement copié dans Whop : il commence par https://whop.com/"),
+});
+export type PaymentLinkBody = z.input<typeof paymentLinkBodySchema>;
+
 export const roadmapApi = {
   /** GET ?saasId= → RoadmapState, after checking the missions against the SaaS's data. */
   state: { path: "/api/roadmap" },
   /** PUT AppUrlBody → RoadmapState. */
   appUrl: { path: "/api/roadmap/app-url" },
+  /** PUT PaymentLinkBody → RoadmapState. */
+  paymentLink: { path: "/api/roadmap/payment-link" },
 } as const;

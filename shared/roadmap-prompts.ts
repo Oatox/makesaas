@@ -30,6 +30,8 @@ export type MissionProject = {
   price: number | null;
   /** Public address of the SaaS's logo (saas.logo_url), once added: Base44 takes it from there. */
   logoUrl?: string | null;
+  /** The Whop payment link of the app (saas.payment_link), once given in its task: the payment prompt carries it. */
+  paymentLink?: string | null;
 };
 
 /** 9,99 € (the idea's consumer price), 9 € for the whole prices of older ideas. */
@@ -220,22 +222,49 @@ export function buildReviewPrompt(project: MissionProject): string {
   ].join("\n");
 }
 
-/** Where a Whop buyer finds their subscriptions and cancels one (Profile → Orders, docs.whop.com). */
+/**
+ * Whop, where members sell their app's subscription (docs.whop.com, read 2026-11-24): an account "for
+ * payment processing only", a product with its monthly plan, then, in the developer page, an Account
+ * API key and a webhook. The payment tasks (shared/roadmap-missions.ts) open these pages.
+ */
+export const WHOP_SELL_URL = "https://whop.com/sell";
+export const WHOP_DEVELOPER_URL = "https://whop.com/dashboard/developer";
+const WHOP_API_BASE = "https://api.whop.com/api/v1";
+/** Whop's docs written for coding agents: the first API call, a checkout, and its signed webhooks. */
+const WHOP_DOCS_FOR_AI = ["https://docs.whop.com/developer/quickstart.md", "https://docs.whop.com/developer/guides/webhooks.md"];
+/** Where a Whop buyer finds their subscriptions and cancels one (Profile → Orders). */
 const WHOP_ORDERS_URL = "https://whop.com/@me/settings/orders/";
+/** In the payment prompt until the member gives their Whop payment link (in the "Crée ta boutique Whop" task). */
+export const PAYMENT_LINK_PLACEHOLDER = "[COLLE TON LIEN DE PAIEMENT ICI]";
+/** Membership statuses that grant access (Whop's Membership.status): past_due is the grace period after a failed payment. */
+const WHOP_ACCESS_STATUSES = "active, trialing, past_due ou completed";
 
 /**
- * For Base44: the paywall's "Débloquer mon résultat" and the "Passer à Pro" buttons open the member's
- * Whop payment page, after the sign-up for visitors; Pro users cancel on Whop, which deleting their
- * account does not do. Turning the buyer Pro stays manual (the admin page's "Passer en Pro") until a
- * payment webhook is added.
+ * For Base44: the whole Whop layer. A checkout made by the server for the signed-in user (a checkout
+ * configuration on the member's plan, carrying the user's id in its metadata, back to /app once paid),
+ * then the signed `membership.updated` webhook (sent on activation and deactivation alike), which
+ * re-reads the membership from Whop's API and turns `is_subscriber` on or off: nobody is turned Pro
+ * by hand anymore (the admin page keeps it, to give access). Pro users manage and cancel on Whop,
+ * which deleting their account does not do. Base44 walks the member through the API key at once; the
+ * webhook is created on Whop once the app is published (its own task), and its secret added then.
  */
 export function buildPaymentPrompt(project: MissionProject): string {
   return [
-    `Branche le paiement de ${project.name} : les boutons « Débloquer mon résultat » (le paywall, à la fin du parcours d'accueil et sur l'écran principal) et « Passer à Pro » (page Abonnement) ouvrent ma page de paiement Whop dans un nouvel onglet : [COLLE TON LIEN DE PAIEMENT ICI]`,
-    "Un visiteur sans compte crée d'abord son compte, puis arrive sur la page de paiement.",
-    `C'est ma page de paiement pour ${offerOf(project)}. Garde le même style que le reste de l'app.`,
+    `Branche les paiements de ${project.name} avec Whop, de bout en bout : l'utilisateur paie, et son compte passe Pro tout seul.`,
     "",
-    `Pour un abonné Pro, la page Abonnement a un lien « Gérer mon abonnement » vers ses commandes Whop (${WHOP_ORDERS_URL}), où il l'annule. Dans Paramètres, avant la suppression du compte, il lit : « Annule d'abord ton abonnement sur Whop : supprimer ton compte ne l'arrête pas. », avec le même lien.`,
+    `Mon offre sur Whop : ${offerOf(project)}. Son lien de paiement : ${project.paymentLink ?? PAYMENT_LINK_PLACEHOLDER}`,
+    "L'identifiant de cette offre (plan_…) est dans ce lien ; s'il n'y est pas, demande-le-moi.",
+    `L'API de Whop : ${WHOP_API_BASE}, avec l'en-tête « Authorization: Bearer », et sa documentation pour les IA : ${WHOP_DOCS_FOR_AI.join(" et ")}. Appelle-la uniquement depuis des fonctions serveur, avec ma clé rangée dans les secrets de l'app sous le nom WHOP_API_KEY, jamais dans le code de l'app.`,
+    "",
+    "1. Payer : « Débloquer mon résultat » (le paywall et l'écran principal) et « Passer à Pro » (la page Abonnement) appellent une fonction serveur qui crée un paiement Whop pour cet utilisateur : une checkout configuration sur mon offre, avec son identifiant d'utilisateur dans les metadata et un retour vers /app une fois payé. Puis l'app ouvre ce paiement. Un visiteur sans compte crée d'abord son compte, puis part directement au paiement. Un abonné Pro ne voit plus ces boutons.",
+    `2. Passer Pro tout seul : une adresse publique de l'app reçoit les webhooks de Whop. Elle vérifie leur signature sur le corps brut de la requête avec le secret WHOP_WEBHOOK_SECRET (le ws_… tel quel) et refuse tout le reste. À chaque événement membership.updated (Whop l'envoie quand un abonnement commence, change ou s'arrête), elle relit cet abonnement auprès de l'API Whop, car un événement peut arriver en double ou dans le désordre. Elle retrouve l'utilisateur par les metadata (sinon par son e-mail), puis met is_subscriber à oui si le statut est ${WHOP_ACCESS_STATUSES}, et à non sinon. Elle garde aussi sur l'utilisateur l'identifiant de son abonnement et son lien de gestion (manage_url), que seuls les administrateurs et le serveur peuvent modifier. Elle répond en moins de 5 secondes.`,
+    "3. Retour du paiement : sur /app, « Paiement reçu, on active ton accès… » s'affiche jusqu'à ce qu'il soit Pro (quelques secondes), puis son résultat complet.",
+    `4. Gérer son abonnement : pour un abonné Pro, la page Abonnement a un lien « Gérer mon abonnement » vers son lien de gestion Whop (à défaut, ses commandes Whop : ${WHOP_ORDERS_URL}), où il l'annule. Dans Paramètres, avant la suppression du compte, il lit : « Annule d'abord ton abonnement sur Whop : supprimer ton compte ne l'arrête pas. », avec le même lien.`,
+    "5. Administration : « Passer en Pro » reste là pour offrir l'accès à la main, et la liste montre quels abonnés Pro paient avec Whop.",
+    `6. Ma clé Whop : avant de coder, explique-moi simplement, étape par étape, comment la créer : sur ${WHOP_DEVELOPER_URL}, dans Account API Keys, une clé avec seulement les permissions des appels que fait l'app (créer un paiement, lire un abonnement : dis-moi lesquelles cocher, d'après la documentation de Whop). Puis demande-la-moi dans les secrets de l'app (WHOP_API_KEY). Si Whop refuse un appel faute de permission, dis-moi laquelle ajouter.`,
+    "7. Le webhook : à la fin, donne-moi l'adresse exacte de ton webhook, sur le domaine de mon app. Une fois l'app publiée, je le crée sur Whop (Create webhook, version v1, événement membership.updated), puis j'ajoute moi-même son secret dans les secrets de l'app sous le nom WHOP_WEBHOOK_SECRET : ne me le demande pas maintenant.",
+    "",
+    "Garde le même style que le reste de l'app.",
   ].join("\n");
 }
 

@@ -1,5 +1,5 @@
 import { MRR_TIERS, monthlyGoalOf, type Milestone, type MissionDone, type RoadmapMission, type RoadmapStage, type StepAction } from "./roadmap";
-import { ONESHOT_KEYS_URL } from "./roadmap-prompts";
+import { ONESHOT_KEYS_URL, WHOP_DEVELOPER_URL, WHOP_SELL_URL } from "./roadmap-prompts";
 
 /**
  * The content of the roadmap: its stages, their missions and each mission's steps (shared/roadmap.ts
@@ -34,7 +34,7 @@ export const EARLIER_BUILD_MISSIONS = ["build:landing", "build:accounts", "build
  * Tasks added to the launch after members had gone past them: done once the task after them is
  * (withEarlierBuildMissions), so that nobody who already published goes back to them.
  */
-export const LATER_ADDED_MISSIONS: Record<string, string> = { "build:review": "build:online" };
+export const LATER_ADDED_MISSIONS: Record<string, string> = { "build:review": "build:online", "payment:webhook": "payment:test" };
 
 const STATS: StepAction = { kind: "page", label: "Ouvrir mes statistiques", href: "/acquisition" };
 const CONTENT: StepAction = { kind: "page", label: "Créer un carrousel", href: "/acquisition/contenu" };
@@ -225,23 +225,47 @@ const BASE_STAGES: RoadmapStage[] = [
         why: "Whop encaisse les paiements de ton app pour toi.",
         minutes: 15,
         steps: [
-          { text: "Crée ton compte Whop.", action: { kind: "open", label: "Ouvrir Whop", url: "https://whop.com" } },
-          { text: "Crée ta boutique au nom de ton app." },
-          { text: "Ajoute un produit : un abonnement mensuel, au prix de ton offre." },
-          { text: "Copie le lien de paiement de ce produit : tu en as besoin juste après." },
+          {
+            text: "Crée ton compte Whop et choisis **Use Whop for payment processing only** : ton app reste chez Base44.",
+            action: { kind: "open", label: "Ouvrir Whop", url: WHOP_SELL_URL },
+          },
+          { text: "Nomme ta boutique comme ton app, puis ajoute un produit : un abonnement mensuel, au prix de ton offre." },
+          {
+            text: "Dans **Checkout links**, copie le lien de paiement de ce produit et colle-le ici : il ira dans le message pour Base44.",
+            action: { kind: "payment_link" },
+          },
         ],
-        check: { kind: "manual" },
+        check: { kind: "payment_link" },
       },
       {
         key: "payment:in_app",
         title: "Ajoute le paiement à ton app",
-        why: "Le bouton d'abonnement de ton app doit ouvrir ta page de paiement.",
-        minutes: 15,
+        why: "Ton client paie depuis ton app, et son compte passe Pro tout seul.",
+        minutes: 20,
         steps: [
           { text: "Copie le message pour Base44.", action: { kind: "copy", prompt: "payment" } },
-          { text: "Colle-le dans Base44, remplace **[COLLE TON LIEN…]** par ton lien Whop, puis envoie." },
-          { text: "Vérifie dans l'aperçu que le bouton ouvre ta page de paiement, puis clique sur **Publish**." },
-          { text: "Quand quelqu'un paie, ouvre la page **Administration** de ton app et clique sur **Passer en Pro** à côté de son compte." },
+          { text: "Colle-le dans le chat de ton app et envoie : ton lien de paiement Whop est déjà dedans." },
+          {
+            text: "Base44 te demande ta clé Whop ? Crée-la dans **Account API Keys**, puis colle-la dans l'encadré **Set secrets**.",
+            action: { kind: "open", label: "Ouvrir mes clés Whop", url: WHOP_DEVELOPER_URL },
+          },
+          { text: "Garde l'adresse du webhook que Base44 te donne à la fin : tu la colles dans Whop juste après." },
+        ],
+        check: { kind: "manual" },
+      },
+      {
+        key: "payment:webhook",
+        title: "Relie Whop à ton app",
+        why: "Dès qu'un client paie ou annule, Whop prévient ton app, qui ouvre ou ferme son accès toute seule.",
+        minutes: 10,
+        steps: [
+          { text: "Dans Base44, clique sur **Publish** : ton app en ligne doit pouvoir recevoir les messages de Whop." },
+          {
+            text: "Dans Whop, clique sur **Create webhook** : colle l'adresse de Base44, garde **v1** et coche **membership.updated**.",
+            action: { kind: "open", label: "Ouvrir Whop", url: WHOP_DEVELOPER_URL },
+          },
+          { text: "Copie le secret du webhook (il commence par **ws_**, dans la colonne **Secret**)." },
+          { text: "Dans Base44, ouvre **Dashboard**, **Secrets**, **Add Secret** : nomme-le **WHOP_WEBHOOK_SECRET** et colle le secret." },
         ],
         check: { kind: "manual" },
       },
@@ -249,11 +273,12 @@ const BASE_STAGES: RoadmapStage[] = [
         key: "payment:test",
         title: "Fais un paiement test",
         why: "La preuve que tout marche, avant de montrer ton app au monde.",
-        minutes: 10,
+        minutes: 15,
         steps: [
           { text: "Dans Whop, crée un code promo à 100 % pour toi." },
-          { text: "Ouvre ton app en ligne, va jusqu'au paiement et utilise ton code." },
-          { text: "Vérifie que le paiement passe et que tu reviens bien dans ton app." },
+          { text: "Ouvre ton app en ligne, crée un compte avec une autre adresse e-mail, va jusqu'au paiement et utilise ton code." },
+          { text: "De retour dans ton app, ce compte passe Pro tout seul en quelques secondes. Pas le cas ? Décris-le à Base44 : il corrige." },
+          { text: "Annule ensuite cet abonnement test avec **Gérer mon abonnement** : il ne sera pas renouvelé." },
         ],
         check: { kind: "manual" },
       },
@@ -637,6 +662,8 @@ export function missionCheckText(check: RoadmapMission["check"]): string {
       return "Se coche dès que tu colles l'adresse de ton app sur ton nom de domaine et qu'elle répond.";
     case "logo":
       return "Se coche dès que ton projet a son logo.";
+    case "payment_link":
+      return "Se coche dès que tu colles le lien de paiement Whop de ton app.";
     case "payment_account":
       return "Se coche dès que ton compte de paiement est connecté.";
     case "tiktok_accounts":

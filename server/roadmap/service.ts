@@ -15,6 +15,8 @@ export type MissionFacts = {
   hasCustomDomain: boolean;
   /** The SaaS has a logo. */
   hasLogo: boolean;
+  /** The member gave the Whop payment link of their app. */
+  hasPaymentLink: boolean;
   /** A Stripe / Whop account is connected (live or test). */
   hasPaymentAccount: boolean;
   tiktokAccounts: number;
@@ -32,8 +34,8 @@ export type MissionFacts = {
  * The build tasks before the core (home page, accounts, onboarding) count as done, with its date, once
  * the core is (build:first_version): members who built their app with the former single prompt are
  * not sent back to them, and the others did them first anyway. Likewise a task added later
- * (LATER_ADDED_MISSIONS, "Valide ton app") once the one after it is. Not saved, and not the member's
- * to untick.
+ * (LATER_ADDED_MISSIONS: "Valide ton app", "Relie Whop à ton app") once the one after it is. Not
+ * saved, and not the member's to untick.
  */
 export function withEarlierBuildMissions(done: Record<string, MissionDone>): Record<string, MissionDone> {
   const result = { ...done };
@@ -72,6 +74,10 @@ export function observedMissions(facts: MissionFacts, stages: RoadmapStage[]): R
         break;
       case "logo":
         result = facts.hasLogo ? { at: facts.now, source: "observed" } : null;
+        break;
+      case "payment_link":
+        // Given by the member, like the app's address.
+        result = facts.hasPaymentLink ? { at: facts.now, source: "declared" } : null;
         break;
       case "payment_account":
         result = facts.hasPaymentAccount ? { at: facts.now, source: "observed" } : null;
@@ -116,6 +122,7 @@ type SaasRow = {
   created_at: string;
   app_url: string | null;
   logo_url: string | null;
+  payment_link: string | null;
   idea: { content?: { problem?: unknown; price?: unknown; feature?: unknown } } | null;
 };
 
@@ -133,6 +140,7 @@ export function projectOf(saas: SaasRow): MissionProject {
     feature: ideaText(idea?.feature),
     price: typeof idea?.price === "number" && idea.price > 0 ? Math.round(idea.price * 100) / 100 : null,
     logoUrl: saas.logo_url,
+    paymentLink: saas.payment_link,
   };
 }
 
@@ -193,6 +201,7 @@ export class RoadmapService {
         saasCreatedAt: saas.created_at,
         hasCustomDomain: isCustomDomain(saas.app_url),
         hasLogo: !!saas.logo_url,
+        hasPaymentLink: !!saas.payment_link,
         hasPaymentAccount: (connections.data ?? []).length > 0,
         tiktokAccounts: tiktok.count ?? 0,
         videoDates: (videos.data ?? []).map((video) => video.posted_at),
@@ -237,10 +246,21 @@ export class RoadmapService {
     return this.state(userId, saasId);
   }
 
+  /** Saves the Whop payment link of the member's app (the payment prompt carries it), then answers the roadmap. */
+  async setPaymentLink(userId: string, saasId: string, url: string): Promise<RoadmapState> {
+    await this.ownSaas(userId, saasId);
+    const { error } = await this.db.from("saas").update({ payment_link: url }).eq("id", saasId).eq("user_id", userId);
+    if (error) {
+      logger.error({ err: error, saasId }, "Failed to save the payment link");
+      throw new HttpError(500, "Impossible d'enregistrer ton lien de paiement.");
+    }
+    return this.state(userId, saasId);
+  }
+
   async ownSaas(userId: string, saasId: string): Promise<SaasRow> {
     const { data, error } = await this.db
       .from("saas")
-      .select("id, name, description, audience, created_at, app_url, logo_url, idea:saas_ideas(content)")
+      .select("id, name, description, audience, created_at, app_url, logo_url, payment_link, idea:saas_ideas(content)")
       .eq("id", saasId)
       .eq("user_id", userId)
       .maybeSingle();

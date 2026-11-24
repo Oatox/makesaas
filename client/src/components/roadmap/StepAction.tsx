@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } fro
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Check, ChevronDown, Copy, ExternalLink, ImagePlus, Loader2, MessageCircle, Settings, SquareTerminal } from "lucide-react";
-import { APP_URL_MAX_LENGTH, type RoadmapState, type StepAction as Action } from "@shared/roadmap";
+import { APP_URL_MAX_LENGTH, PAYMENT_LINK_MAX_LENGTH, type RoadmapState, type StepAction as Action } from "@shared/roadmap";
 import { chatGptUrl, missionPromptText, PROMPT_TARGET } from "@shared/roadmap-prompts";
 import type { Saas } from "@shared/saas";
 import { IMAGE_TYPES, IMAGE_TYPES_LABEL } from "@shared/storage";
@@ -11,9 +11,10 @@ import { SaasDialog, type SaasDialogState } from "@/components/saas/SaasDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAskGus } from "@/hooks/use-ask-gus";
-import { roadmapKeys, useSaveAppUrl } from "@/hooks/use-roadmap";
+import { roadmapKeys, useSaveAppUrl, useSetPaymentLink } from "@/hooks/use-roadmap";
 import { useSaasLogo } from "@/hooks/use-saas";
 import { useToast } from "@/hooks/use-toast";
+import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 const copyText = async (text: string) => {
@@ -100,9 +101,9 @@ function PromptCopy({
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-1 border-t border-border/60 p-2.5 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-1 border-t border-border/60 p-2.5">
         {openInChatGpt && (
-          <Button asChild variant={quiet ? "secondary" : "default"} className="w-full sm:w-auto">
+          <Button asChild variant={quiet ? "secondary" : "default"} className="w-full">
             <a href={chatGptUrl(text)} target="_blank" rel="noreferrer">
               Ouvrir ChatGPT <ExternalLink />
             </a>
@@ -164,6 +165,54 @@ function AppUrlForm({ saasId, appUrl }: { saasId: string; appUrl: string | null 
 }
 
 /**
+ * The Whop payment link of the member's app: checked by the server (a whop.com address), then saved.
+ * Its task gets checked, and the payment prompt carries it.
+ */
+function PaymentLinkForm({ saasId, paymentLink }: { saasId: string; paymentLink: string | null }) {
+  const { toast } = useToast();
+  const setPaymentLink = useSetPaymentLink();
+  const [url, setUrl] = useState(paymentLink ?? "");
+  const busy = setPaymentLink.isPending;
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!url.trim() || busy) return;
+    try {
+      const state = await setPaymentLink.mutateAsync({ saasId, url });
+      if (state.project.paymentLink) setUrl(state.project.paymentLink);
+      toast({ title: "Lien de paiement enregistré", description: "Il est déjà dans le message pour Base44." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Lien refusé", description: error instanceof ApiError ? error.message : "Réessaie dans un instant." });
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input
+          aria-label="Ton lien de paiement Whop"
+          inputMode="url"
+          value={url}
+          maxLength={PAYMENT_LINK_MAX_LENGTH}
+          onChange={(event) => setUrl(event.target.value)}
+          placeholder="https://whop.com/checkout/…"
+          className="h-11"
+        />
+        <Button type="submit" className="h-11 shrink-0" disabled={busy || !url.trim() || url.trim() === paymentLink}>
+          {busy && <Loader2 className="animate-spin" />}
+          Valider
+        </Button>
+      </div>
+      {paymentLink && (
+        <a href={paymentLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
+          Ouvrir ma page de paiement <ExternalLink className="h-3.5 w-3.5" />
+        </a>
+      )}
+    </form>
+  );
+}
+
+/**
  * Opens the SaaS's settings on a tab (its logo, its payment account). Closing them reads the roadmap
  * again, so the mission they complete gets checked at once.
  */
@@ -175,7 +224,7 @@ function SettingsAction({ saas, tab, quiet, children }: { saas: Saas; tab: "gene
     <>
       <Button
         variant={quiet ? "secondary" : "default"}
-        className="w-full sm:w-auto"
+        className="w-full"
         onClick={() => {
           setDialogKey((key) => key + 1);
           setDialog({ mode: "edit", saas, tab });
@@ -290,7 +339,7 @@ export function StepActionButton({ action, saas, state, quiet = false }: { actio
   switch (action.kind) {
     case "open":
       return (
-        <Button asChild variant={variant} className="w-full sm:w-auto">
+        <Button asChild variant={variant} className="w-full">
           <a href={action.url} target="_blank" rel="noreferrer">
             {action.label} <ExternalLink />
           </a>
@@ -298,7 +347,7 @@ export function StepActionButton({ action, saas, state, quiet = false }: { actio
       );
     case "page":
       return (
-        <Button asChild variant={variant} className="w-full sm:w-auto">
+        <Button asChild variant={variant} className="w-full">
           <Link href={action.href}>
             {action.label} <ArrowRight />
           </Link>
@@ -312,7 +361,7 @@ export function StepActionButton({ action, saas, state, quiet = false }: { actio
       return (
         <Button
           variant={variant}
-          className="w-full sm:w-auto"
+          className="w-full"
           onClick={() => askGus(saas.id, action.message)}
         >
           <MessageCircle /> {action.label}
@@ -328,5 +377,7 @@ export function StepActionButton({ action, saas, state, quiet = false }: { actio
       );
     case "app_url":
       return <AppUrlForm saasId={saas.id} appUrl={state.appUrl} />;
+    case "payment_link":
+      return <PaymentLinkForm saasId={saas.id} paymentLink={state.project.paymentLink ?? null} />;
   }
 }

@@ -58,7 +58,7 @@ describe("coach context", () => {
     expect(text).toContain("- [ ] Première vidéo : à venir");
     expect(text).toMatch(/- \[ \] 100\s€ par mois : à venir/);
     expect(text).not.toContain("7 vidéos");
-    expect(text).toContain("Phase : lancement de son SaaS (3 tâches de lancement faites sur 18).");
+    expect(text).toContain("Phase : lancement de son SaaS (3 tâches de lancement faites sur 19).");
     expect(text).toContain("- [ ] Ajoute les comptes (il la coche lui-même)");
     expect(text).toContain("Sa prochaine tâche : « Ajoute les comptes ».");
     expect(text).toContain("Le prompt à coller dans Base44 que sa tâche lui donne :");

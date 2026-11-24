@@ -58,8 +58,8 @@ describe("the day's tasks", () => {
 
   test("about an hour a day: a long task ends the day", () => {
     const done = doneAt(BEFORE, ["idea:chosen", "brand:logo", "build:claude", "build:landing", "build:accounts", "build:onboarding", "build:first_version", "build:customize", "build:review", "build:online", "build:domain", "payment:whop"]);
-    // In-app payment (15), payment test (10), connect (5): 30 minutes, 3 tasks.
-    expect(keysOf(todayPlan(STAGES, done, DAY))).toEqual(["payment:in_app", "payment:test", "payment:connect"]);
+    // In-app payment (20), the Whop webhook (10), payment test (15): 45 minutes, 3 tasks.
+    expect(keysOf(todayPlan(STAGES, done, DAY))).toEqual(["payment:in_app", "payment:webhook", "payment:test"]);
   });
 
   test("once launched: every day's tasks, keyed by the day, and the tier's next mission", () => {
@@ -145,7 +145,7 @@ describe("the milestones", () => {
       "build:online",
       "build:domain",
     ]);
-    expect(keys("payment:connect")).toEqual(["payment:whop", "payment:in_app", "payment:test", "payment:connect"]);
+    expect(keys("payment:connect")).toEqual(["payment:whop", "payment:in_app", "payment:webhook", "payment:test", "payment:connect"]);
     expect(keys("video:posted")).toEqual(["video:account", "video:prepare", "video:posted"]);
     expect(keys("mrr_100:reached")).toEqual(["mrr_100:format", "mrr_100:paywall"]);
     expect(keys("idea:chosen")).toEqual([]);

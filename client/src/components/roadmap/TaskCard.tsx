@@ -28,6 +28,12 @@ const stepMotion = {
 const DONE_SHOWN = 3;
 
 /**
+ * Buttons that complete their task right there (its logo dropped, its payment account, its app's
+ * address, its payment link): on its last step, the task's "Se coche dès que…" would only repeat them.
+ */
+const COMPLETING_ACTIONS = new Set(["settings", "app_url", "payment_link"]);
+
+/**
  * The tasks already done (pages/Today.tsx, under the day's; shared/today.ts: doneTasks): a quiet list,
  * in the order of the journey, the furthest first, each with its day. The first ones, then all on
  * demand. Each opens again in the drawer (TaskDetail), to read its steps and reuse their buttons (a
@@ -124,6 +130,9 @@ export function TaskDetail({
   const steps = task.steps;
   const step = steps[stepIndex];
   const lastStep = stepIndex >= steps.length - 1;
+  // A task checked from the data whose last step's own button completes it (a field, a drop zone): it
+  // waits for that button, so nothing is added under it (it gets done, and the drawer moves on).
+  const waitsHere = !manual && lastStep && !!step?.action && COMPLETING_ACTIONS.has(step.action.kind);
   const stepsTop = useRef<HTMLDivElement>(null);
   const goToStep = (index: number) => setStep([index, index > stepIndex ? 1 : -1]);
 
@@ -306,36 +315,40 @@ export function TaskDetail({
 
           {!done && (
             <div className="mt-8 space-y-4 border-t border-border pt-5">
-              <div className="flex gap-2">
-                {stepIndex > 0 && (
-                  <Button variant="secondary" onClick={() => goToStep(stepIndex - 1)} disabled={busy}>
-                    <ArrowLeft /> Retour
-                  </Button>
-                )}
-                {!lastStep ? (
-                  // Quieter when the step has its own button: that one comes first.
-                  <Button variant={step?.action ? "secondary" : "default"} className="flex-1" onClick={() => goToStep(stepIndex + 1)}>
-                    Suivant <ArrowRight />
-                  </Button>
-                ) : manual ? (
-                  next ? (
-                    <Button onClick={tickIt} disabled={busy} className="flex-1">
-                      Tâche suivante
-                      {busy ? <Loader2 className="animate-spin" /> : <ArrowRight />}
+              {(stepIndex > 0 || !waitsHere) && (
+                <div className="flex gap-2">
+                  {stepIndex > 0 && (
+                    <Button variant="secondary" onClick={() => goToStep(stepIndex - 1)} disabled={busy}>
+                      <ArrowLeft /> Retour
                     </Button>
+                  )}
+                  {!lastStep ? (
+                    // Quieter when the step has its own button: that one comes first.
+                    <Button variant={step?.action ? "secondary" : "default"} className="flex-1" onClick={() => goToStep(stepIndex + 1)}>
+                      Suivant <ArrowRight />
+                    </Button>
+                  ) : manual ? (
+                    next ? (
+                      <Button onClick={tickIt} disabled={busy} className="flex-1">
+                        Tâche suivante
+                        {busy ? <Loader2 className="animate-spin" /> : <ArrowRight />}
+                      </Button>
+                    ) : (
+                      <Button onClick={tickIt} disabled={busy} className="flex-1">
+                        {busy ? <Loader2 className="animate-spin" /> : <Check />}
+                        C'est fait
+                      </Button>
+                    )
                   ) : (
-                    <Button onClick={tickIt} disabled={busy} className="flex-1">
-                      {busy ? <Loader2 className="animate-spin" /> : <Check />}
-                      C'est fait
-                    </Button>
-                  )
-                ) : (
-                  <p className="flex flex-1 items-center gap-2 rounded-xl bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
-                    <Zap className="h-4 w-4 shrink-0 text-primary" />
-                    {missionCheckText(task.check)}
-                  </p>
-                )}
-              </div>
+                    !waitsHere && (
+                      <p className="flex flex-1 items-center gap-2 rounded-xl bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">
+                        <Zap className="h-4 w-4 shrink-0 text-primary" />
+                        {missionCheckText(task.check)}
+                      </p>
+                    )
+                  )}
+                </div>
+              )}
               <div className="flex">
                 <button
                   type="button"
