@@ -29,9 +29,10 @@ const DONE_SHOWN = 3;
 
 /**
  * Buttons that complete their task right there (its logo dropped, its payment account, its app's
- * address, its payment link): on its last step, the task's "Se coche dès que…" would only repeat them.
+ * address, its TikTok account, its payment link): on its last step, the task's "Se coche dès que…"
+ * would only repeat them.
  */
-const COMPLETING_ACTIONS = new Set(["settings", "app_url", "payment_link"]);
+const COMPLETING_ACTIONS = new Set(["settings", "payment_account", "app_url", "tiktok_account", "payment_link"]);
 
 /**
  * The tasks already done (pages/Today.tsx, under the day's; shared/today.ts: doneTasks): a quiet list,

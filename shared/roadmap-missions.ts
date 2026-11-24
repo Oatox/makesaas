@@ -290,7 +290,16 @@ const BASE_STAGES: RoadmapStage[] = [
         steps: [
           {
             text: "Connecte ton compte Whop avec une clé en lecture seule : la fenêtre t'explique où la trouver.",
-            action: { kind: "settings", tab: "payments", label: "Connecter mon compte" },
+            action: { kind: "payment_account", provider: "whop" },
+          },
+          { text: "Retrouve tes revenus dans ton tableau de bord : ton MRR et tes abonnés s'y mettent à jour tout seuls.", action: REVENUE },
+          {
+            text: "Demande à Gus d'analyser tes chiffres : il les voit déjà.",
+            action: {
+              kind: "gus",
+              label: "Analyser avec Gus",
+              message: "Analyse mes revenus avec moi : où j'en suis, et ce que je peux faire pour les faire grimper.",
+            },
           },
         ],
         check: { kind: "payment_account" },
@@ -305,13 +314,13 @@ const BASE_STAGES: RoadmapStage[] = [
     missions: [
       {
         key: "video:account",
-        title: "Crée le compte TikTok de ton app",
-        why: "Un compte rien que pour ton app : TikTok le montre aux bonnes personnes.",
+        title: "Crée un premier compte TikTok",
+        why: "Un compte qui a l'air d'un utilisateur normal : ses vidéos passent pour un vrai avis, pas pour de la pub.",
         minutes: 10,
         steps: [
-          { text: "Crée un nouveau compte TikTok, avec une adresse e-mail rien que pour ton app." },
-          { text: "Mets le nom de ton app en pseudo, et ton logo en photo." },
-          { text: "Écris une bio d'une phrase : ce que fait ton app, et pour qui." },
+          { text: "Crée un nouveau compte TikTok, avec une adresse e-mail rien que pour lui." },
+          { text: "Donne-lui l'air d'un utilisateur normal : un pseudo et une photo comme n'importe qui, pas le nom ni le logo de ton app." },
+          { text: "Écris une bio courte, comme une vraie personne, sans faire de pub pour ton app." },
         ],
         check: { kind: "manual" },
       },
@@ -320,7 +329,7 @@ const BASE_STAGES: RoadmapStage[] = [
         title: "Suis ton compte sur MakeSaaS",
         why: "Tu vois tes vues, et tes vidéos font avancer ta roadmap toutes seules.",
         minutes: 2,
-        steps: [{ text: "Ajoute ton compte TikTok avec son @.", action: STATS }],
+        steps: [{ text: "Ajoute ton compte TikTok avec son @.", action: { kind: "tiktok_account" } }],
         check: { kind: "tiktok_accounts", min: 1 },
       },
       {
@@ -340,7 +349,7 @@ const BASE_STAGES: RoadmapStage[] = [
         title: "Poste-la",
         why: "La première est la plus dure. Ensuite, ça devient une habitude.",
         minutes: 5,
-        steps: [{ text: "Publie ta vidéo sur le compte de ton app." }],
+        steps: [{ text: "Publie ta vidéo sur ton compte TikTok." }],
         check: { kind: "videos", min: 1 },
       },
     ],
@@ -448,8 +457,8 @@ function mrrMissions(key: string, level: number, amount: number): RoadmapMission
         why: "Deux comptes, deux fois plus de chances que TikTok pousse tes vidéos.",
         minutes: 15,
         steps: [
-          { text: "Crée un second compte pour ton app, sur un autre angle." },
-          { text: "Ajoute-le sur MakeSaaS.", action: STATS },
+          { text: "Crée un second compte d'utilisateur normal, sur un autre angle." },
+          { text: "Ajoute-le sur MakeSaaS avec son @.", action: { kind: "tiktok_account" } },
         ],
         check: { kind: "tiktok_accounts", min: 2 },
       },
@@ -496,7 +505,7 @@ function mrrMissions(key: string, level: number, amount: number): RoadmapMission
       minutes: 15,
       steps: [
         { text: "Ouvre un nouveau compte sur un angle que tu n'as pas encore testé." },
-        { text: "Ajoute-le sur MakeSaaS.", action: STATS },
+        { text: "Ajoute-le sur MakeSaaS avec son @.", action: { kind: "tiktok_account" } },
       ],
       check: { kind: "tiktok_accounts", min: accounts },
     },
@@ -611,7 +620,7 @@ export function dailyTasks(day: string): RoadmapMission[] {
       minutes: 20,
       steps: [
         { text: "Prépare-la : un carrousel sur le problème que règle ton app, ou ton écran qui montre son résultat.", action: CONTENT },
-        { text: "Publie-la sur le compte de ton app, avec une accroche différente d'hier." },
+        { text: "Publie-la sur ton compte TikTok, avec une accroche différente d'hier." },
       ],
       check: { kind: "manual" },
     },

@@ -1,15 +1,18 @@
-import { useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, ChevronDown, Copy, ExternalLink, ImagePlus, Loader2, MessageCircle, Settings, SquareTerminal } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Copy, ExternalLink, ImagePlus, Loader2, MessageCircle, SquareTerminal } from "lucide-react";
 import { APP_URL_MAX_LENGTH, PAYMENT_LINK_MAX_LENGTH, type RoadmapState, type StepAction as Action } from "@shared/roadmap";
+import type { RevenueProvider } from "@shared/revenue";
 import { chatGptUrl, missionPromptText, PROMPT_TARGET } from "@shared/roadmap-prompts";
 import type { Saas } from "@shared/saas";
 import { IMAGE_TYPES, IMAGE_TYPES_LABEL } from "@shared/storage";
+import { AddAccountForm } from "@/components/acquisition/AddAccountForm";
 import { SaasAvatar } from "@/components/saas/SaasAvatar";
-import { SaasDialog, type SaasDialogState } from "@/components/saas/SaasDialog";
+import { ConnectDialog, ProviderButton } from "@/components/revenue/ConnectDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useTikTokAccounts } from "@/hooks/use-acquisition";
 import { useAskGus } from "@/hooks/use-ask-gus";
 import { roadmapKeys, useSaveAppUrl, useSetPaymentLink } from "@/hooks/use-roadmap";
 import { useSaasLogo } from "@/hooks/use-saas";
@@ -213,32 +216,50 @@ function PaymentLinkForm({ saasId, paymentLink }: { saasId: string; paymentLink:
 }
 
 /**
- * Opens the SaaS's settings on a tab (its logo, its payment account). Closing them reads the roadmap
- * again, so the mission they complete gets checked at once.
+ * A TikTok account added by its @ right in its task (the form of the Statistiques page), to this SaaS.
+ * Once added, the roadmap is read again: its task is checked from the accounts. Those already
+ * followed are named under it, with the way to their statistics.
  */
-function SettingsAction({ saas, tab, quiet, children }: { saas: Saas; tab: "general" | "payments"; quiet?: boolean; children: ReactNode }) {
+function TikTokAccountForm({ saasId }: { saasId: string }) {
   const queryClient = useQueryClient();
-  const [dialog, setDialog] = useState<SaasDialogState>(null);
-  const [dialogKey, setDialogKey] = useState(0);
+  const accounts = useTikTokAccounts(saasId);
+  const handles = (accounts.data ?? []).map((account) => `@${account.handle}`);
+  return (
+    <div className="space-y-2">
+      <AddAccountForm saasId={saasId} onAdded={() => void queryClient.invalidateQueries({ queryKey: roadmapKeys.state(saasId) })} />
+      {handles.length > 0 && (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+          <span>
+            {handles.length > 1 ? "Déjà suivis" : "Déjà suivi"} : {handles.join(", ")}
+          </span>
+          <Link href="/acquisition" className="inline-flex items-center gap-1.5 text-primary hover:underline">
+            Ouvrir mes statistiques <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The payment provider's button, right in its task: opens straight on its key form (the same as the
+ * Paiements tab of the SaaS's settings). Closing it reads the roadmap again: once the account is
+ * connected, its task is checked.
+ */
+function ConnectPaymentAccount({ saasId, provider }: { saasId: string; provider: RevenueProvider }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
   return (
     <>
-      <Button
-        variant={quiet ? "secondary" : "default"}
-        className="w-full"
-        onClick={() => {
-          setDialogKey((key) => key + 1);
-          setDialog({ mode: "edit", saas, tab });
+      <ProviderButton provider={provider} onClick={() => setOpen(true)} />
+      <ConnectDialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) void queryClient.invalidateQueries({ queryKey: roadmapKeys.state(saasId) });
         }}
-      >
-        {children}
-      </Button>
-      <SaasDialog
-        key={dialogKey}
-        state={dialog}
-        onClose={() => {
-          setDialog(null);
-          void queryClient.invalidateQueries({ queryKey: roadmapKeys.state(saas.id) });
-        }}
+        provider={provider}
+        saasId={saasId}
       />
     </>
   );
@@ -368,15 +389,13 @@ export function StepActionButton({ action, saas, state, quiet = false }: { actio
         </Button>
       );
     case "settings":
-      // The logo is dropped right in its task; the payment account opens the SaaS's settings.
-      if (action.tab === "general") return <LogoDrop saas={saas} />;
-      return (
-        <SettingsAction saas={saas} tab={action.tab} quiet={quiet}>
-          <Settings /> {action.label}
-        </SettingsAction>
-      );
+      return <LogoDrop saas={saas} />;
+    case "payment_account":
+      return <ConnectPaymentAccount saasId={saas.id} provider={action.provider} />;
     case "app_url":
       return <AppUrlForm saasId={saas.id} appUrl={state.appUrl} />;
+    case "tiktok_account":
+      return <TikTokAccountForm saasId={saas.id} />;
     case "payment_link":
       return <PaymentLinkForm saasId={saas.id} paymentLink={state.project.paymentLink ?? null} />;
   }

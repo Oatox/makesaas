@@ -355,7 +355,7 @@ describe("prompts", () => {
     expect(prompt).not.toContain("nouvel onglet");
   });
 
-  test("the payment tasks: the Whop shop, the prompt, then the webhook before the test", () => {
+  test("the payment tasks: the Whop shop, the prompt, the webhook before the test, then the revenue", () => {
     const payment = STAGES.find((stage) => stage.key === "payment")!.missions;
     expect(payment.map((mission) => mission.key)).toEqual(["payment:whop", "payment:in_app", "payment:webhook", "payment:test", "payment:connect"]);
     const steps = (key: string) => payment.find((mission) => mission.key === key)!.steps.map((step) => step.text).join("\n");
@@ -373,6 +373,9 @@ describe("prompts", () => {
     const tested = { at: CREATED, source: "declared" as const };
     expect(withEarlierBuildMissions({ "payment:test": tested })["payment:webhook"]).toEqual({ at: CREATED, source: "observed" });
     expect(withEarlierBuildMissions({ "payment:in_app": tested })["payment:webhook"]).toBeUndefined();
+    // The Whop account connected right in its task, then its revenue on the dashboard and with Gus.
+    const connect = payment.find((mission) => mission.key === "payment:connect")!;
+    expect(connect.steps.map((step) => step.action?.kind)).toEqual(["payment_account", "page", "gus"]);
   });
 
   test("the review prompt checks the whole app before publishing, and lets Base44 fix it", () => {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { RevenueProvider } from "./revenue";
 import type { MissionProject, MissionPrompt } from "./roadmap-prompts";
 
 /**
@@ -65,10 +66,14 @@ export type StepAction =
   | { kind: "copy"; prompt: MissionPrompt }
   /** Opens a new discussion with Gus, starting with this message. */
   | { kind: "gus"; label: string; message: string }
-  /** Opens the SaaS's settings on one of its tabs (its logo, its payment account). */
-  | { kind: "settings"; tab: "general" | "payments"; label: string }
+  /** The SaaS's logo, dropped or picked right in its task (the Général tab of its settings). */
+  | { kind: "settings"; tab: "general"; label: string }
+  /** The provider's button: opens the form where the member pastes its read-only key. */
+  | { kind: "payment_account"; provider: RevenueProvider }
   /** The field where the member pastes the address of their app. */
   | { kind: "app_url" }
+  /** The field where the member adds a TikTok account by its @ (followed on the Statistiques page). */
+  | { kind: "tiktok_account" }
   /** The field where the member pastes the Whop payment link of their app. */
   | { kind: "payment_link" };
 

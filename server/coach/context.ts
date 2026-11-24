@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatOnboardingProfile, onboardingProfileSchema } from "@shared/onboarding-profile";
-import type { RevenueOverview, RevenueProvider, RevenueSnapshot } from "@shared/revenue";
+import { REVENUE_PROVIDER_NAMES, type RevenueOverview, type RevenueProvider, type RevenueSnapshot } from "@shared/revenue";
 import {
   type Milestone,
   type MissionDone,
@@ -125,8 +125,14 @@ function stepLine(step: MissionStep, index: number): string {
     case "settings":
       button = ` [bouton « ${action.label} » : les réglages de son projet]`;
       break;
+    case "payment_account":
+      button = ` [bouton « ${REVENUE_PROVIDER_NAMES[action.provider]} » : la fenêtre où il colle sa clé en lecture seule]`;
+      break;
     case "app_url":
       button = " [champ où il colle l'adresse de son app]";
+      break;
+    case "tiktok_account":
+      button = " [champ où il ajoute son compte TikTok avec son @]";
       break;
   }
   return `${index + 1}. ${step.text}${button}`;
