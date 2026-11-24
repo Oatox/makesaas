@@ -1,13 +1,15 @@
 /*
  * Fake onboarding (marketing tool, to film): passions → time → bank → monthly goal → the site
  * "created" before your eyes, up to the moment it goes live.
- * Nothing is saved or sent anywhere. Keys: R restart, M sound, F fullscreen, Escape back to the list.
+ * Nothing is saved or sent anywhere. Keys: R restart, M sound, A spider (spider.js), F fullscreen,
+ * Escape back to the list.
  */
 (() => {
   "use strict";
 
   const { PASSIONS, TIMES, BANKS, GOAL } = window.FO_DATA;
   const ICONS = window.FO_ICONS;
+  const spider = window.FO_SPIDER;
 
   const main = document.getElementById("main");
   const progressFill = document.getElementById("progressFill");
@@ -402,6 +404,7 @@
   function restart() {
     state = fresh();
     confetti.clear();
+    spider.respawn();
     show(0);
   }
 
@@ -917,6 +920,7 @@
 
   document.getElementById("btnRestart").addEventListener("click", restart);
   document.getElementById("btnSound").addEventListener("click", () => sound.toggle());
+  document.getElementById("btnSpider").addEventListener("click", () => spider.toggle());
   document.getElementById("btnFull").addEventListener("click", toggleFullscreen);
   btnBack.addEventListener("click", () => stepIndex > 0 && show(stepIndex - 1));
 
@@ -925,6 +929,7 @@
     const key = event.key.toLowerCase();
     if (key === "r") restart();
     else if (key === "m") sound.toggle();
+    else if (key === "a") spider.toggle();
     else if (key === "f") toggleFullscreen();
     else if (event.key === "Escape" && !document.fullscreenElement && window.parent !== window) {
       window.parent.postMessage({ type: "marketing-tool:home" }, location.origin);
