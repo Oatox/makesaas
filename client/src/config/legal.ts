@@ -14,5 +14,5 @@ export const LEGAL = {
     address: "548 Market Street, San Francisco, CA 94104, États-Unis",
   },
   /** Date shown as "Dernière mise à jour" on every legal page. */
-  updatedAt: "23 novembre 2026",
+  updatedAt: "24 novembre 2026",
 } as const;

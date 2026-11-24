@@ -25,7 +25,7 @@ export default function CGV() {
         </p>
         <p>
           Le paiement est encaissé par Whop (whop.com), notre prestataire de paiement. {LEGAL.editorName} reste votre
-          vendeur et votre seul interlocuteur pour le service, le remboursement et la rétractation.
+          vendeur et votre seul interlocuteur pour le service et le remboursement.
         </p>
       </LegalSection>
 
@@ -86,24 +86,21 @@ export default function CGV() {
         </p>
       </LegalSection>
 
-      <LegalSection title="7. Rétractation et remboursement">
+      <LegalSection title="7. Renonciation au droit de rétractation et remboursement">
         <p>
-          Vous disposez de 14 jours après votre premier paiement pour vous rétracter, sans justification,
-          <span className={strong}> tant que vous n'avez pas commencé à utiliser {LEGAL.siteName}</span>. Utiliser{" "}
-          {LEGAL.siteName}, c'est envoyer un message à {COACH_NAME}, ouvrir votre plan ou une tâche de votre roadmap, ou
-          utiliser un outil de l'application. En demandant l'accès immédiat au service lors de la souscription, vous
-          acceptez que, dès cette première utilisation, le service vous ait été fourni et que votre droit de
-          rétractation ne puisse plus être exercé (articles L.221-25 et L.221-28 du Code de la consommation).
+          L'accès à {LEGAL.siteName} est immédiat : votre plan, {COACH_NAME} et les outils de l'application sont
+          ouverts dès votre paiement.{" "}
+          <span className={strong}>
+            En vous abonnant, vous demandez que le service commence tout de suite et vous renoncez expressément à votre
+            droit de rétractation de 14 jours
+          </span>{" "}
+          (article L.221-28 du Code de la consommation). Vous ne pouvez donc pas vous rétracter après votre paiement.
         </p>
         <p>
-          Pour vous rétracter, écrivez à <SupportEmail /> avec l'adresse e-mail de votre compte. Si votre demande remplit
-          ces conditions, nous vous remboursons sous 14 jours sur votre moyen de paiement et vous le confirmons par
-          e-mail.
-        </p>
-        <p>
-          Les renouvellements ne sont pas remboursés, et une période commencée n'est pas remboursée au prorata. Exceptions : la
-          garantie {LEGAL.siteName} (article 8), une suspension de compte qui ne vous est pas imputable (article 9), une
-          erreur de notre part ou une obligation légale.
+          Les paiements, celui de la souscription comme ceux des renouvellements, ne sont pas remboursés, et une période
+          commencée n'est pas remboursée au prorata. Exceptions : la garantie {LEGAL.siteName} (article 8), une
+          suspension de compte qui ne vous est pas imputable (article 9), une erreur de notre part ou une obligation
+          légale.
         </p>
       </LegalSection>
 
@@ -111,8 +108,8 @@ export default function CGV() {
         {/* Same conditions as FirstMRR's guarantee: an offer you can pay for, online before the first
             video, then 6 videos in 48 hours. */}
         <p>
-          En plus de ce droit, et <span className={strong}>même si vous avez utilisé {LEGAL.siteName}</span>, votre
-          premier paiement vous est remboursé si :
+          <span className={strong}>Même si vous avez utilisé {LEGAL.siteName}</span>, votre premier paiement vous est
+          remboursé si :
         </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>vous avez mis votre offre en ligne, avec un paiement possible, avant votre première vidéo ;</li>
