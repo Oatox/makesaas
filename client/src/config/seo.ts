@@ -20,51 +20,45 @@ export type SeoPage = {
   file: string;
   title: string;
   description: string;
-  changefreq: "daily" | "weekly" | "monthly" | "yearly";
-  priority: number;
+  /**
+   * Indexed and listed in the sitemap. Without it, the page is still prerendered (visitors, link
+   * previews) but kept out of search results with robots "noindex": the legal pages.
+   */
+  sitemap?: { changefreq: "daily" | "weekly" | "monthly" | "yearly"; priority: number };
 };
 
-/** Public, indexable pages: prerendered to static HTML and listed in the sitemap. */
+/** Public pages: prerendered to static HTML; those with `sitemap` are indexed and listed there. */
 export const PUBLIC_PAGES: SeoPage[] = [
   {
     path: "/",
     file: "index.html",
     title: "MakeSaaS · Lance ton business",
     description: SITE.description,
-    changefreq: "weekly",
-    priority: 1,
+    sitemap: { changefreq: "weekly", priority: 1 },
   },
   {
     path: "/mentions-legales",
     file: "mentions-legales.html",
     title: "Mentions légales | MakeSaaS",
     description: "Éditeur, hébergeur et informations légales du site MakeSaaS.",
-    changefreq: "yearly",
-    priority: 0.2,
   },
   {
     path: "/cgu",
     file: "cgu.html",
     title: "Conditions générales d'utilisation | MakeSaaS",
     description: "Conditions d'utilisation du service MakeSaaS.",
-    changefreq: "yearly",
-    priority: 0.2,
   },
   {
     path: "/cgv",
     file: "cgv.html",
     title: "Conditions générales de vente | MakeSaaS",
     description: "Conditions de souscription, de paiement, de résiliation et de remboursement des abonnements MakeSaaS.",
-    changefreq: "yearly",
-    priority: 0.2,
   },
   {
     path: "/confidentialite",
     file: "confidentialite.html",
     title: "Politique de confidentialité | MakeSaaS",
     description: "Comment MakeSaaS collecte, utilise et protège vos données personnelles.",
-    changefreq: "yearly",
-    priority: 0.2,
   },
 ];
 
@@ -115,14 +109,15 @@ function structuredData(page: SeoPage): object[] {
   ];
 }
 
-/** <head> tags for a public page: title, description, canonical, Open Graph, X, JSON-LD. */
+/** <head> tags for a public page: title, description, canonical or noindex, Open Graph, X, JSON-LD. */
 export function renderHead(page: SeoPage): string {
   const url = absolute(page.path);
   const image = absolute(SITE.ogImage);
   return [
     `<title>${escapeHtml(page.title)}</title>`,
     `<meta name="description" content="${escapeHtml(page.description)}" />`,
-    `<link rel="canonical" href="${url}" />`,
+    // A canonical URL on a noindex page would ask search engines for two opposite things.
+    page.sitemap ? `<link rel="canonical" href="${url}" />` : `<meta name="robots" content="noindex" />`,
     `<meta property="og:type" content="website" />`,
     `<meta property="og:site_name" content="${SITE.name}" />`,
     `<meta property="og:locale" content="${SITE.locale}" />`,
@@ -151,10 +146,13 @@ export function renderAppShellHead(): string {
 }
 
 export function renderSitemap(lastmod: string): string {
-  const urls = PUBLIC_PAGES.map(
-    (page) =>
-      `  <url>\n    <loc>${absolute(page.path)}</loc>\n    <lastmod>${lastmod}</lastmod>\n` +
-      `    <changefreq>${page.changefreq}</changefreq>\n    <priority>${page.priority.toFixed(1)}</priority>\n  </url>`,
+  const urls = PUBLIC_PAGES.flatMap(({ path, sitemap }) =>
+    sitemap
+      ? [
+          `  <url>\n    <loc>${absolute(path)}</loc>\n    <lastmod>${lastmod}</lastmod>\n` +
+            `    <changefreq>${sitemap.changefreq}</changefreq>\n    <priority>${sitemap.priority.toFixed(1)}</priority>\n  </url>`,
+        ]
+      : [],
   ).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
