@@ -44,22 +44,40 @@ export const IDEA_STEER_MAX_LENGTH = 200;
 export const IDEA_TEXT_LIMITS = {
   name: 40,
   pitch: 120,
+  feature: 140,
   problem: 140,
   audience: 90,
   whyYou: 140,
 } as const;
 
-/** Monthly price of the subscription, in euros. */
-export const IDEA_PRICE_RANGE = { min: 1, max: 200 } as const;
+/**
+ * The app's single price: one monthly subscription, at a consumer (B2C) app price ending in ,99. The
+ * Base44 prompts of the roadmap reuse it (shared/roadmap-prompts.ts). Ideas written before were whole
+ * euros, up to 200.
+ */
+export const IDEA_PRICE_RANGE = { min: 2.99, max: 29.99 } as const;
+
+/** The model's price brought to a consumer price: whole euros minus a cent, within IDEA_PRICE_RANGE (9 → 8,99 €). */
+export function consumerPrice(price: number): number {
+  const euros = Math.min(Math.round(IDEA_PRICE_RANGE.max), Math.max(Math.round(IDEA_PRICE_RANGE.min), Math.round(price)));
+  return Math.round((euros - 0.01) * 100) / 100;
+}
 
 /** One idea, as stored in saas_ideas.content. */
 export const ideaContentSchema = z.object({
   name: z.string().trim().min(1).max(IDEA_TEXT_LIMITS.name),
   /** What the app does, in one sentence. */
   pitch: z.string().trim().min(1).max(IDEA_TEXT_LIMITS.pitch),
+  /**
+   * Its main feature, concretely: what the user gives and what the app gives back ("une photo du repas
+   * → ses calories et ses macros"). The Base44 prompt builds the app around it. Absent from the ideas
+   * written before it.
+   */
+  feature: z.string().trim().min(1).max(IDEA_TEXT_LIMITS.feature).optional(),
   problem: z.string().trim().min(1).max(IDEA_TEXT_LIMITS.problem),
   audience: z.string().trim().min(1).max(IDEA_TEXT_LIMITS.audience),
-  price: z.number().int().min(IDEA_PRICE_RANGE.min).max(IDEA_PRICE_RANGE.max),
+  /** Monthly, in euros (consumerPrice). */
+  price: z.number().min(IDEA_PRICE_RANGE.min).max(IDEA_PRICE_RANGE.max),
   /** Why it suits the member, said to them. */
   whyYou: z.string().trim().min(1).max(IDEA_TEXT_LIMITS.whyYou),
 });

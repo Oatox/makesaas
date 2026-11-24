@@ -463,9 +463,10 @@ Classe les idées de celle que tu conseilles le plus au membre (la plus simple �
 Pour chaque idée, des textes courts : une seule phrase simple par champ, sans détails ni exemples.
 - name : un nom court et facile à retenir (un ou deux mots), qui n'est pas une marque connue.
 - pitch : ce que fait l'app.
+- feature : sa fonctionnalité principale, concrètement : ce que l'utilisateur donne → ce que l'app lui rend (par exemple « une photo du repas → ses calories et ses macros »).
 - problem : le problème qu'elle règle.
 - audience : pour qui, en quelques mots.
-- price : le prix mensuel conseillé de l'abonnement, en euros (un nombre entier).
+- price : le prix unique de l'app : un seul abonnement mensuel (pas de formules, d'offre annuelle ni de réduction), au prix d'une app grand public entre 2,99 € et 29,99 € qui finit par ,99 (par exemple 4.99, 9.99 ou 14.99), adapté à ce que ce public paie déjà pour ce type d'app.
 - whyYou : pourquoi cette idée colle au membre, en lui parlant directement.$prompt$,
     $prompt$Réponds uniquement avec un objet JSON valide, sans texte autour ni bloc de code, au format exact suivant, avec exactement {{nombre}} idées :
 {
@@ -473,9 +474,10 @@ Pour chaque idée, des textes courts : une seule phrase simple par champ, sans d
     {
       "name": "nom de l'app (40 caractères max)",
       "pitch": "ce que fait l'app, une phrase (120 caractères max)",
+      "feature": "la fonctionnalité principale : ce que l'utilisateur donne → ce que l'app lui rend (140 caractères max)",
       "problem": "le problème réglé, une phrase (140 caractères max)",
       "audience": "pour qui, quelques mots (90 caractères max)",
-      "price": 9,
+      "price": 9.99,
       "whyYou": "pourquoi l'idée colle au membre, une phrase (140 caractères max)"
     }
   ]
@@ -483,6 +485,41 @@ Pour chaque idée, des textes courts : une seule phrase simple par champ, sans d
 Écris en français, en tutoyant le membre.$prompt$
 )
 ON CONFLICT (slug) DO NOTHING;
+
+-- Ideas got their main feature (`feature`, which the Base44 prompt builds the app around): added
+-- next to the pitch in prompts written before it, leaving the rest as admins edited it.
+UPDATE public.ai_pipelines
+SET
+    instructions_prompt = replace(
+        instructions_prompt,
+        $old$- pitch : ce que fait l'app.$old$,
+        $new$- pitch : ce que fait l'app.
+- feature : sa fonctionnalité principale, concrètement : ce que l'utilisateur donne → ce que l'app lui rend (par exemple « une photo du repas → ses calories et ses macros »).$new$
+    ),
+    output_format_prompt = replace(
+        output_format_prompt,
+        $old$      "pitch": "ce que fait l'app, une phrase (120 caractères max)",$old$,
+        $new$      "pitch": "ce que fait l'app, une phrase (120 caractères max)",
+      "feature": "la fonctionnalité principale : ce que l'utilisateur donne → ce que l'app lui rend (140 caractères max)",$new$
+    )
+WHERE slug = 'ideas' AND position('"feature"' IN output_format_prompt) = 0;
+
+-- Ideas got a single consumer price (one monthly subscription between 2,99 € and 29,99 €, ending in
+-- ,99, brought there by consumerPrice in shared/ideas.ts): the price line and its example replaced in
+-- prompts written before it, leaving the rest as admins edited it.
+UPDATE public.ai_pipelines
+SET
+    instructions_prompt = replace(
+        instructions_prompt,
+        $old$- price : le prix mensuel conseillé de l'abonnement, en euros (un nombre entier).$old$,
+        $new$- price : le prix unique de l'app : un seul abonnement mensuel (pas de formules, d'offre annuelle ni de réduction), au prix d'une app grand public entre 2,99 € et 29,99 € qui finit par ,99 (par exemple 4.99, 9.99 ou 14.99), adapté à ce que ce public paie déjà pour ce type d'app.$new$
+    ),
+    output_format_prompt = replace(
+        output_format_prompt,
+        $old$      "price": 9,$old$,
+        $new$      "price": 9.99,$new$
+    )
+WHERE slug = 'ideas' AND position('29,99' IN instructions_prompt) = 0;
 
 -- Carousel pipeline (/acquisition/contenu, server/content/): a JSON job writing the text of a
 -- carousel and the description of each slide's image (then drawn by Nano Banana 2, with no text in
@@ -1119,7 +1156,7 @@ CREATE TABLE IF NOT EXISTS public.saas_ideas (
     batch_id UUID NOT NULL,
     -- Rank in its request, 0 being the idea Gus recommends most: shown in this order, 3 at a time.
     position SMALLINT NOT NULL,
-    -- IdeaContent of shared/ideas.ts: name, pitch, problem, audience, price, whyYou (older ideas may hold more).
+    -- IdeaContent of shared/ideas.ts: name, pitch, feature, problem, audience, price, whyYou (older ideas may hold more, or no feature).
     content JSONB NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
 

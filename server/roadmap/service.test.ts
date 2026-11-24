@@ -2,13 +2,17 @@ import { describe, expect, test } from "bun:test";
 import { canUntickMission, currentStageIndex, isCustomDomain, stageProgress, ticksAfter } from "@shared/roadmap";
 import { missionTime, roadmapStagesFor, stageTimeLeft } from "@shared/roadmap-missions";
 import {
+  buildAccountsPrompt,
   buildAppPrompt,
+  buildLandingPrompt,
   buildLogoPrompt,
+  buildOnboardingPrompt,
   buildPaymentPrompt,
+  buildReviewPrompt,
   chatGptUrl,
   missionPromptText,
 } from "@shared/roadmap-prompts";
-import { observedMissions, type MissionFacts } from "./service";
+import { observedMissions, withEarlierBuildMissions, type MissionFacts } from "./service";
 
 const CREATED = "2026-11-20T10:00:00.000Z";
 const NOW = "2026-11-23T15:00:00.000Z";
@@ -27,7 +31,6 @@ const series = (days: Record<number, number>, carry = false) => {
 
 const facts = (overrides: Partial<MissionFacts> = {}): MissionFacts => ({
   saasCreatedAt: CREATED,
-  hasAppUrl: false,
   hasCustomDomain: false,
   hasLogo: false,
   hasPaymentAccount: false,
@@ -74,8 +77,8 @@ describe("roadmapStagesFor", () => {
     const stage = (key: string) => STAGES.find((item) => item.key === key)!;
     expect(missionTime(stage("brand").missions[0])).toBe("5 min");
     expect(stageTimeLeft(stage("brand"), {})).toBe("≈ 5 min");
-    expect(stageTimeLeft(stage("build"), {})).toBe("≈ 1 h 12");
-    expect(stageTimeLeft(stage("build"), { "build:claude": { at: NOW, source: "declared" } })).toBe("≈ 1 h 10");
+    expect(stageTimeLeft(stage("build"), {})).toBe("≈ 2 h 09");
+    expect(stageTimeLeft(stage("build"), { "build:claude": { at: NOW, source: "declared" } })).toBe("≈ 2 h 07");
     // A mission over days: no total.
     expect(stageTimeLeft(stage("customer"), {})).toBeNull();
     expect(missionTime(stage("customer").missions[0])).toBe("7 jours");
@@ -108,17 +111,16 @@ describe("observedMissions", () => {
     expect(observedMissions(facts(), STAGES)).toEqual({ "idea:chosen": { at: CREATED, source: "declared" } });
   });
 
-  test("the app on its own domain: online, and its domain bought", () => {
-    const done = observedMissions(facts({ hasAppUrl: true, hasCustomDomain: true }), STAGES);
-    expect(done["build:online"]).toEqual({ at: NOW, source: "declared" });
+  test("the app's address on its own domain: its domain bought, its publishing still the member's to tick", () => {
+    const done = observedMissions(facts({ hasCustomDomain: true }), STAGES);
     expect(done["build:domain"]).toEqual({ at: NOW, source: "declared" });
+    expect(done["build:online"]).toBeUndefined();
   });
 
-  test("the address, the accounts and the videos, dated by the Nth video", () => {
+  test("the accounts and the videos, dated by the Nth video", () => {
     const videoDates = Array.from({ length: 7 }, (_, i) => `2026-11-${String(19 + i).padStart(2, "0")}T18:00:00.000Z`);
-    const done = observedMissions(facts({ hasAppUrl: true, hasPaymentAccount: true, tiktokAccounts: 1, videoDates }), STAGES);
-    expect(done["build:online"]).toEqual({ at: NOW, source: "declared" });
-    // Still on its free Base44 address: no domain of its own yet.
+    const done = observedMissions(facts({ hasPaymentAccount: true, tiktokAccounts: 1, videoDates }), STAGES);
+    // No address on a domain of its own yet.
     expect(done["build:domain"]).toBeUndefined();
     expect(done["payment:connect"]).toEqual({ at: NOW, source: "observed" });
     expect(done["video:track"]?.source).toBe("observed");
@@ -128,6 +130,7 @@ describe("observedMissions", () => {
     expect(done["mrr_1000:2_accounts"]).toBeUndefined();
     // Manual missions are only ticked by the member.
     expect(done["build:claude"]).toBeUndefined();
+    expect(done["build:online"]).toBeUndefined();
     expect(done["brand:logo"]).toBeUndefined();
   });
 
@@ -168,7 +171,7 @@ describe("stage progress", () => {
     const done = { "idea:chosen": { at: CREATED, source: "declared" as const }, "build:claude": { at: NOW, source: "declared" as const } };
     expect(stageProgress(STAGES[0], done)).toEqual({ done: 1, total: 1, complete: true });
     expect(stageProgress(STAGES[1], done)).toEqual({ done: 0, total: 1, complete: false });
-    expect(stageProgress(STAGES[2], done)).toEqual({ done: 1, total: 5, complete: false });
+    expect(stageProgress(STAGES[2], done)).toEqual({ done: 1, total: 9, complete: false });
     expect(currentStageIndex(STAGES, done)).toBe(1);
   });
 });
@@ -176,26 +179,149 @@ describe("stage progress", () => {
 describe("prompts", () => {
   const project = { name: "Fitlo", description: "Ton programme de muscu en 3 questions.", audience: "Étudiants", problem: "Pas de programme clair.", price: 9 };
 
-  test("the build prompt for Base44 carries the project, and the logo added in the style stage", () => {
-    const prompt = buildAppPrompt({ ...project, logoUrl: "https://files.example.com/u/s/logo/abc.png" });
-    expect(prompt).toContain("Crée une app web appelée Fitlo");
+  const feature = "Tes créneaux et ton niveau → ton programme de la semaine";
+
+  test("the first prompt creates the app: its project, its home page and legal pages, its logo and colors", () => {
+    const prompt = buildLandingPrompt({ ...project, feature, logoUrl: "https://files.example.com/u/s/logo/abc.png" });
+    expect(prompt).toContain("Crée une app web appelée Fitlo, pensée d'abord pour le téléphone, avec tous ses textes en français.");
     expect(prompt).toContain("L'idée : Ton programme de muscu en 3 questions.");
-    // Intl puts a narrow no-break space before the euro sign.
-    expect(prompt).toMatch(/Plus tard, un abonnement à 9\s€ par mois débloquera la suite/);
+    expect(prompt).toContain(`Sa fonctionnalité principale : ${feature}`);
+    expect(prompt).toContain("Pour qui : Étudiants");
+    expect(prompt).toContain("3 situations que vit ce public");
+    // No pricing section on the home page.
+    expect(prompt).not.toContain("Tarifs");
+    expect(prompt).not.toContain("€");
+    expect(prompt).toContain("Mentions légales, CGU et Politique de confidentialité");
+    expect(prompt).toContain("une page /commencer qui affiche « Bientôt disponible »");
+    expect(prompt).toContain("inspire-toi de ce modèle : https://saas-boilerplate-0bbac609.base44.app (");
     expect(prompt).toContain("Mon logo est cette image : https://files.example.com/u/s/logo/abc.png");
+    // Learned from a first app built with these prompts: its own copy of the logo, one voice, French everywhere.
+    expect(prompt).toContain("Importe-la dans les fichiers de l'app et utilise ta copie");
+    expect(prompt).toContain("l'app tutoie l'utilisateur, partout et toujours");
+    expect(prompt).toContain("tient sur une seule ligne sur téléphone");
+    expect(prompt).toContain("Une page introuvable (404) en français");
+    expect(prompt).toContain('lang="fr"');
+    expect(prompt).toContain("« Nom de la page · Fitlo »");
     expect(prompt).toContain("les couleurs de mon logo");
-    expect(prompt).toContain("Pas de connexion obligatoire");
-    expect(prompt).not.toContain("[COLLE ICI");
     // No logo yet: the app's name instead.
-    expect(buildAppPrompt(project)).toContain("j'ajouterai mon logo plus tard");
-    expect(buildAppPrompt(project)).not.toContain("Mon logo est cette image");
+    expect(buildLandingPrompt(project)).toContain("j'ajouterai mon logo plus tard");
+    expect(buildLandingPrompt(project)).not.toContain("Mon logo est cette image");
+  });
+
+  test("the accounts prompt: Base44's login pages, settings, the Pro field only admins change, the admin page", () => {
+    const prompt = buildAccountsPrompt(project);
+    expect(prompt).toContain("Ajoute à Fitlo les comptes utilisateurs.");
+    expect(prompt).toContain("les pages de connexion de Base44");
+    expect(prompt).toContain("la connexion avec Google");
+    expect(prompt).toContain("inspire-toi de https://saas-boilerplate-0bbac609.base44.app/login");
+    expect(prompt).toContain("tutoient l'utilisateur");
+    expect(prompt).toContain("« Connexion · Fitlo »");
+    expect(prompt).toContain("« En créant ton compte, tu acceptes les CGU et la politique de confidentialité »");
+    expect(prompt).toContain("« Se connecter » devient un petit lien discret");
+    expect(prompt).toContain("supprimer son compte après confirmation");
+    expect(prompt).toContain("un champ is_subscriber (non par défaut) que seuls les administrateurs peuvent modifier");
+    expect(prompt).toMatch(/l'offre Pro à 9\s€ par mois/);
+    expect(prompt).toContain("« Passer en Pro » ou « Repasser en Gratuit »");
+  });
+
+  test("the onboarding and the core are built around the idea's main feature, else its pitch", () => {
+    expect(buildOnboardingPrompt({ ...project, feature })).toContain(`(Fitlo : ${feature})`);
+    expect(buildOnboardingPrompt(project)).toContain("(Fitlo : Ton programme de muscu en 3 questions)");
+    // The paywall right after the questions, with the price, then the sign-up.
+    expect(buildOnboardingPrompt(project)).toContain("3. Paywall : juste après, un écran d'abonnement en plein écran.");
+    expect(buildOnboardingPrompt(project)).toMatch(/l'offre Pro à 9\s€ par mois, 4 avantages concrets/);
+    expect(buildOnboardingPrompt(project)).toContain("« Débloquer mon résultat »");
+    expect(buildOnboardingPrompt(project)).toContain("ce bouton reste visible en bas de l'écran, sans avoir à faire défiler");
+    expect(buildOnboardingPrompt(project)).toContain("le vrai résultat complet n'est jamais dans la page");
+    expect(buildOnboardingPrompt(project)).toContain("« ta musculation », pas « ton musculation »");
+    expect(buildPaymentPrompt(project)).toContain("« Débloquer mon résultat »");
+    expect(buildOnboardingPrompt(project)).toContain("onboarding_answers");
+    expect(buildAppPrompt({ ...project, feature })).toContain(`le cœur de Fitlo dans l'espace connecté, sa fonctionnalité principale : ${feature}.`);
+    expect(buildAppPrompt(project)).toContain("sa fonctionnalité principale : Ton programme de muscu en 3 questions.");
+    expect(buildAppPrompt(project)).toContain("réservés aux abonnés Pro (is_subscriber) et aux administrateurs");
+    // Learned from a first app: its core was the onboarding again, with a score made up from answers.
+    expect(buildAppPrompt(project)).toContain("le résultat du parcours d'accueil ne la remplace pas");
+    expect(buildAppPrompt(project)).toContain("la fonctionnalité principale, en premier et en grand");
+    expect(buildAppPrompt(project)).toContain("n'affiche jamais un score, une mesure ou un chiffre que l'app n'a pas vraiment calculé");
+    expect(buildAppPrompt(project)).toContain("tout ce qu'ils promettent, l'app le fait vraiment");
+    expect(buildAppPrompt(project)).not.toContain("part de ses réponses du parcours d'accueil");
+    // Each OneShotAPI call costs the member credits: a daily limit, announced, never "unlimited".
+    expect(buildAppPrompt(project)).toContain("Fixe une limite d'utilisations par jour et par utilisateur, vérifiée par la fonction serveur");
+    expect(buildAppPrompt(project)).toMatch(/au plus un quart de son abonnement \(9\s€ par mois\) en crédits/);
+    expect(buildAppPrompt(project)).toContain("« Tu as atteint ta limite du jour, reviens demain »");
+    expect(buildAppPrompt(project)).toContain("Nulle part l'app ne promet d'usage illimité.");
+    expect(buildAppPrompt(project)).not.toContain("autant qu'il veut");
+    expect(buildAccountsPrompt(project)).toContain("ne présente pas Gratuit comme une offre avec des fonctionnalités");
+    // Pro users cancel on Whop, which deleting the account does not do.
+    expect(buildPaymentPrompt(project)).toContain("« Gérer mon abonnement » vers ses commandes Whop (https://whop.com/@me/settings/orders/)");
+    expect(buildPaymentPrompt(project)).toContain("supprimer ton compte ne l'arrête pas");
+    // AI or an API goes through OneShotAPI, from a server function, with the member's key in the app's secrets.
+    expect(buildAppPrompt(project)).toContain("utilise OneShotAPI");
+    expect(buildAppPrompt(project)).toContain("https://api.oneshotapi.com");
+    expect(buildAppPrompt(project)).toContain("https://oneshotapi.com/llms.txt");
+    expect(buildAppPrompt(project)).toContain("dans les secrets de l'app sous le nom ONESHOT_API_KEY, jamais dans le code");
+    expect(buildAppPrompt(project)).toContain("explique-moi simplement, étape par étape, comment l'obtenir");
+    expect(buildAppPrompt(project)).toContain("https://oneshotapi.com/keys");
+    expect(buildAppPrompt(project)).not.toContain("IA intégrée de Base44");
+    expect(buildPaymentPrompt(project)).toContain("[COLLE TON LIEN DE PAIEMENT ICI]");
+    expect(buildPaymentPrompt(project)).toMatch(/un abonnement à 9\s€ par mois/);
+  });
+
+  test("the idea's consumer price keeps its cents in every prompt", () => {
+    const priced = { ...project, price: 9.99 };
+    // Intl puts a narrow no-break space before the euro sign.
+    expect(buildAccountsPrompt(priced)).toMatch(/l'offre Pro à 9,99\s€ par mois/);
+    expect(buildOnboardingPrompt(priced)).toMatch(/l'offre Pro à 9,99\s€ par mois/);
+    expect(buildPaymentPrompt(priced)).toMatch(/un abonnement à 9,99\s€ par mois/);
+    expect(buildAppPrompt(priced)).toMatch(/un quart de son abonnement \(9,99\s€ par mois\)/);
   });
 
   test("a SaaS created by its name only still gets prompts", () => {
     const bare = { name: "Fitlo", description: null, audience: null, problem: null, price: null };
-    expect(buildAppPrompt(bare)).not.toContain("L'idée");
-    expect(buildAppPrompt(bare)).toContain("Plus tard, un abonnement mensuel débloquera la suite");
+    expect(buildLandingPrompt(bare)).not.toContain("L'idée");
+    expect(buildLandingPrompt(bare)).toContain("3 situations que vit mon public");
+    expect(buildAccountsPrompt(bare)).toContain("Gratuit, ou l'offre Pro, un abonnement mensuel");
+    expect(buildOnboardingPrompt(bare)).toContain("avant de lui préparer son résultat. Une question par écran");
+    expect(buildAppPrompt(bare)).toContain("le cœur de Fitlo dans l'espace connecté, sa fonctionnalité principale, celle que promet la page d'accueil.");
+    expect(buildAppPrompt(bare)).toContain("au plus un quart de son abonnement en crédits");
     expect(buildPaymentPrompt(bare)).toContain("un abonnement mensuel");
+  });
+
+  test("once the core is built, the build tasks before it are done too", () => {
+    const built = { at: CREATED, source: "declared" as const };
+    const done = withEarlierBuildMissions({ "build:first_version": built });
+    expect(done["build:landing"]).toEqual({ at: CREATED, source: "observed" });
+    expect(done["build:accounts"]).toEqual({ at: CREATED, source: "observed" });
+    expect(done["build:onboarding"]).toEqual({ at: CREATED, source: "observed" });
+    // Ticked by the member: kept as is.
+    const ticked = withEarlierBuildMissions({ "build:first_version": built, "build:landing": { at: NOW, source: "declared" } });
+    expect(ticked["build:landing"]).toEqual({ at: NOW, source: "declared" });
+    // Not built yet: nothing added.
+    expect(withEarlierBuildMissions({ "build:claude": built })).toEqual({ "build:claude": built });
+  });
+
+  test("« Valide ton app » comes right before publishing, and those who already published skip it", () => {
+    const build = STAGES.find((stage) => stage.key === "build")!.missions.map((mission) => mission.key);
+    expect(build.indexOf("build:review")).toBe(build.indexOf("build:online") - 1);
+    expect(build.indexOf("build:review")).toBe(build.indexOf("build:customize") + 1);
+    const published = { at: CREATED, source: "declared" as const };
+    expect(withEarlierBuildMissions({ "build:online": published })["build:review"]).toEqual({ at: CREATED, source: "observed" });
+    expect(withEarlierBuildMissions({ "build:customize": published })["build:review"]).toBeUndefined();
+  });
+
+  test("the review prompt checks the whole app before publishing, and lets Base44 fix it", () => {
+    const prompt = buildReviewPrompt(project);
+    expect(prompt).toContain("Avant que je publie Fitlo, passe toute l'app en revue");
+    expect(prompt).toContain("sans bouton ni lien mort ni page blanche");
+    expect(prompt).toContain("le résultat complet n'est jamais dans la page");
+    expect(prompt).toContain("vérifie l'accès Pro et la limite du jour");
+    expect(prompt).toContain("Aucun faux avis, aucun faux chiffre");
+    expect(prompt).toContain("« Nom de la page · Fitlo »");
+    expect(prompt).toContain("s'il reste des [À COMPLÉTER], demande-moi les informations qui manquent");
+    // The payment comes after publishing.
+    expect(prompt).toContain("« Bientôt disponible » sur la page Abonnement est normal");
+    expect(prompt).toContain("ce que tu as corrigé, puis ce qui me reste à faire moi-même");
+    expect(missionPromptText("review", project)).toBe(prompt);
   });
 
   test("the logo prompt for ChatGPT carries the project on its own", () => {

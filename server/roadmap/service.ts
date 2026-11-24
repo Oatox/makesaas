@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RevenueOverview, RevenueProvider, RevenueSnapshot } from "@shared/revenue";
 import { isCustomDomain, monthlyGoalOf, type MissionDone, type RoadmapStage, type RoadmapState } from "@shared/roadmap";
-import { roadmapStagesFor } from "@shared/roadmap-missions";
+import { EARLIER_BUILD_MISSIONS, LATER_ADDED_MISSIONS, roadmapStagesFor } from "@shared/roadmap-missions";
 import type { MissionProject } from "@shared/roadmap-prompts";
 import { HttpError } from "../lib/http";
 import { logger } from "../lib/logger";
@@ -11,9 +11,7 @@ import { buildOverview, DAY_MS, type ExchangeRates } from "../revenue/metrics";
 /** What the SaaS's data says, for the missions that check themselves. */
 export type MissionFacts = {
   saasCreatedAt: string;
-  /** The member gave the address of their app. */
-  hasAppUrl: boolean;
-  /** That address is on their own domain (isCustomDomain). */
+  /** The address of their app, which the member gave, is on their own domain (isCustomDomain). */
   hasCustomDomain: boolean;
   /** The SaaS has a logo. */
   hasLogo: boolean;
@@ -29,6 +27,23 @@ export type MissionFacts = {
   /** Date of what is seen now without a date of its own (a count reached, an account connected). */
   now: string;
 };
+
+/**
+ * The build tasks before the core (home page, accounts, onboarding) count as done, with its date, once
+ * the core is (build:first_version): members who built their app with the former single prompt are
+ * not sent back to them, and the others did them first anyway. Likewise a task added later
+ * (LATER_ADDED_MISSIONS, "Valide ton app") once the one after it is. Not saved, and not the member's
+ * to untick.
+ */
+export function withEarlierBuildMissions(done: Record<string, MissionDone>): Record<string, MissionDone> {
+  const result = { ...done };
+  const built = done["build:first_version"];
+  if (built) for (const key of EARLIER_BUILD_MISSIONS) result[key] ??= { at: built.at, source: "observed" };
+  for (const [key, after] of Object.entries(LATER_ADDED_MISSIONS)) {
+    if (done[after]) result[key] ??= { at: done[after].at, source: "observed" };
+  }
+  return result;
+}
 
 /** The day of a daily series, as an ISO date (noon UTC: no time zone moves it to another day). */
 const dayOf = (seriesStart: string, index: number) =>
@@ -51,9 +66,6 @@ export function observedMissions(facts: MissionFacts, stages: RoadmapStage[]): R
     switch (check.kind) {
       case "saas":
         result = { at: facts.saasCreatedAt, source: "declared" };
-        break;
-      case "app_url":
-        result = facts.hasAppUrl ? { at: facts.now, source: "declared" } : null;
         break;
       case "custom_domain":
         result = facts.hasCustomDomain ? { at: facts.now, source: "declared" } : null;
@@ -104,8 +116,11 @@ type SaasRow = {
   created_at: string;
   app_url: string | null;
   logo_url: string | null;
-  idea: { content?: { problem?: unknown; price?: unknown } } | null;
+  idea: { content?: { problem?: unknown; price?: unknown; feature?: unknown } } | null;
 };
+
+/** A text of the idea, trimmed; null when missing or empty (older ideas lack the newer fields). */
+const ideaText = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null);
 
 /** What the tutorials' prompts say about the project. The idea is read as is: older ideas are longer than today's limits. */
 export function projectOf(saas: SaasRow): MissionProject {
@@ -114,8 +129,9 @@ export function projectOf(saas: SaasRow): MissionProject {
     name: saas.name,
     description: saas.description,
     audience: saas.audience,
-    problem: typeof idea?.problem === "string" && idea.problem.trim() ? idea.problem.trim() : null,
-    price: typeof idea?.price === "number" && idea.price > 0 ? Math.round(idea.price) : null,
+    problem: ideaText(idea?.problem),
+    feature: ideaText(idea?.feature),
+    price: typeof idea?.price === "number" && idea.price > 0 ? Math.round(idea.price * 100) / 100 : null,
     logoUrl: saas.logo_url,
   };
 }
@@ -175,7 +191,6 @@ export class RoadmapService {
     const observed = observedMissions(
       {
         saasCreatedAt: saas.created_at,
-        hasAppUrl: !!saas.app_url,
         hasCustomDomain: isCustomDomain(saas.app_url),
         hasLogo: !!saas.logo_url,
         hasPaymentAccount: (connections.data ?? []).length > 0,
@@ -202,7 +217,7 @@ export class RoadmapService {
       goal,
       project: projectOf(saas),
       appUrl: saas.app_url,
-      done,
+      done: withEarlierBuildMissions(done),
       progress: {
         videos: videos.count ?? (videos.data ?? []).length,
         tiktokAccounts: tiktok.count ?? 0,

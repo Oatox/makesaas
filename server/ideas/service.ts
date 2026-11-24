@@ -10,7 +10,7 @@ import {
 import {
   IDEA_BATCH_RUNNING_AT_MOST_MS,
   IDEA_BATCHES_PER_DAY,
-  IDEA_PRICE_RANGE,
+  consumerPrice,
   IDEA_TEXT_LIMITS,
   IDEAS_PER_REQUEST,
   IDEAS_PER_SERIES,
@@ -45,9 +45,10 @@ export function toIdeaContents(result: IdeasAiResult): IdeaContent[] {
     ideaContentSchema.parse({
       name: clip(idea.name, IDEA_TEXT_LIMITS.name),
       pitch: clip(idea.pitch, IDEA_TEXT_LIMITS.pitch),
+      feature: clip(idea.feature, IDEA_TEXT_LIMITS.feature),
       problem: clip(idea.problem, IDEA_TEXT_LIMITS.problem),
       audience: clip(idea.audience, IDEA_TEXT_LIMITS.audience),
-      price: Math.min(IDEA_PRICE_RANGE.max, Math.max(IDEA_PRICE_RANGE.min, Math.round(idea.price))),
+      price: consumerPrice(idea.price),
       whyYou: clip(idea.whyYou, IDEA_TEXT_LIMITS.whyYou),
     }),
   );

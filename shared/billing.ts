@@ -66,6 +66,16 @@ export type SubscriptionSummary = {
 export const SUBSCRIPTION_SUMMARY_COLUMNS =
   "status, provider, current_period_end, cancel_at_period_end, whop_membership_id, manage_url";
 
+/**
+ * Whether a subscription will bill again: a Whop one granting access whose renewal is not cancelled.
+ * Its account cannot be deleted until then: Whop would keep billing a member who no longer exists.
+ */
+export function renewsBilling(
+  subscription: Pick<SubscriptionSummary, "provider" | "status" | "cancel_at_period_end"> | null | undefined,
+): boolean {
+  return subscription?.provider === "whop" && grantsAccess(subscription.status) && !subscription.cancel_at_period_end;
+}
+
 export const billingApi = {
   /** Public: the offers shown on the paywall, with their prices read from Whop. */
   plan: { path: "/api/billing/plan" },

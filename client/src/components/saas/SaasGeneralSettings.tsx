@@ -23,8 +23,8 @@ type SaasGeneralSettingsProps = {
 };
 
 /**
- * The address of the SaaS's app (given in its "Mets ton app en ligne" task), to change it when the app
- * moves, to its own domain for instance. Saved like in the task: it must answer first. Like the name,
+ * The address of the SaaS's app (given at the end of its "Achète ton nom de domaine dans Base44" task),
+ * to change it when the app moves. Saved like in the task: it must answer first. Like the name,
  * "Enregistrer" only once it changed; "Ouvrir" otherwise.
  */
 function AppUrlSetting({ saas }: { saas: Saas }) {

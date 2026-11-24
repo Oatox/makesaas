@@ -29,8 +29,9 @@ const DONE_SHOWN = 3;
 
 /**
  * The tasks already done (pages/Today.tsx, under the day's; shared/today.ts: doneTasks): a quiet list,
- * the latest first, each with its day. The first ones, then all on demand. Each opens again in the
- * drawer (TaskDetail), to read its steps and reuse their buttons (a prompt to copy again…).
+ * in the order of the journey, the furthest first, each with its day. The first ones, then all on
+ * demand. Each opens again in the drawer (TaskDetail), to read its steps and reuse their buttons (a
+ * prompt to copy again…).
  */
 export function DoneTaskList({ items, onOpen }: { items: DoneTask[]; onOpen: (key: string) => void }) {
   const [all, setAll] = useState(false);

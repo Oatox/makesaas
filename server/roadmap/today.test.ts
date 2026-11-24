@@ -27,27 +27,27 @@ describe("the day's tasks", () => {
   test("the launch first: the next missions in order, while the day has room", () => {
     const plan = todayPlan(STAGES, doneAt(BEFORE, ["idea:chosen"]), DAY);
     expect(plan.phase).toBe("launch");
-    expect(keysOf(plan)).toEqual(["brand:logo", "build:claude", "build:first_version"]);
+    expect(keysOf(plan)).toEqual(["brand:logo", "build:claude", "build:landing"]);
     expect(plan.more).toBe(true);
   });
 
   test("the tasks done today stay in the day; once it is full, one more on demand", () => {
-    const done = { ...doneAt(BEFORE, ["idea:chosen"]), ...doneAt(TODAY, ["brand:logo", "build:claude", "build:first_version"]) };
-    expect(keysOf(todayPlan(STAGES, done, DAY))).toEqual(["brand:logo", "build:claude", "build:first_version"]);
-    expect(keysOf(todayPlan(STAGES, done, DAY, 1))).toEqual(["brand:logo", "build:claude", "build:first_version", "build:customize"]);
+    const done = { ...doneAt(BEFORE, ["idea:chosen"]), ...doneAt(TODAY, ["brand:logo", "build:claude", "build:landing"]) };
+    expect(keysOf(todayPlan(STAGES, done, DAY))).toEqual(["brand:logo", "build:claude", "build:landing"]);
+    expect(keysOf(todayPlan(STAGES, done, DAY, 1))).toEqual(["brand:logo", "build:claude", "build:landing", "build:accounts"]);
     // The next day starts on what is left.
-    expect(keysOf(todayPlan(STAGES, done, "2026-11-24"))[0]).toBe("build:customize");
+    expect(keysOf(todayPlan(STAGES, done, "2026-11-24"))[0]).toBe("build:accounts");
   });
 
   test("new tasks on demand: those done before leave the list, the next ones come", () => {
-    const done = { ...doneAt(BEFORE, ["idea:chosen"]), ...doneAt(TODAY, ["brand:logo", "build:claude", "build:first_version"]) };
+    const done = { ...doneAt(BEFORE, ["idea:chosen"]), ...doneAt(TODAY, ["brand:logo", "build:claude", "build:landing"]) };
     const since = "2026-11-23T10:00:00";
     const plan = todayPlan(STAGES, done, DAY, 0, since);
-    expect(keysOf(plan)).toEqual(["build:customize", "build:online", "build:domain"]);
+    expect(keysOf(plan)).toEqual(["build:accounts", "build:onboarding", "build:first_version"]);
     expect(plan.more).toBe(true);
     // Those done after it stay in the series.
-    const later = { ...done, ...doneAt("2026-11-23T10:30:00", ["build:customize"]) };
-    expect(keysOf(todayPlan(STAGES, later, DAY, 0, since))).toEqual(["build:customize", "build:online", "build:domain"]);
+    const later = { ...done, ...doneAt("2026-11-23T10:30:00", ["build:accounts"]) };
+    expect(keysOf(todayPlan(STAGES, later, DAY, 0, since))).toEqual(["build:accounts", "build:onboarding", "build:first_version"]);
   });
 
   test("once launched, new tasks: the day's own ones done leave, the tier's next ones come", () => {
@@ -57,7 +57,7 @@ describe("the day's tasks", () => {
   });
 
   test("about an hour a day: a long task ends the day", () => {
-    const done = doneAt(BEFORE, ["idea:chosen", "brand:logo", "build:claude", "build:first_version", "build:customize", "build:online", "build:domain", "payment:whop"]);
+    const done = doneAt(BEFORE, ["idea:chosen", "brand:logo", "build:claude", "build:landing", "build:accounts", "build:onboarding", "build:first_version", "build:customize", "build:review", "build:online", "build:domain", "payment:whop"]);
     // In-app payment (15), payment test (10), connect (5): 30 minutes, 3 tasks.
     expect(keysOf(todayPlan(STAGES, done, DAY))).toEqual(["payment:in_app", "payment:test", "payment:connect"]);
   });
@@ -101,6 +101,26 @@ describe("the tasks done", () => {
     expect(tasks[3].done).toEqual({ at: BEFORE, source: "declared" });
     expect(doneTasks(STAGES, {})).toEqual([]);
   });
+
+  test("in the order of the journey, not of when they were ticked", () => {
+    const done = {
+      ...doneAt(BEFORE, ["brand:logo"]),
+      // Seen in the data before the tasks ahead of them were ticked.
+      ...doneAt("2026-11-21T08:00:00", ["build:online", "build:domain", "mrr_100:paywall"], "observed"),
+      ...doneAt("2026-11-21T09:00:00", ["build:claude", "daily:video:2026-11-21"]),
+      ...doneAt("2026-11-22T09:00:00", ["mrr_100:format", "daily:video:2026-11-22"]),
+    };
+    expect(doneTasks(STAGES, done).map(({ task }) => task.key)).toEqual([
+      "daily:video:2026-11-22",
+      "mrr_100:paywall",
+      "mrr_100:format",
+      "daily:video:2026-11-21",
+      "build:domain",
+      "build:online",
+      "build:claude",
+      "brand:logo",
+    ]);
+  });
 });
 
 describe("the milestones", () => {
@@ -114,7 +134,17 @@ describe("the milestones", () => {
 
   test("the tasks that lead to each: its stage's, without the other milestones and the outcomes", () => {
     const keys = (key: string) => milestoneTasks(STAGES, milestones, key).map((task) => task.key);
-    expect(keys("build:online")).toEqual(["build:claude", "build:first_version", "build:customize", "build:online", "build:domain"]);
+    expect(keys("build:domain")).toEqual([
+      "build:claude",
+      "build:landing",
+      "build:accounts",
+      "build:onboarding",
+      "build:first_version",
+      "build:customize",
+      "build:review",
+      "build:online",
+      "build:domain",
+    ]);
     expect(keys("payment:connect")).toEqual(["payment:whop", "payment:in_app", "payment:test", "payment:connect"]);
     expect(keys("video:posted")).toEqual(["video:account", "video:prepare", "video:posted"]);
     expect(keys("mrr_100:reached")).toEqual(["mrr_100:format", "mrr_100:paywall"]);
@@ -122,7 +152,7 @@ describe("the milestones", () => {
   });
 
   test("the one in progress, with its figure", () => {
-    const done = doneAt(BEFORE, ["idea:chosen", "brand:logo", "build:online", "payment:connect", "video:track", "video:posted"], "observed");
+    const done = doneAt(BEFORE, ["idea:chosen", "brand:logo", "build:domain", "payment:connect", "video:track", "video:posted"], "observed");
     const current = currentMilestone(milestones, done)!;
     expect(current.key).toBe("customer:7_videos");
     expect(milestoneCounter(current, { videos: 3, tiktokAccounts: 1, mrr: null })?.label).toBe("3 / 7 vidéos");
@@ -149,7 +179,7 @@ describe("the objectives", () => {
     ]);
     expect(objectives.slice(0, 3).map((objective) => objective.title)).toEqual(["Lancer ton SaaS", "Première vidéo", "Premier client"]);
     const keysOf = (index: number) => objectives[index].milestones.map((milestone) => milestone.key);
-    expect(keysOf(0)).toEqual(["idea:chosen", "brand:logo", "build:online", "payment:connect"]);
+    expect(keysOf(0)).toEqual(["idea:chosen", "brand:logo", "build:domain", "payment:connect"]);
     expect(keysOf(1)).toEqual(["video:track", "video:posted"]);
     expect(keysOf(2)).toEqual(["customer:7_videos", "customer:first_payment"]);
     expect(keysOf(3)).toEqual(["mrr_100:reached"]);

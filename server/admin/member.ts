@@ -141,7 +141,7 @@ export async function readSaasDetail(db: SupabaseClient, userId: string, saasId:
     description: saas.description,
     audience: saas.audience,
     appUrl: saas.app_url,
-    idea: saas.idea ? { problem: idea.problem, price: idea.price } : null,
+    idea: saas.idea ? { feature: idea.feature ?? null, problem: idea.problem, price: idea.price } : null,
     roadmap: state,
     payment: connection && {
       provider: connection.provider,

@@ -6,7 +6,7 @@ import { ProfileForm } from "@/components/settings/ProfileForm";
 import { blurIn } from "@/lib/motion";
 import { motion } from "framer-motion";
 import { AlertTriangle, LogOut, Crown } from "lucide-react";
-import { PLAN, grantsAccess } from "@shared/billing";
+import { PLAN, grantsAccess, renewsBilling } from "@shared/billing";
 import { formatDate } from "@/lib/format";
 import type { LucideIcon } from "lucide-react";
 
@@ -64,10 +64,10 @@ function Row({ icon: Icon, title, hint, iconClass, children }: {
 
 export default function Settings() {
   const { profile, hasAccess, signOut } = useAuth();
-  // A running Whop subscription must be cancelled before the account is deleted (it would keep billing).
+  // A renewing Whop subscription must be cancelled before the account is deleted (the server refuses it too).
   const subscription = profile?.subscription;
   const isWhop = subscription?.provider === "whop" && grantsAccess(subscription.status);
-  const hasActiveBilling = isWhop && !subscription.cancel_at_period_end;
+  const hasActiveBilling = renewsBilling(subscription);
   const renewal = isWhop && subscription.current_period_end ? formatDate(subscription.current_period_end) : null;
 
   return (

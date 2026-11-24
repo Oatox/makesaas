@@ -43,7 +43,10 @@ describe("coach context", () => {
         project: PROJECT,
         progress: PROGRESS,
         done: Object.fromEntries(
-          ["idea:chosen", "brand:logo", "build:claude"].map((key) => [key, { at: "2026-11-21T10:00:00Z", source: "declared" as const }]),
+          ["idea:chosen", "brand:logo", "build:claude", "build:landing"].map((key) => [
+            key,
+            { at: "2026-11-21T10:00:00Z", source: "declared" as const },
+          ]),
         ),
       },
       "2026-11-23",
@@ -51,15 +54,15 @@ describe("coach context", () => {
     expect(text).toContain("0 atteint sur 7.");
     expect(text).toContain("- [ ] Lancer ton SaaS : EN COURS (2 / 4 étapes)");
     expect(text).toContain("  - [x] Ton logo : passée le");
-    expect(text).toContain("  - [ ] Ton app en ligne : EN COURS (1 / 5 tâches)");
+    expect(text).toContain("  - [ ] Ton app en ligne : EN COURS (2 / 9 tâches)");
     expect(text).toContain("- [ ] Première vidéo : à venir");
     expect(text).toMatch(/- \[ \] 100\s€ par mois : à venir/);
     expect(text).not.toContain("7 vidéos");
-    expect(text).toContain("Phase : lancement de son SaaS (2 tâches de lancement faites sur 14).");
-    expect(text).toContain("- [ ] Construis la première version (il la coche lui-même)");
-    expect(text).toContain("Sa prochaine tâche : « Construis la première version ».");
+    expect(text).toContain("Phase : lancement de son SaaS (3 tâches de lancement faites sur 18).");
+    expect(text).toContain("- [ ] Ajoute les comptes (il la coche lui-même)");
+    expect(text).toContain("Sa prochaine tâche : « Ajoute les comptes ».");
     expect(text).toContain("Le prompt à coller dans Base44 que sa tâche lui donne :");
-    expect(text).toContain("Crée une app web appelée Fitlo");
+    expect(text).toContain("Ajoute à Fitlo les comptes utilisateurs.");
   });
 
   test("the logo task gives Gus its ChatGPT prompt, and a step in progress its figure", () => {
@@ -77,7 +80,7 @@ describe("coach context", () => {
         project: PROJECT,
         progress: { videos: 3, tiktokAccounts: 1, mrr: null },
         done: Object.fromEntries(
-          ["idea:chosen", "brand:logo", "build:online", "payment:connect", "video:track", "video:posted"].map((key) => [key, { at, source: "observed" as const }]),
+          ["idea:chosen", "brand:logo", "build:domain", "payment:connect", "video:track", "video:posted"].map((key) => [key, { at, source: "observed" as const }]),
         ),
       },
       "2026-11-23",

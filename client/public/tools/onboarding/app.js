@@ -874,12 +874,12 @@
       $(".core").classList.add("flash");
       ideaCard.classList.add("in");
       sound.pop();
-      await sleep(2100);
+      await sleep(1100);
 
       ideaCard.classList.add("out");
       await sleep(250);
       mock.classList.add("in");
-      await sleep(750);
+      await sleep(400);
 
       paint(3200);
       await sleep(3600);

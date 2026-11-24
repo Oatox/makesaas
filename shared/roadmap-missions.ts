@@ -1,4 +1,5 @@
 import { MRR_TIERS, monthlyGoalOf, type Milestone, type MissionDone, type RoadmapMission, type RoadmapStage, type StepAction } from "./roadmap";
+import { ONESHOT_KEYS_URL } from "./roadmap-prompts";
 
 /**
  * The content of the roadmap: its stages, their missions and each mission's steps (shared/roadmap.ts
@@ -15,14 +16,25 @@ const euros = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR
  */
 export const BASE44_URL = "https://app.base44.com/register?ref=A3KZZ2DZZ85WHDJB&source=referral_program";
 
-/** Base44's plans: connecting a domain needs Starter or higher (the "Achète ton nom de domaine" task). */
+/**
+ * Base44's plans: the "Crée ton compte Base44" task advises Builder from the start (more credits to
+ * build the app; like every paid plan, a domain bought in Base44, free the first year when billed
+ * yearly), since "Achète ton nom de domaine dans Base44" buys it there ("Buy new domain", registered by Wix).
+ */
 const BASE44_PRICING_URL = "https://base44.com/pricing";
 
 /**
- * Where members buy their domain, before connecting it in Base44 ("Connect existing domain", which
- * sets Namecheap's DNS itself once they sign in there).
+ * The build tasks before the core of the app. The app used to be built with a single prompt, in the
+ * task now named "Construis le cœur de ton app" (build:first_version): members who did it then have
+ * these done (withEarlierBuildMissions in server/roadmap/service.ts).
  */
-const NAMECHEAP_URL = "https://www.namecheap.com";
+export const EARLIER_BUILD_MISSIONS = ["build:landing", "build:accounts", "build:onboarding"] as const;
+
+/**
+ * Tasks added to the launch after members had gone past them: done once the task after them is
+ * (withEarlierBuildMissions), so that nobody who already published goes back to them.
+ */
+export const LATER_ADDED_MISSIONS: Record<string, string> = { "build:review": "build:online" };
 
 const STATS: StepAction = { kind: "page", label: "Ouvrir mes statistiques", href: "/acquisition" };
 const CONTENT: StepAction = { kind: "page", label: "Créer un carrousel", href: "/acquisition/contenu" };
@@ -80,20 +92,67 @@ const BASE_STAGES: RoadmapStage[] = [
         minutes: 2,
         steps: [
           { text: "Crée ton compte Base44 avec ce lien : tu reçois 30 crédits offerts pour commencer.", action: { kind: "open", label: "Créer mon compte Base44", url: BASE44_URL } },
+          {
+            text: "Conseil : prends le plan **Builder**, avec plus de crédits pour construire ton app. En annuel, ton nom de domaine est offert la 1re année.",
+            action: { kind: "open", label: "Voir les plans Base44", url: BASE44_PRICING_URL },
+          },
           { text: "Garde l'onglet ouvert : tu y construis ton app juste après." },
         ],
         check: { kind: "manual" },
       },
       {
+        key: "build:landing",
+        title: "Crée ton app et sa page d'accueil",
+        why: "Ton nom, ton logo et ta promesse : ta page d'accueil dit tout de suite ce que fait ton app, et pour qui.",
+        minutes: 15,
+        steps: [
+          { text: "Copie le message pour Base44.", action: { kind: "copy", prompt: "landing" } },
+          { text: "Sur l'accueil de Base44, colle-le dans la case **Describe the app you want to build** et envoie : il crée ton app." },
+          { text: "S'il te pose des questions, réponds-y ou clique sur **Skip question** : tout est déjà dans le message." },
+          { text: "Regarde ta page d'accueil dans l'aperçu. Un texte à changer ? Demande-le à Base44 avec tes mots." },
+        ],
+        check: { kind: "manual" },
+      },
+      {
+        key: "build:accounts",
+        title: "Ajoute les comptes",
+        why: "Tes clients se créent un compte : leurs résultats sont gardés, et ils pourront s'abonner.",
+        minutes: 15,
+        steps: [
+          { text: "Copie le message pour Base44.", action: { kind: "copy", prompt: "accounts" } },
+          { text: "Colle-le dans le chat de ton app, dans Base44, et envoie : il ajoute la connexion, les paramètres et ton administration." },
+          { text: "Dans Base44, ouvre **Dashboard**, puis **Overview**, et règle **App Visibility** sur **Public** : tout le monde doit voir ta page d'accueil." },
+          { text: "Crée-toi un compte dans l'aperçu : comme c'est ton app, tu en es l'administrateur." },
+        ],
+        check: { kind: "manual" },
+      },
+      {
+        key: "build:onboarding",
+        title: "Construis ton parcours d'accueil",
+        why: "Quelques questions, un aperçu de son résultat, puis ton offre au bon moment : c'est ce qui transforme un curieux en client.",
+        minutes: 20,
+        steps: [
+          { text: "Copie le message pour Base44.", action: { kind: "copy", prompt: "onboarding" } },
+          { text: "Colle-le dans le chat de ton app et envoie : il ajoute les questions, puis l'écran d'abonnement." },
+          { text: "Fais le parcours dans l'aperçu jusqu'à l'écran d'abonnement, puis clique sur **Débloquer mon résultat** et crée un compte." },
+          { text: "Un souci ? Décris-le à Base44 avec tes mots : il corrige." },
+        ],
+        check: { kind: "manual" },
+      },
+      {
+        // The key comes from when the whole app was built with a single prompt: kept, done missions are saved by key.
         key: "build:first_version",
-        title: "Construis la première version",
-        why: "Une app simple qui marche vaut mieux qu'une app parfaite jamais finie.",
+        title: "Construis le cœur de ton app",
+        why: "C'est ce que tes clients paient : le résultat complet que ton app leur donne.",
         minutes: 30,
         steps: [
           { text: "Copie le message pour Base44.", action: { kind: "copy", prompt: "app" } },
-          { text: "Colle-le dans Base44 et envoie : il construit ton app tout seul." },
-          { text: "Teste ton app dans l'aperçu, jusqu'à l'écran de résultat." },
-          { text: "Un souci ? Décris-le à Base44 avec tes mots : il corrige." },
+          { text: "Colle-le dans le chat de ton app et envoie : il construit l'écran principal de ton app." },
+          {
+            text: "Base44 te demande une clé OneShotAPI ? Crée-la ici, puis colle-la dans l'encadré **Set secrets** de Base44.",
+            action: { kind: "open", label: "Créer ma clé OneShotAPI", url: ONESHOT_KEYS_URL },
+          },
+          { text: "Teste ton app dans l'aperçu jusqu'au résultat complet. Un souci ? Décris-le à Base44 avec tes mots : il corrige." },
         ],
         check: { kind: "manual" },
       },
@@ -118,33 +177,37 @@ const BASE_STAGES: RoadmapStage[] = [
         check: { kind: "manual" },
       },
       {
-        key: "build:online",
-        title: "Mets ton app en ligne",
-        why: "Sans adresse, personne ne peut l'essayer ni la payer.",
-        minutes: 5,
+        key: "build:review",
+        title: "Valide ton app",
+        why: "Base44 relit toute ton app et corrige ce qui cloche : tu publies une app propre, sans bouton mort ni promesse en l'air.",
+        minutes: 15,
         steps: [
-          { text: "Dans Base44, clique sur **Publish** : ton app reçoit son adresse." },
-          { text: "Ouvre cette adresse sur ton téléphone pour vérifier que tout marche." },
-          { text: "Colle l'adresse de ton app ici.", action: { kind: "app_url" } },
+          { text: "Copie le message pour Base44.", action: { kind: "copy", prompt: "review" } },
+          { text: "Colle-le dans le chat de ton app et envoie : il passe toute ton app en revue et corrige ce qui cloche." },
+          { text: "Il te demande tes informations pour les pages légales ? Donne-les-lui : elles doivent être complètes avant de publier." },
+          { text: "Lis son récap, puis refais tout le parcours dans l'aperçu. Encore un souci ? Décris-le à Base44 avec tes mots : il corrige." },
         ],
-        check: { kind: "app_url" },
+        check: { kind: "manual" },
+      },
+      {
+        key: "build:online",
+        title: "Publie ton app",
+        why: "Tant qu'elle n'est pas publiée, personne ne peut l'essayer ni la payer.",
+        minutes: 2,
+        // Its address is given in the next task, once on its own domain.
+        steps: [{ text: "Dans Base44, clique sur **Publish** en haut à droite, puis sur **Publish** dans la fenêtre qui s'ouvre : ton app est en ligne." }],
+        check: { kind: "manual" },
       },
       {
         key: "build:domain",
-        title: "Achète ton nom de domaine",
+        title: "Achète ton nom de domaine dans Base44",
         why: "Une adresse à ton nom fait pro et rassure ceux qui vont payer.",
-        minutes: 15,
+        minutes: 10,
         steps: [
-          {
-            text: "Achète ton nom de domaine sur Namecheap : un nom court, au nom de ton app, en **.com** si possible.",
-            action: { kind: "open", label: "Ouvrir Namecheap", url: NAMECHEAP_URL },
-          },
-          {
-            text: "Passe Base44 au plan **Starter** : il faut ce plan pour y connecter ton domaine.",
-            action: { kind: "open", label: "Voir les plans Base44", url: BASE44_PRICING_URL },
-          },
-          { text: "Dans Base44, ouvre **Dashboard**, **Domains**, **Connect existing domain**, entre ton domaine, puis connecte ton compte Namecheap." },
-          { text: "Quand ton domaine passe en **Verified** (quelques minutes, parfois jusqu'à 48 h), colle ta nouvelle adresse ici.", action: { kind: "app_url" } },
+          { text: "Dans Base44, ouvre **Dashboard**, **Domains**, **Buy new domain**, et cherche un nom court au nom de ton app, en **.com** si possible." },
+          { text: "Clique sur **Get it**, choisis **1 year** et **Public Registration** (ce que couvre le domaine offert), puis **Submit Purchase**." },
+          { text: "Confirme ton domaine avec le lien de l'e-mail que Wix t'envoie (regarde aussi dans tes spams)." },
+          { text: "Quand ton domaine est en ligne (en général moins de 30 minutes), colle l'adresse de ton app ici.", action: { kind: "app_url" } },
         ],
         check: { kind: "custom_domain" },
       },
@@ -178,6 +241,7 @@ const BASE_STAGES: RoadmapStage[] = [
           { text: "Copie le message pour Base44.", action: { kind: "copy", prompt: "payment" } },
           { text: "Colle-le dans Base44, remplace **[COLLE TON LIEN…]** par ton lien Whop, puis envoie." },
           { text: "Vérifie dans l'aperçu que le bouton ouvre ta page de paiement, puis clique sur **Publish**." },
+          { text: "Quand quelqu'un paie, ouvre la page **Administration** de ton app et clique sur **Passer en Pro** à côté de son compte." },
         ],
         check: { kind: "manual" },
       },
@@ -493,7 +557,7 @@ export function milestonesFor(goal: number): Milestone[] {
   return [
     milestone("idea:chosen", "Ton idée", "Tu sais ce que tu construis, et pour qui.", "launch"),
     milestone("brand:logo", "Ton logo", "Ton SaaS a son logo et ses couleurs.", "launch"),
-    milestone("build:online", "Ton app en ligne", "Tout le monde peut l'ouvrir, à son adresse.", "launch"),
+    milestone("build:domain", "Ton app en ligne", "Tout le monde peut l'ouvrir, à son adresse.", "launch"),
     milestone("payment:connect", "Tes paiements connectés", "MakeSaaS suit tes revenus tout seul.", "launch", linkOf(REVENUE)),
     milestone("video:track", "Ton compte TikTok", "Tes vidéos sont suivies sur MakeSaaS.", "launch", linkOf(STATS)),
     milestone("video:posted", "Ta 1re vidéo", "Les premières personnes découvrent ton app.", "launch", linkOf(STATS)),
@@ -569,8 +633,6 @@ export function missionCheckText(check: RoadmapMission["check"]): string {
       return "Coche-la quand c'est fait.";
     case "saas":
       return "Se coche dès que ton projet est créé.";
-    case "app_url":
-      return "Se coche dès que tu colles l'adresse de ton app et qu'elle répond.";
     case "custom_domain":
       return "Se coche dès que tu colles l'adresse de ton app sur ton nom de domaine et qu'elle répond.";
     case "logo":

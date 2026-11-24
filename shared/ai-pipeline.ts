@@ -161,6 +161,7 @@ export const ideasAiResultSchema = z.object({
       z.object({
         name: z.string().trim().min(1),
         pitch: z.string().trim().min(1),
+        feature: z.string().trim().min(1),
         problem: z.string().trim().min(1),
         audience: z.string().trim().min(1),
         price: z.number().positive(),
@@ -190,13 +191,19 @@ export function ideasResponseSchema(count: number) {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["name", "pitch", "problem", "audience", "price", "whyYou"],
+          required: ["name", "pitch", "feature", "problem", "audience", "price", "whyYou"],
           properties: {
             name: text(`Nom court de l'app, ${IDEA_TEXT_LIMITS.name} caractères maximum`),
             pitch: text(`Ce que fait l'app, une phrase courte, ${IDEA_TEXT_LIMITS.pitch} caractères maximum`),
+            feature: text(
+              `La fonctionnalité principale, concrètement : ce que l'utilisateur donne → ce que l'app lui rend (ex. « une photo du repas → ses calories et ses macros »), ${IDEA_TEXT_LIMITS.feature} caractères maximum`,
+            ),
             problem: text(`Le problème réglé, une phrase courte, ${IDEA_TEXT_LIMITS.problem} caractères maximum`),
             audience: text(`Pour qui, quelques mots, ${IDEA_TEXT_LIMITS.audience} caractères maximum`),
-            price: { type: "number", description: "Prix mensuel conseillé de l'abonnement, en euros, nombre entier" },
+            price: {
+              type: "number",
+              description: "Le prix unique de l'app : son abonnement mensuel, en euros, un prix d'app grand public entre 2.99 et 29.99 qui finit par .99",
+            },
             whyYou: text(`Pourquoi l'idée colle au membre, une phrase courte en le tutoyant, ${IDEA_TEXT_LIMITS.whyYou} caractères maximum`),
           },
         },

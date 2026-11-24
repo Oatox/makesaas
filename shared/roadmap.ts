@@ -37,9 +37,7 @@ export type MissionCheck =
   | { kind: "manual" }
   /** The SaaS exists. */
   | { kind: "saas" }
-  /** The member gave the address of their app, and it answered. */
-  | { kind: "app_url" }
-  /** That address is on the member's own domain, not a free one like *.base44.app (isCustomDomain). */
+  /** The address of the app (given by the member, it answered) is on their own domain, not a free one like *.base44.app (isCustomDomain). */
   | { kind: "custom_domain" }
   /** The SaaS has a logo (added from its settings). */
   | { kind: "logo" }

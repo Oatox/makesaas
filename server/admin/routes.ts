@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { z } from "zod";
-import { SUBSCRIPTION_SUMMARY_COLUMNS, type SubscriptionSummary } from "@shared/billing";
+import { SUBSCRIPTION_SUMMARY_COLUMNS, renewsBilling, type SubscriptionSummary } from "@shared/billing";
 import { getUserId, requireAdmin } from "../lib/auth";
 import { asyncRoute, HttpError, parseInput } from "../lib/http";
 import { logger } from "../lib/logger";
@@ -160,7 +160,7 @@ export function registerAdminRoutes(app: Express) {
     }),
   );
 
-  // Deleting the auth user cascades to the profile and the subscription.
+  // Deleting the auth user cascades to the profile and all their data (refused while their Whop subscription renews).
   app.delete(
     "/api/admin/users/:id",
     requireAdmin,
@@ -171,7 +171,7 @@ export function registerAdminRoutes(app: Express) {
         throw new HttpError(400, "Supprimez votre propre compte depuis les paramètres.");
       }
 
-      await deleteAuthUser(userId);
+      await deleteAuthUser(userId, "admin");
       res.status(204).end();
     }),
   );
@@ -209,11 +209,31 @@ export function registerAdminRoutes(app: Express) {
   );
 }
 
+/** Who deletes an account: its member (from the settings) or an admin. */
+type DeletedBy = "member" | "admin";
+
+const RENEWING_SUBSCRIPTION_MESSAGES: Record<DeletedBy, string> = {
+  member: "Votre abonnement se renouvelle encore : résiliez-le d'abord depuis vos paramètres, puis supprimez votre compte.",
+  admin: "Ce membre a un abonnement Whop qui se renouvelle : annulez-le d'abord sur Whop, sinon il continuerait d'être prélevé.",
+};
+
 /**
- * Removes the auth user; the profile and subscription follow through ON DELETE CASCADE, and their
- * files in the R2 bucket are removed in the background.
+ * Removes the auth user; the profile and every table of theirs follow through ON DELETE CASCADE, and their
+ * files in the R2 bucket are removed in the background. Refused (409) while their Whop subscription renews:
+ * Whop would keep billing them, and the webhook ignores a deleted user.
  */
-export async function deleteAuthUser(userId: string): Promise<void> {
+export async function deleteAuthUser(userId: string, by: DeletedBy): Promise<void> {
+  const { data: subscription, error: readError } = await supabaseAdmin!
+    .from("subscriptions")
+    .select("provider, status, cancel_at_period_end")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (readError) {
+    logger.error({ err: readError, userId }, "Failed to read the subscription of a user to delete");
+    throw new HttpError(500, "Impossible de supprimer le compte.");
+  }
+  if (renewsBilling(subscription)) throw new HttpError(409, RENEWING_SUBSCRIPTION_MESSAGES[by]);
+
   const { error } = await supabaseAdmin!.auth.admin.deleteUser(userId);
   if (!error) {
     void removeUserFiles(userId);

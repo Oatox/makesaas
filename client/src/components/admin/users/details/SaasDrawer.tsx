@@ -150,8 +150,9 @@ function SaasDetail({ saas, onOpenDiscussion }: { saas: AdminSaasDetail; onOpenD
 
   const project = [
     ...(saas.audience ? [{ label: "Pour qui", value: saas.audience }] : []),
+    ...(saas.idea?.feature ? [{ label: "Fonctionnalité principale", value: saas.idea.feature }] : []),
     ...(saas.idea?.problem ? [{ label: "Problème réglé", value: saas.idea.problem }] : []),
-    ...(saas.idea?.price ? [{ label: "Prix conseillé", value: `${saas.idea.price} € par mois` }] : []),
+    ...(saas.idea?.price ? [{ label: "Prix conseillé", value: `${saas.idea.price.toLocaleString("fr-FR")} € par mois` }] : []),
     { label: "Créé le", value: `${formatShortDate(saas.createdAt)}${saas.idea ? "" : " (sans idée de Gus)"}` },
     {
       label: "Son app",

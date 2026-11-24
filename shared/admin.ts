@@ -32,8 +32,8 @@ export type AdminSaasDetail = AdminSaasSummary & {
   description: string | null;
   audience: string | null;
   appUrl: string | null;
-  /** The idea of Gus it was kept from (its problem, its advised monthly price); null when created by its name. */
-  idea: { problem: string | null; price: number | null } | null;
+  /** The idea of Gus it was kept from (its main feature, its problem, its advised monthly price); null when created by its name. */
+  idea: { feature: string | null; problem: string | null; price: number | null } | null;
   /** Its roadmap, as the member sees it on Accueil and Roadmap. */
   roadmap: RoadmapState;
   /** Its payment account; null when none is connected. */

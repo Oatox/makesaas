@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Loader2, Puzzle, Target, UserRound } from "lucide-react";
-import type { IdeaContent, SaasIdea } from "@shared/ideas";
+import { ChevronDown, Loader2, Puzzle, Target, UserRound, Zap } from "lucide-react";
+import type { SaasIdea } from "@shared/ideas";
 import { COACH_NAME, CoachAvatar } from "@/components/brand/Coach";
 import { stepAppear } from "@/components/onboarding/StepHeader";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/** What "En savoir plus" unfolds, in reading order. */
-const DETAILS: { key: keyof IdeaContent; label: string; icon: typeof Target }[] = [
+/** What "En savoir plus" unfolds, in reading order (those the idea has: older ones have no feature). */
+const DETAILS: { key: "feature" | "problem" | "audience" | "whyYou"; label: string; icon: typeof Target }[] = [
+  { key: "feature", label: "La fonctionnalité principale", icon: Zap },
   { key: "problem", label: "Le problème", icon: Target },
   { key: "audience", label: "Pour qui", icon: UserRound },
   { key: "whyYou", label: "Pourquoi toi", icon: Puzzle },
@@ -70,7 +71,7 @@ export function IdeaCard({
             className="overflow-hidden"
           >
             <dl className="mt-3 space-y-4 border-t border-border pt-4">
-              {DETAILS.map(({ key, label, icon: Icon }) => (
+              {DETAILS.filter(({ key }) => content[key]).map(({ key, label, icon: Icon }) => (
                 <div key={key} className="flex gap-3">
                   <Icon aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <div className="min-w-0">

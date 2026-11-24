@@ -72,12 +72,13 @@ export function registerAccountRoutes(app: Express) {
     }),
   );
 
-  // GDPR erasure: the auth user goes, the profile and history follow (ON DELETE CASCADE).
+  // GDPR erasure: the auth user goes, the profile and history follow (ON DELETE CASCADE). Refused while
+  // the Whop subscription renews: the settings hide the button, this guards a direct call.
   app.delete(
     "/api/account",
     requireUser,
     asyncRoute(async (_req, res) => {
-      await deleteAuthUser(getUserId(res));
+      await deleteAuthUser(getUserId(res), "member");
       res.status(204).end();
     }),
   );

@@ -28,6 +28,8 @@ export type CoachContext = { profil: string; projet: string; roadmap: string; ch
 const UNAVAILABLE = "Indisponible pour le moment (erreur de lecture) : ne suppose rien.";
 const day = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" });
 const whole = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
+/** A price: 9,99 (the idea's consumer price), 9 for the whole prices of older ideas. */
+const priceFormat = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const money = (amount: number, currency: string) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency, maximumFractionDigits: amount >= 100 ? 0 : 2 }).format(amount);
 const dateOf = (iso: string | null | undefined) => (iso ? day.format(new Date(iso)) : "inconnue");
@@ -61,7 +63,7 @@ export function formatProfil(input: {
 
 // ---- Project ----------------------------------------------------------------------------------
 
-type IdeaContent = Partial<Record<"name" | "pitch" | "problem" | "audience" | "product" | "whyYou" | "firstCustomers", string>> & {
+type IdeaContent = Partial<Record<"name" | "pitch" | "feature" | "problem" | "audience" | "product" | "whyYou" | "firstCustomers", string>> & {
   price?: number;
 };
 
@@ -84,9 +86,10 @@ export function formatProjet(saas: {
   if (idea) {
     lines.push("", "L'idée qu'il a gardée parmi celles que tu lui as proposées :");
     if (idea.pitch) lines.push(`- Promesse : ${idea.pitch}`);
+    if (idea.feature) lines.push(`- Fonctionnalité principale : ${idea.feature}`);
     if (idea.problem) lines.push(`- Problème réglé : ${idea.problem}`);
     if (idea.audience) lines.push(`- Public : ${idea.audience}`);
-    if (typeof idea.price === "number") lines.push(`- Prix conseillé : ${whole.format(idea.price)} € par mois`);
+    if (typeof idea.price === "number") lines.push(`- Prix conseillé : ${priceFormat.format(idea.price)} € par mois`);
     if (idea.product) lines.push(`- Fonctionnement prévu : ${idea.product}`);
     if (idea.whyYou) lines.push(`- Pourquoi elle lui correspond : ${idea.whyYou}`);
     if (idea.firstCustomers) lines.push(`- Premiers clients : ${idea.firstCustomers}`);

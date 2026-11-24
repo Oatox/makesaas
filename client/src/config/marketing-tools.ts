@@ -28,7 +28,7 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     title: "Le faux onboarding",
     description: "Passions, temps, banque et objectif, puis le site qui se crée sous tes yeux et les paiements qui tombent. À filmer.",
     icon: Rocket,
-    src: "/tools/onboarding/index.html?v=7",
+    src: "/tools/onboarding/index.html?v=8",
   },
 ];
 

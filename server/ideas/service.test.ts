@@ -7,9 +7,10 @@ import { buildIdeasMessages, toIdeaContents } from "./service";
 const IDEA = {
   name: "Fitlo",
   pitch: "Un programme de musculation adapté à ton emploi du temps.",
+  feature: "Tes créneaux et ton niveau → ton programme de la semaine, séance par séance.",
   problem: "Les débutants abandonnent faute de programme clair.",
   audience: "Étudiants qui débutent la musculation",
-  price: 9,
+  price: 9.99,
   whyYou: "Tu fais du sport et tu connais ce public.",
 };
 
@@ -18,11 +19,20 @@ describe("toIdeaContents", () => {
     expect(toIdeaContents({ ideas: [IDEA] })).toEqual([IDEA]);
   });
 
+  test("the price is a single consumer price, ending in ,99", () => {
+    const priced = (price: number) => toIdeaContents({ ideas: [{ ...IDEA, price }] })[0].price;
+    expect(priced(9)).toBe(8.99);
+    expect(priced(9.99)).toBe(9.99);
+    expect(priced(14.5)).toBe(14.99);
+    expect(priced(4.49)).toBe(3.99);
+  });
+
   test("cuts long texts, rounds and bounds the price, keeps at most one batch", () => {
     const long: IdeasAiResult = {
       ideas: Array.from({ length: IDEAS_PER_REQUEST + 2 }, () => ({
         ...IDEA,
         pitch: "mot ".repeat(100),
+        feature: "mot ".repeat(100),
         price: 1234.6,
       })),
     };
@@ -30,6 +40,7 @@ describe("toIdeaContents", () => {
     expect(ideas).toHaveLength(IDEAS_PER_REQUEST);
     expect(ideas[0].pitch.length).toBeLessThanOrEqual(IDEA_TEXT_LIMITS.pitch);
     expect(ideas[0].pitch.endsWith("…")).toBe(true);
+    expect(ideas[0].feature!.length).toBeLessThanOrEqual(IDEA_TEXT_LIMITS.feature);
     expect(ideas[0].price).toBe(IDEA_PRICE_RANGE.max);
     expect(toIdeaContents({ ideas: [{ ...IDEA, price: 0.2 }] })[0].price).toBe(IDEA_PRICE_RANGE.min);
   });

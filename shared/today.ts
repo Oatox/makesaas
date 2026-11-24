@@ -116,20 +116,24 @@ export type DoneTask = { task: RoadmapMission; done: MissionDone };
 const DAILY_KEY = /^daily:[^:]+:(\d{4}-\d{2}-\d{2})$/;
 
 /**
- * Every task already done, the latest first: the launch missions, those of every MRR tier, and every
- * day's (found again from the day in their key). Not the idea, nor the milestones only the data
- * reaches (a payment, an MRR, a number of videos). Accueil lists those out of the day's tasks.
+ * Every task already done, in the order of the journey, the furthest first: not by when it was ticked
+ * (a task seen in the data, or ticked late, keeps its place). The launch missions in their order, then
+ * those of the MRR tiers in theirs and every day's day by day (found again from the day in their key),
+ * these two side by side as they were done. Not the idea, nor the milestones only the data reaches
+ * (a payment, an MRR, a number of videos). Accueil lists those out of the day's tasks.
  */
 export function doneTasks(stages: RoadmapStage[], done: Record<string, MissionDone>): DoneTask[] {
-  const catalog = new Map<string, RoadmapMission>();
-  for (const task of [...launchTasks(stages), ...stages.filter((stage) => stage.mrr).flatMap(tierTasks)]) catalog.set(task.key, task);
-  const found: DoneTask[] = [];
-  for (const [key, record] of Object.entries(done)) {
-    const day = DAILY_KEY.exec(key)?.[1];
-    const task = day ? dailyTasks(day).find((item) => item.key === key) : catalog.get(key);
-    if (task) found.push({ task, done: record });
+  const doneOf = (tasks: RoadmapMission[]): DoneTask[] => tasks.flatMap((task) => (done[task.key] ? [{ task, done: done[task.key] }] : []));
+  const days = Array.from(new Set(Object.keys(done).flatMap((key) => DAILY_KEY.exec(key)?.[1] ?? []))).sort();
+  const daily = doneOf(days.flatMap((day) => dailyTasks(day)));
+  const tiers = doneOf(stages.filter((stage) => stage.mrr).flatMap(tierTasks));
+  // After the launch: each of the two keeps its order, the next one taken from the one done first.
+  const growth: DoneTask[] = [];
+  while (daily.length || tiers.length) {
+    const fromTiers = tiers.length > 0 && (!daily.length || Date.parse(tiers[0].done.at) <= Date.parse(daily[0].done.at));
+    growth.push((fromTiers ? tiers : daily).shift()!);
   }
-  return found.sort((a, b) => Date.parse(b.done.at) - Date.parse(a.done.at));
+  return [...doneOf(launchTasks(stages)), ...growth].reverse();
 }
 
 /** The milestone the member works towards: the first one not reached; null once all are. */
