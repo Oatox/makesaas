@@ -43,9 +43,9 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     id: "onboarding-idee",
     title: "Le faux onboarding 3 : ton idée",
     description:
-      "Ce que tu aimes, ton objectif, l'idée trouvée (les noms qui défilent, puis sa carte), son prompt, Base44 qui construit le site dans son chat, puis le site qui défile pendant que les paiements tombent. Entrée pour avancer, araignée (A), écran tourné (T).",
+      "Ce que tu aimes, ton objectif, l'idée trouvée (les noms qui défilent, puis sa carte), son prompt, Claude qui construit le site dans son chat, puis le site qui défile pendant que les paiements tombent. Entrée pour avancer, araignée (A), écran tourné (T).",
     icon: Lightbulb,
-    src: "/tools/onboarding-idee/index.html?v=1",
+    src: "/tools/onboarding-idee/index.html?v=3",
   },
 ];
 
