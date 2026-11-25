@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { AUTH_CONFIG } from "@/config/auth";
 import { syncSignupSource } from "@/lib/attribution";
+import { identifyUser, resetUser, trackAccountCreated } from "@/lib/analytics";
 import { grantsAccess, SUBSCRIPTION_SUMMARY_COLUMNS, type SubscriptionSummary } from "@shared/billing";
 import type { LaunchStep } from "@shared/launch";
 import { translateSupabaseError } from "@/lib/error-translator";
@@ -83,12 +84,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoadingSession(false);
 
       if (event === "SIGNED_OUT") {
+        resetUser();
         queryClient.clear();
         window.location.href = AUTH_CONFIG.LOGIN_PATH;
       }
 
       if (event === "SIGNED_IN" && session) {
         syncSignupSource(session);
+      }
+
+      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user) {
+        identifyUser(session.user.id);
+        trackAccountCreated(session.user);
       }
 
       // Activity is recorded once per sign-in / page load, not on every token refresh.

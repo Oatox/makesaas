@@ -53,6 +53,7 @@ export default function Confidentialite() {
           <li>Railway : hébergement du site ;</li>
           <li>Whop : paiement et gestion des abonnements ;</li>
           <li>Google : connexion avec un compte Google, si vous choisissez cette option ;</li>
+          <li>Amplitude : mesure d'audience et enregistrement des sessions sur le site (voir la section 6) ;</li>
           <li>OneShotAPI : génération des contenus IA (contenu des textes envoyés).</li>
         </ul>
         <p>
@@ -71,10 +72,16 @@ export default function Confidentialite() {
 
       <LegalSection title="6. Cookies et stockage local">
         <p>
-          {LEGAL.siteName} n'utilise aucun cookie publicitaire ni outil de mesure d'audience tiers. Le site enregistre
-          dans votre navigateur uniquement les informations nécessaires à son fonctionnement : votre session de
-          connexion, la progression de votre inscription et, pendant 30 jours au plus, la source de votre première
-          visite. Le module de paiement Whop peut déposer ses propres cookies nécessaires au paiement.
+          {LEGAL.siteName} n'utilise aucun cookie publicitaire. Le site enregistre dans votre navigateur les informations
+          nécessaires à son fonctionnement : votre session de connexion, la progression de votre inscription et,
+          pendant 30 jours au plus, la source de votre première visite. Le module de paiement Whop peut déposer ses
+          propres cookies nécessaires au paiement.
+        </p>
+        <p>
+          Pour comprendre où le parcours d'inscription bloque et l'améliorer, {LEGAL.siteName} utilise Amplitude, qui
+          enregistre un identifiant dans votre navigateur. Il mesure les pages vues, les clics, les écrans de
+          l'inscription parcourus et les réponses aux questions à choix (jamais les réponses écrites), et enregistre
+          les sessions : les champs saisis y sont toujours masqués, et tous les textes une fois dans l'application.
         </p>
       </LegalSection>
 

@@ -29,6 +29,7 @@ import {
   Settings as SettingsIcon,
   Workflow,
   Megaphone,
+  Filter,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -81,6 +82,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin", label: "Aperçu Admin", icon: ShieldCheck },
       { href: "/admin/users", label: "Utilisateurs", icon: Users, matchPrefix: true },
+      { href: "/admin/onboarding", label: "Onboarding", icon: Filter },
       { href: "/admin/pipeline", label: "Pipelines", icon: Workflow, matchPrefix: true },
       { href: "/admin/marketing", label: "Marketing", icon: Megaphone, matchPrefix: true },
     ],

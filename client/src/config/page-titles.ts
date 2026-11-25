@@ -18,6 +18,7 @@ const TITLE_BY_PATH: Record<string, string> = {
   "/settings": "Paramètres",
   "/admin": "Aperçu admin",
   "/admin/users": "Utilisateurs",
+  "/admin/onboarding": "Onboarding",
   "/admin/pipeline": "Pipelines IA",
   "/admin/marketing": "Marketing",
   "/mentions-legales": "Mentions légales",

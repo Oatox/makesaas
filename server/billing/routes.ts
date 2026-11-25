@@ -1,6 +1,8 @@
 import type { Express, Request } from "express";
 import { unwrapWebhook, WebhookVerificationError } from "@whop/sdk/helpers";
+import { ANALYTICS_EVENTS } from "@shared/analytics";
 import { billingApi, isOfferKey, type CheckoutSession, type PaywallResponse } from "@shared/billing";
+import { trackServerEvent } from "../lib/analytics";
 import { getUserId, requireUser } from "../lib/auth";
 import { asyncRoute, HttpError } from "../lib/http";
 import { logger } from "../lib/logger";
@@ -132,7 +134,10 @@ export function registerBillingRoutes(app: Express) {
       const activatedUserId = await billing.syncMembership(membershipId);
       // A new member: Gus starts writing their first SaaS ideas now, in the background, so that they
       // are ready (or nearly) when the member lands on /lancement.
-      if (activatedUserId) void getIdeasService()?.startWelcomeIdeas(activatedUserId);
+      if (activatedUserId) {
+        void getIdeasService()?.startWelcomeIdeas(activatedUserId);
+        void trackServerEvent(activatedUserId, ANALYTICS_EVENTS.subscriptionStarted, `subscription-started-${membershipId}`);
+      }
       res.status(200).json({ received: true });
     } catch (err) {
       logger.error({ err, type: event.type, membershipId }, "Failed to process Whop webhook");

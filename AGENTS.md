@@ -33,6 +33,7 @@ Architecture is frontend-first: the React app communicates directly with Supabas
 - Payments: Whop (`@whop/sdk`, `@whop/elements-react`)
 - AI: OneShotAPI (Gemini models, enforced JSON output)
 - Files: Cloudflare R2 (S3 API signed with `aws4fetch`)
+- Analytics: Amplitude (`@amplitude/unified`: events, autocapture, Session Replay)
 
 ## Environment variables
 
@@ -48,10 +49,11 @@ Set them in `.env` (development) or in the host platform (production):
 - `WHOP_ENVIRONMENT` — `sandbox` to use sandbox.whop.com, production otherwise
 - `ONESHOT_API_KEY` — OneShotAPI key for the AI pipelines (server-only, optional: without it the AI routes answer 503; the coach also reads the older name `ONESHOTAPI_KEY`)
 - `SCRAPECREATORS_API_KEY` — ScrapeCreators key for the TikTok stats of the acquisition page (server-only, optional: without it adding or refreshing an account answers 503)
-- `REVENUE_ENCRYPTION_KEY` — 32 random bytes (`openssl rand -hex 32`) encrypting the Stripe/Whop keys members connect to the revenue dashboard (server-only, recommended: without it a key derived from `SUPABASE_SECRET_KEY` is used, and rotating that one forces members to reconnect their accounts)
 - `R2_ACCOUNT_ID` — Cloudflare account id (the S3 endpoint is `https://<id>.r2.cloudflarestorage.com`)
 - `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` — R2 API token with Object Read & Write on the bucket (server-only)
 - `R2_BUCKET` — name of the R2 bucket of uploaded files
+- `AMPLITUDE_SECRET_KEY` — secret key of the same Amplitude project (server-only, optional: without it the admin's Onboarding page says it is not connected), for the figures read back from Amplitude
+- `VITE_AMPLITUDE_API_KEY` — Amplitude project API key (public: ingestion only, it ships in the bundle; optional: without it no event is sent). Read by the browser and by the server (the payment event); inlined at build time, so a change needs a restart or a rebuild
 - `R2_PUBLIC_URL` — public base URL of that bucket (its `r2.dev` URL, or a custom domain in production); without the five R2 variables, uploads answer 503 and generated carousels get no images
 
 ## User journey
@@ -59,6 +61,16 @@ Set them in `.env` (development) or in the host platform (production):
 - Landing `/` → onboarding `/onboarding` (questions saved in localStorage, `client/src/components/onboarding/steps.tsx`; adding a step there is all it takes) → sign-up `/register` → paywall `/abonnement` → Gus's 3 SaaS ideas `/lancement`, then the project, the plan and the first mission (the app stays locked until the launch is over) → Accueil `/accueil` (the day's tasks, where members land once signed in: `AUTH_CONFIG.REDIRECT_PATH`).
 - `ProtectedRoute` (client/src/App.tsx) sends visitors to the onboarding and signed-in users without a subscription to the paywall.
 - Nobody skips the onboarding: accounts are created in it (`AccountStep`). `/register` (the login page's "S'inscrire") sends visitors there until they answered it on this device (`onboardingFinishedHere`), and the paywall sends there the signed-in users who never answered it (an account opened with Google from the login page): `useOnboardingAnswered` (`client/src/hooks/use-onboarding.ts`, finished on this device or answers saved on `profiles.onboarding_profile`).
+
+## Analytics (Amplitude)
+
+- The visitor's journey from the landing page to the payment, to see where they leave. The events the app sends are named in `shared/analytics.ts` (`ANALYTICS_EVENTS`; keep the names stable, Amplitude's charts are built on them): each onboarding screen (`Onboarding Step Viewed`, labeled by `step`, "04 social-proof", which the charts group by, from `useOnboardingAnalytics` in `client/src/components/onboarding/analytics.ts`) and its end, the account created, the paywall, its offers, the offer picked and the checkout entered (`Paywall.tsx`), then the payment, sent by the server from the Whop webhook (`Subscription Started`, `server/lib/analytics.ts`). Page views, clicks and sessions come from the SDK's autocapture.
+- The onboarding answers picked among options become user properties (`onboarding_<step id>`, numbers for sliders and wheels), to split the funnel by profile; written answers (first name, the member's sentence, "Autre" fields) never leave.
+- Identity: anonymous until signed in, then the Supabase user id (`identifyUser` in `use-auth.tsx`, which keeps the events made before on that device), reset at sign-out.
+- Session Replay records every session but shows texts only on the public journey (landing, onboarding, sign-up and sign-in, paywall; inputs masked); in the app and the admin every text is masked (`privacyConfig` in `client/src/lib/analytics.ts`).
+- The project is in Amplitude's EU region (data kept in the EU): `serverZone` in `client/src/lib/analytics.ts` and the URL in `server/lib/analytics.ts` change together, and the key must be that region's project's.
+- `client/src/lib/analytics.ts` loads the SDK apart from the page and never in the prerender; calls made before it is there wait for it, and nothing is sent without the key.
+- The admin's **Onboarding** page (`/admin/onboarding`, `client/src/components/admin/onboarding/`) shows them back over 7, 30 or 90 days: the funnel of `ONBOARDING_FUNNEL` (`shared/analytics.ts`) drawn as a funnel, then every screen in order with the visitors who reached it and the biggest drops. `GET /api/admin/onboarding?days=` (`server/admin/onboarding.ts`) reads Amplitude's Dashboard REST API with the project's API and secret keys, and keeps each period 5 minutes (Amplitude limits queries). Screens at the same position (the branches after "experience") add up.
 
 ## Product data
 
@@ -109,7 +121,7 @@ Set them in `.env` (development) or in the host platform (production):
 ## Revenue dashboard (Tableau de bord)
 
 - `/dash` shows the active SaaS's revenue (`/app`, its former address, redirects there) (`client/src/components/revenue/RevenueDashboard.tsx`): the period's key figures (`KpiCards`: revenue collected, MRR/ARR, new subscribers, churn, each with a mini chart), the MRR card (revenue collected as bars on the left axis, MRR as a line on the right axis) and the latest payments (an icon per kind of payment), over 30 days / 90 days / 12 months.
-- A SaaS connects a single payment account (unique index `revenue_connections_saas_key`): to change it, the member removes it first (Paiements tab of the SaaS settings; a failed sync shows above the figures); reconnecting the same account only replaces its key. Members connect it with a read-only API key: Stripe (restricted key `rk_…` reading Charges and Subscriptions) and Whop (account API key with `payment:basic:read`, `member:basic:read` and plan read). `POST /api/revenue/connections` (body `{ saasId, provider, apiKey }`) checks the key, imports 12 months of history and stores the key encrypted (`server/revenue/secret-box.ts`) in `revenue_connections` with the computed daily series (`snapshot`). Members read the public columns and remove accounts straight from Supabase (RLS); the key and the snapshot are never granted to clients.
+- A SaaS connects a single payment account (unique index `revenue_connections_saas_key`): to change it, the member removes it first (Paiements tab of the SaaS settings; a failed sync shows above the figures); reconnecting the same account only replaces its key. Members connect it with a read-only API key: Stripe (restricted key `rk_…` reading Charges and Subscriptions) and Whop (account API key with `payment:basic:read`, `member:basic:read` and plan read). `POST /api/revenue/connections` (body `{ saasId, provider, apiKey }`) checks the key, imports 12 months of history and stores the key encrypted (`server/revenue/secret-box.ts`, with a key derived from `SUPABASE_SECRET_KEY`: rotating that one makes members reconnect their accounts) in `revenue_connections` with the computed daily series (`snapshot`). Members read the public columns and remove accounts straight from Supabase (RLS); the key and the snapshot are never granted to clients.
 - `GET /api/revenue?saasId=` combines the SaaS's accounts (other currencies converted with the ECB rates of frankfurter.dev) and re-syncs in the background the accounts synced more than 30 minutes ago; the client polls while `syncing` is not empty. `POST /api/revenue/refresh` re-syncs now.
 - MRR and subscribers are rebuilt day by day from the subscriptions (start after trial, end), at their current price; revenue comes from the payments, refunds deducted (`server/revenue/metrics.ts`, tested in `metrics.test.ts`). To add a provider: see the header of `shared/revenue.ts`.
 
@@ -117,7 +129,7 @@ Set them in `.env` (development) or in the host platform (production):
 
 - "Acquisition" unfolds two sub-pages in the sidebar (`children` in `APP_PAGES`, `client/src/config/app-pages.ts`), both rendered by `client/src/pages/Acquisition.tsx`: **Statistiques** at `/acquisition` (`StatsSection`) and **Création de contenu** at `/acquisition/contenu` (`ContentSection`, the carousels, below).
 - Members add public TikTok accounts by @handle to their active SaaS (`saas_id` on the three tables, `POST` body `{ saasId, handle }`); `TIKTOK_MAX_ACCOUNTS` counts every SaaS of the user, since credits follow the number of accounts (`shared/acquisition.ts`). The server (`server/acquisition/`) fetches their profile and latest videos from ScrapeCreators (1 credit per call) and alone writes `tiktok_accounts`, `tiktok_videos` and `tiktok_account_stats` (one snapshot per account and day, for the evolution charts); members read them and remove accounts straight from Supabase (RLS).
-- No background job: opening the page refreshes the accounts older than `TIKTOK_AUTO_SYNC_HOURS`, and refreshes are capped at one per `TIKTOK_SYNC_COOLDOWN_MINUTES` per account (atomic claim on `sync_attempted_at`). The first video's task ("Vérifier ma vidéo") refreshes the SaaS's accounts sooner: `POST /api/acquisition/tiktok/first-video` (body `{ saasId }`), one per `TIKTOK_FIRST_VIDEO_CHECK_MINUTES` per account, 10 per member and hour (in memory), and only while the SaaS has no video (after that it answers the accounts without fetching).
+- One analysis per account and day, automatic, with no button nor background job: the first opening of the page on a day (Paris's, as the daily snapshots) refreshes the accounts not refreshed yet that day (`syncedToday` in `shared/acquisition.ts`, `useAutoSyncTikTokAccounts`), and the server refuses a second one that day (atomic claim on `sync_attempted_at`; adding an account counts as its analysis). The first video's task ("Vérifier ma vidéo") refreshes the SaaS's accounts sooner: `POST /api/acquisition/tiktok/first-video` (body `{ saasId }`), one per `TIKTOK_FIRST_VIDEO_CHECK_MINUTES` per account, 10 per member and hour (in memory), and only while the SaaS has no video (after that it answers the accounts without fetching).
 
 ## Content (TikTok carousels)
 

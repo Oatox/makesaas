@@ -27,6 +27,7 @@ import { PactStep } from "@/components/onboarding/PactStep";
 import { CoachChatStep } from "@/components/onboarding/CoachChatStep";
 import { BuildStep } from "@/components/onboarding/BuildStep";
 import { ProjectionStep } from "@/components/onboarding/ProjectionStep";
+import { useOnboardingAnalytics } from "@/components/onboarding/analytics";
 import { STEP_TITLE_CLASS, stepAppear as appear } from "@/components/onboarding/StepHeader";
 import { TypewriterText } from "@/components/onboarding/TypewriterText";
 import { useOnboardingProgress } from "@/hooks/use-onboarding";
@@ -101,6 +102,7 @@ export default function OnboardingPage() {
   const { progress, answer, next, back, reset } = useOnboardingProgress(countSteps);
   const answers = progress.answers;
   const steps = useMemo(() => visibleSteps(answers), [answers]);
+  useOnboardingAnalytics(steps, progress.stepIndex, answers, !isLoading && !hasAccess);
 
   // Subscribers have nothing to do here.
   if (!isLoading && hasAccess) {

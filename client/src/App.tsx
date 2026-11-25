@@ -210,6 +210,9 @@ function Router() {
       <Route path="/admin/users">
         <ProtectedRoute component={AdminPage} />
       </Route>
+      <Route path="/admin/onboarding">
+        <ProtectedRoute component={AdminPage} />
+      </Route>
       <Route path="/admin/pipeline">
         <ProtectedRoute component={AdminPage} />
       </Route>

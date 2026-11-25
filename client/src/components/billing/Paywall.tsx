@@ -36,7 +36,9 @@ import { useSaas } from "@/hooks/use-saas";
 import { createCheckout, usePaywallOffers } from "@/hooks/use-billing";
 import { useToast } from "@/hooks/use-toast";
 import { ApiError } from "@/lib/api-client";
+import { track } from "@/lib/analytics";
 import { loadOnboardingProgress, type OnboardingAnswers } from "@/lib/onboarding-storage";
+import { ANALYTICS_EVENTS } from "@shared/analytics";
 import { cn } from "@/lib/utils";
 
 const WhopCheckout = lazy(() => import("./WhopCheckout"));
@@ -754,6 +756,22 @@ export function Paywall() {
   const monthly = sold?.find((o) => o.key === "monthly");
   const offers = sold ? sold.map((o) => describeOffer(o, monthly)) : null;
 
+  // Analytics: the paywall, its offers, the offer picked and the checkout entered (the payment itself
+  // is sent by the server, from the Whop webhook).
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const pickOffer = (offer: OfferKey) => {
+    setPicked(offer);
+    track(ANALYTICS_EVENTS.offerSelected, { offer });
+  };
+  useEffect(() => {
+    track(ANALYTICS_EVENTS.paywallViewed);
+  }, []);
+  const offersShown = screen === "offers" && !activating;
+  useEffect(() => {
+    if (offersShown) track(ANALYTICS_EVENTS.paywallOffersViewed);
+  }, [offersShown]);
+
   useEffect(() => {
     if (status === "failed" || status === "canceled") {
       toast({ variant: "destructive", title: "Paiement non abouti", description: "Aucun montant n'a été débité. Tu peux réessayer." });
@@ -802,6 +820,9 @@ export function Paywall() {
     return () => window.removeEventListener("blur", onBlur);
   }, []);
   useEffect(() => {
+    if (inCheckout) track(ANALYTICS_EVENTS.checkoutStarted, { offer: selectedRef.current ?? undefined });
+  }, [inCheckout]);
+  useEffect(() => {
     if (!inCheckout || activating) return;
     if (hasAccess) {
       setActivating(true);
@@ -833,7 +854,7 @@ export function Paywall() {
           offersError={offersQuery.isError ? offersQuery.error.message : null}
           onRetryOffers={() => offersQuery.refetch()}
           selected={selected}
-          onSelect={setPicked}
+          onSelect={pickOffer}
           checkout={checkout}
           onRetryCheckout={() => setAttempt((n) => n + 1)}
           environment={offersQuery.data?.environment ?? "production"}

@@ -6,6 +6,7 @@ import { AdminUsersPage } from "@/components/admin/users/AdminUsersPage";
 import { AdminUserDetailsPage } from "@/components/admin/users/AdminUserDetailsPage";
 import { AdminPipelinePage } from "@/components/admin/pipeline/AdminPipelinePage";
 import { AdminMarketingPage } from "@/components/admin/marketing/AdminMarketingPage";
+import { AdminOnboardingPage } from "@/components/admin/onboarding/AdminOnboardingPage";
 import { MarketingToolPage } from "@/components/admin/marketing/MarketingToolPage";
 
 export default function AdminPage() {
@@ -25,6 +26,10 @@ export default function AdminPage() {
 
   if (isUsersPage) {
     return <AdminUsersPage />;
+  }
+
+  if (location === "/admin/onboarding") {
+    return <AdminOnboardingPage />;
   }
 
   if (isPipelinePage) {

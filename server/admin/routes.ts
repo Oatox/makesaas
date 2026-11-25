@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { z } from "zod";
+import { adminApi, isOnboardingStatsPeriod } from "@shared/admin";
 import { SUBSCRIPTION_SUMMARY_COLUMNS, renewsBilling, type SubscriptionSummary } from "@shared/billing";
 import { getUserId, requireAdmin } from "../lib/auth";
 import { asyncRoute, HttpError, parseInput } from "../lib/http";
@@ -8,11 +9,13 @@ import { supabaseAdmin } from "../lib/supabase-admin";
 import { removeUserFiles } from "../storage/files";
 import { mapProviders, mapSessionRow, type AdminSessionPayload } from "./mappers";
 import { JOURNEY_PROFILE_COLUMNS, readDiscussion, readJourney, readSaasDetail } from "./member";
+import { readOnboardingStats } from "./onboarding";
 
 const userParamsSchema = z.object({ id: z.string().uuid() });
 const sessionParamsSchema = userParamsSchema.extend({ sessionId: z.string().uuid() });
 const saasParamsSchema = userParamsSchema.extend({ saasId: z.string().uuid() });
 const discussionParamsSchema = userParamsSchema.extend({ conversationId: z.string().uuid() });
+const onboardingQuerySchema = z.object({ days: z.coerce.number().int().refine(isOnboardingStatsPeriod) });
 
 const updateUserBodySchema = z
   .object({
@@ -117,6 +120,16 @@ export function registerAdminRoutes(app: Express) {
     asyncRoute(async (req, res) => {
       const { id: userId, saasId } = parseInput(saasParamsSchema, req.params);
       res.json(await readSaasDetail(db(), userId, saasId));
+    }),
+  );
+
+  // The onboarding's funnel and screens over 7, 30 or 90 days, read from Amplitude (./onboarding.ts).
+  app.get(
+    adminApi.onboarding,
+    requireAdmin,
+    asyncRoute(async (req, res) => {
+      const { days } = parseInput(onboardingQuerySchema, req.query);
+      res.json(await readOnboardingStats(days));
     }),
   );
 

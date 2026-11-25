@@ -78,7 +78,33 @@ export type AdminDiscussionSummary = {
 /** GET adminApi.discussion: a discussion with Gus and its messages, oldest first. */
 export type AdminDiscussion = AdminDiscussionSummary & { saasId: string; thread: CoachMessage[] };
 
+/** Periods of the Onboarding page, in days. */
+export const ONBOARDING_STATS_PERIODS = [7, 30, 90] as const;
+export type OnboardingStatsPeriod = (typeof ONBOARDING_STATS_PERIODS)[number];
+
+export const isOnboardingStatsPeriod = (days: number): days is OnboardingStatsPeriod =>
+  (ONBOARDING_STATS_PERIODS as readonly number[]).includes(days);
+
+/** One step of the funnel (ONBOARDING_FUNNEL in shared/analytics.ts): the visitors who reached it. */
+export type OnboardingFunnelStep = { label: string; users: number };
+
+/**
+ * One position in the onboarding (its Nth screen) and the visitors who reached it. The screens a
+ * position shows can differ with the answers (the branches after "experience"): `stepIds` lists them.
+ */
+export type OnboardingScreenStat = { number: number; stepIds: string[]; users: number };
+
+/** GET adminApi.onboarding?days=: the onboarding's funnel and screens over the period, from Amplitude. */
+export type AdminOnboardingStats = {
+  days: OnboardingStatsPeriod;
+  funnel: OnboardingFunnelStep[];
+  screens: OnboardingScreenStat[];
+  /** When Amplitude computed these figures (they are kept a few minutes). */
+  computedAt: string;
+};
+
 export const adminApi = {
+  onboarding: "/api/admin/onboarding",
   userDetails: (userId: string) => `/api/admin/users/${userId}/details`,
   saas: (userId: string, saasId: string) => `/api/admin/users/${userId}/saas/${saasId}`,
   discussion: (userId: string, conversationId: string) => `/api/admin/users/${userId}/discussions/${conversationId}`,
