@@ -162,6 +162,7 @@ export function registerContentRoutes(app: Express) {
         topic: body.topic,
         slideCount: body.slideCount,
         ratio: body.ratio,
+        textStyle: body.textStyle,
       });
     }),
   );

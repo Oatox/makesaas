@@ -1,24 +1,14 @@
 import { useState, type ReactNode } from "react";
-import {
-  ArrowLeft,
-  GalleryHorizontalEnd,
-  Image as ImageIcon,
-  LayoutGrid,
-  Loader2,
-  Minus,
-  MousePointer2,
-  Plus,
-  Sparkle,
-  Sparkles,
-  Type,
-} from "lucide-react";
+import { ArrowLeft, GalleryHorizontalEnd, Loader2, Minus, PenLine, Plus, WandSparkles, type LucideIcon } from "lucide-react";
 import {
   CAROUSEL_GENERATED_SLIDES,
   CAROUSEL_RATIOS,
   CAROUSEL_RATIO_IDS,
   CAROUSEL_TOPIC_MAX_LENGTH,
+  DEFAULT_CAROUSEL_TEXT_STYLE,
   generateCarouselBodySchema,
   type CarouselRatio,
+  type CarouselTextStyle,
 } from "@shared/carousel";
 import type { Carousel } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -28,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCarouselQuota, useGenerateCarousel } from "@/hooks/use-carousels";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { TextStylePicker } from "./TextStylePicker";
 
 // The ratio tiles of the generation form: each draws its slide shape at the same height.
 const RATIO_SHAPE_HEIGHT = 30;
@@ -45,81 +36,6 @@ function quotaShort(quota: { used: number; limit: number; nextAvailableAt: strin
   return quota.nextAvailableAt ? `Prochaine possible à ${timeFormat.format(new Date(quota.nextAvailableAt))}` : "Plus de générations pour l'instant";
 }
 
-// A slide in the card illustrations: portrait, like a carousel slide. The fanned ones of the AI card
-// sit on top of each other (absolute); glass: the white-tinted look of an unfilled slide.
-const miniSlideClass = "h-[74px] w-14 rounded-[8px] transition-transform duration-300 ease-out";
-const fannedSlideClass = `absolute left-[42px] top-0 ${miniSlideClass}`;
-const glassSlideClass = "border border-white/10 bg-gradient-to-b from-white/[0.14] to-white/[0.04]";
-
-function SlideLines({ className }: { className: string }) {
-  return (
-    <span className="absolute inset-x-2 bottom-2.5 space-y-1">
-      <span className={`block h-1 rounded-full ${className}`} />
-      <span className={`block h-1 w-2/3 rounded-full ${className}`} />
-    </span>
-  );
-}
-
-/** Three slides fanned out, the front one orange with the AI sparkles; they spread out on hover. */
-function GeneratePreview() {
-  return (
-    <span aria-hidden className="relative h-[74px] w-[140px]">
-      <span className={`${fannedSlideClass} ${glassSlideClass} -translate-x-6 -rotate-12 group-hover:-translate-x-8 group-hover:-rotate-[16deg]`}>
-        <SlideLines className="bg-white/20" />
-      </span>
-      <span className={`${fannedSlideClass} ${glassSlideClass} translate-x-6 rotate-12 group-hover:translate-x-8 group-hover:rotate-[16deg]`}>
-        <SlideLines className="bg-white/20" />
-      </span>
-      <span
-        className={`${fannedSlideClass} flex justify-center bg-gradient-to-br from-orange-400 to-orange-600 pt-3.5 shadow-[0_10px_24px_-6px_rgb(0_0_0/0.6),inset_0_1px_0_rgb(255_255_255/0.35)] group-hover:-translate-y-1.5`}
-      >
-        <Sparkles className="size-6 text-white" />
-        <SlideLines className="bg-white/60" />
-      </span>
-      {/* Two sparks around the front slide, which twinkle on hover. */}
-      <Sparkle className="absolute -top-2.5 right-4 size-3 fill-current text-orange-200/90 transition-transform duration-500 group-hover:rotate-90 group-hover:scale-125" />
-      <Sparkle className="absolute bottom-0 left-2.5 size-2.5 fill-current text-orange-300/70 transition-transform duration-500 group-hover:-rotate-90 group-hover:scale-125" />
-    </span>
-  );
-}
-
-/**
- * The editor in miniature: a blank slide (an image to drop, a text being typed), the tool bar under
- * it, and the cursor, which moves onto the slide on hover.
- */
-function ScratchPreview({ busy }: { busy?: boolean }) {
-  return (
-    <span aria-hidden className="relative flex h-[90px] w-[140px] justify-center">
-      <span className={`relative ${miniSlideClass} ${glassSlideClass} group-hover:-translate-y-1`}>
-        <span className="absolute inset-x-1.5 top-1.5 flex h-7 items-center justify-center rounded-[4px] border border-dashed border-white/20 text-white/35">
-          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <ImageIcon className="size-3.5" />}
-        </span>
-        <span className="absolute inset-x-2 top-[42px] flex items-center gap-0.5">
-          <span className="h-1 w-6 rounded-full bg-white/30" />
-          <span className="h-2.5 w-px animate-pulse bg-primary" />
-        </span>
-      </span>
-      <span className="absolute bottom-0 left-1/2 flex -translate-x-1/2 gap-0.5 rounded-full border border-white/10 bg-[hsl(160_7%_14%)] p-0.5 shadow-lg shadow-black/40">
-        {[Type, ImageIcon, LayoutGrid].map((Icon, index) => (
-          <span
-            key={index}
-            className={cn(
-              "flex size-5 items-center justify-center rounded-full",
-              index === 0 ? "bg-white/10 text-foreground" : "text-muted-foreground",
-            )}
-          >
-            <Icon className="size-3" />
-          </span>
-        ))}
-      </span>
-      <MousePointer2
-        strokeWidth={1.5}
-        className="absolute right-5 top-7 size-4 fill-white text-black/70 transition-transform duration-300 ease-out group-hover:-translate-x-2.5 group-hover:-translate-y-1"
-      />
-    </span>
-  );
-}
-
 /** The footer line of a card: a colored dot, then a few words. */
 function CardNote({ dotClassName, children }: { dotClassName: string; children: ReactNode }) {
   return (
@@ -130,19 +46,20 @@ function CardNote({ dotClassName, children }: { dotClassName: string; children: 
   );
 }
 
+/** A way to start: its icon (a spinner while it opens), title, description and footer line. */
 function ChoiceCard({
+  icon: Icon,
+  iconClassName,
   title,
   description,
-  preview,
-  previewClassName,
   onClick,
   busy,
   footer,
 }: {
+  icon: LucideIcon;
+  iconClassName: string;
   title: string;
   description: string;
-  preview: ReactNode;
-  previewClassName?: string;
   onClick: () => void;
   busy?: boolean;
   footer?: ReactNode;
@@ -152,21 +69,14 @@ function ChoiceCard({
       type="button"
       onClick={onClick}
       disabled={busy}
-      className="group flex flex-col rounded-[16px] border border-border bg-background/40 p-1.5 text-left transition-colors hover:border-white/[0.16] hover:bg-white/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
+      className="flex flex-col gap-1 rounded-[16px] border border-border bg-background/40 p-4 text-left transition-colors hover:border-white/[0.16] hover:bg-white/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-60"
     >
-      <span
-        className={cn(
-          "flex h-32 items-center justify-center overflow-hidden rounded-[11px] border border-white/[0.05] bg-white/[0.02]",
-          previewClassName,
-        )}
-      >
-        {preview}
+      <span aria-hidden className={cn("mb-2 flex size-9 items-center justify-center rounded-[10px]", iconClassName)}>
+        {busy ? <Loader2 className="size-[18px] animate-spin" /> : <Icon className="size-[18px]" />}
       </span>
-      <span className="flex flex-1 flex-col gap-1 px-2.5 pb-2 pt-3">
-        <span className="font-medium">{title}</span>
-        <span className="text-sm leading-snug text-muted-foreground">{description}</span>
-        {footer}
-      </span>
+      <span className="font-medium">{title}</span>
+      <span className="text-sm leading-snug text-muted-foreground">{description}</span>
+      {footer}
     </button>
   );
 }
@@ -192,6 +102,7 @@ export function NewCarouselDialog({
   const [topic, setTopic] = useState("");
   const [slideCount, setSlideCount] = useState<number>(CAROUSEL_GENERATED_SLIDES.default);
   const [ratio, setRatio] = useState<CarouselRatio>("9:16");
+  const [textStyle, setTextStyle] = useState<CarouselTextStyle>(DEFAULT_CAROUSEL_TEXT_STYLE);
   const [error, setError] = useState<string | null>(null);
   const generate = useGenerateCarousel();
   const quota = useCarouselQuota();
@@ -217,9 +128,10 @@ export function NewCarouselDialog({
             </DialogHeader>
             <div className="grid gap-3 sm:grid-cols-2">
               <ChoiceCard
+                icon={WandSparkles}
+                iconClassName="bg-primary/10 text-primary"
                 title="Générer avec l'IA"
                 description="Donne un sujet : l'IA écrit les slides et crée les images."
-                preview={<GeneratePreview />}
                 onClick={() => setStep("generate")}
                 footer={
                   quota.data && (
@@ -228,11 +140,10 @@ export function NewCarouselDialog({
                 }
               />
               <ChoiceCard
+                icon={PenLine}
+                iconClassName="bg-white/[0.06] text-foreground/80"
                 title="Partir de zéro"
                 description="Un carrousel vide, à remplir dans l'éditeur."
-                preview={<ScratchPreview busy={creatingEmpty} />}
-                // The editor's canvas: a dot grid.
-                previewClassName="bg-[radial-gradient(rgb(255_255_255/0.08)_1px,transparent_1px)] bg-[length:12px_12px]"
                 onClick={onCreateEmpty}
                 busy={creatingEmpty}
                 footer={<CardNote dotClassName="bg-white/40">Illimité, sans crédit IA</CardNote>}
@@ -262,7 +173,7 @@ export function NewCarouselDialog({
               className="space-y-5"
               onSubmit={(event) => {
                 event.preventDefault();
-                const parsed = generateCarouselBodySchema.omit({ saasId: true }).safeParse({ topic, slideCount, ratio });
+                const parsed = generateCarouselBodySchema.omit({ saasId: true }).safeParse({ topic, slideCount, ratio, textStyle });
                 if (!parsed.success) {
                   setError(parsed.error.issues[0]?.message ?? "Vérifie le formulaire.");
                   return;
@@ -379,6 +290,8 @@ export function NewCarouselDialog({
                   </div>
                 </fieldset>
               </div>
+
+              <TextStylePicker value={textStyle} onChange={setTextStyle} />
 
               {error && (
                 <p className="text-sm text-destructive" role="alert">

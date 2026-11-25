@@ -189,6 +189,47 @@ export const carouselImagePrompt = (imagePrompt: string, ratio: CarouselRatio) =
 /** Images added in the editor (types: IMAGE_TYPES of shared/storage.ts, stored in the R2 bucket). */
 export const CAROUSEL_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
+// ---- Text styles of the AI generation ----
+
+export const CAROUSEL_TEXT_STYLE_IDS = ["dark-box", "light-box", "outline", "shadow"] as const;
+export type CarouselTextStyle = (typeof CAROUSEL_TEXT_STYLE_IDS)[number];
+export const DEFAULT_CAROUSEL_TEXT_STYLE: CarouselTextStyle = "dark-box";
+
+type CarouselTextLook = Pick<CarouselTextLayer, "color" | "backgroundColor" | "backgroundRadius" | "outlineColor" | "shadow" | "shadowIntensity"> & {
+  /** Width of the outline, as a share of the font size (0: none). */
+  outline: number;
+};
+
+/**
+ * The looks a member picks for the text of a generated carousel ("Générer avec l'IA",
+ * NewCarouselDialog), each readable on any image: the style of its text layers
+ * (server/content/generated-document.ts). Everything stays editable in the editor.
+ */
+export const CAROUSEL_TEXT_STYLES: Record<CarouselTextStyle, { label: string; look: CarouselTextLook }> = {
+  "dark-box": {
+    label: "Fond noir",
+    look: { color: "#ffffff", backgroundColor: "#000000b3", backgroundRadius: 8, outlineColor: "#000000", outline: 0, shadow: "none", shadowIntensity: 50 },
+  },
+  "light-box": {
+    label: "Fond blanc",
+    look: { color: "#111111", backgroundColor: "#ffffff", backgroundRadius: 8, outlineColor: "#000000", outline: 0, shadow: "none", shadowIntensity: 50 },
+  },
+  outline: {
+    label: "Contour",
+    look: { color: "#ffffff", backgroundColor: "transparent", backgroundRadius: 6, outlineColor: "#000000", outline: 0.09, shadow: "none", shadowIntensity: 50 },
+  },
+  shadow: {
+    label: "Ombre",
+    look: { color: "#ffffff", backgroundColor: "transparent", backgroundRadius: 6, outlineColor: "#000000", outline: 0, shadow: "strong", shadowIntensity: 100 },
+  },
+};
+
+/** The style fields of a text layer of this font size in this look (its outline follows the size). */
+export function carouselTextStyleFields(style: CarouselTextStyle, fontSize: number) {
+  const { outline, ...look } = CAROUSEL_TEXT_STYLES[style].look;
+  return { ...look, outlineWidth: Math.min(CAROUSEL_TEXT.maxOutlineWidth, Math.round(fontSize * outline * 2) / 2) };
+}
+
 export type CarouselStatus = "generating" | "ready" | "failed";
 
 export const generateCarouselBodySchema = z.object({
@@ -200,6 +241,7 @@ export const generateCarouselBodySchema = z.object({
     .max(CAROUSEL_TOPIC_MAX_LENGTH, `${CAROUSEL_TOPIC_MAX_LENGTH} caractères maximum`),
   slideCount: z.number().int().min(CAROUSEL_GENERATED_SLIDES.min).max(CAROUSEL_GENERATED_SLIDES.max),
   ratio: z.enum(CAROUSEL_RATIO_IDS),
+  textStyle: z.enum(CAROUSEL_TEXT_STYLE_IDS).default(DEFAULT_CAROUSEL_TEXT_STYLE),
 });
 export type GenerateCarouselBody = z.infer<typeof generateCarouselBodySchema>;
 

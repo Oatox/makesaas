@@ -12,6 +12,7 @@ import {
   CAROUSEL_RATIOS,
   carouselImagePrompt,
   type CarouselRatio,
+  type CarouselTextStyle,
 } from "@shared/carousel";
 import type { ChatMessage, OneShotClient } from "../ai/oneshot-client";
 import { AiPipelineNotFoundError, AiPipelineRepository, renderTemplate } from "../ai/pipelines";
@@ -36,6 +37,8 @@ export type CarouselGenerationJob = {
   topic: string;
   slideCount: number;
   ratio: CarouselRatio;
+  /** The look of the text over the images, picked by the member. */
+  textStyle: CarouselTextStyle;
 };
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, run: (item: T, index: number) => Promise<R>): Promise<R[]> {
@@ -141,7 +144,7 @@ export async function generateCarousel(db: SupabaseClient, oneshot: OneShotClien
       .from("carousels")
       .update({
         title: text.title,
-        document: buildGeneratedDocument(job.ratio, text.slides, imageUrls),
+        document: buildGeneratedDocument(job.ratio, text.slides, imageUrls, job.textStyle),
         status: "ready",
         error: missing > 0 ? `${missing} image${missing > 1 ? "s" : ""} sur ${imageUrls.length} n'${missing > 1 ? "ont" : "a"} pas pu être générée${missing > 1 ? "s" : ""} : ajoute-les à la main.` : null,
       })

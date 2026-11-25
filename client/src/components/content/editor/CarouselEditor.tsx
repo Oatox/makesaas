@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { AlertTriangle, ArrowLeft, Check, CloudOff, Download, Loader2, Redo2, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Download, Loader2, Redo2, Undo2 } from "lucide-react";
 import {
   CAROUSEL_RATIOS,
   CAROUSEL_RATIO_IDS,
@@ -11,6 +11,7 @@ import {
 } from "@shared/carousel";
 import type { Carousel } from "@shared/schema";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { uploadCarouselImage, useCarousel, useSaveCarousel } from "@/hooks/use-carousels";
 import { toast } from "@/hooks/use-toast";
@@ -54,19 +55,26 @@ function StatusScreen({ icon, title, description, onBack }: { icon: ReactNode; t
   );
 }
 
+/** The save state as a colored dot (green: saved, orange: saving), named on hover; a failure says so, to retry. */
 function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
   if (state === "error") {
     return (
       <button type="button" onClick={onRetry} className="flex items-center gap-1.5 text-xs text-destructive hover:underline">
-        <CloudOff className="size-3.5" /> Échec, réessayer
+        <span className="size-2 shrink-0 rounded-full bg-destructive" /> Échec, réessayer
       </button>
     );
   }
+  const saved = state === "saved";
+  const label = saved ? "Enregistré" : "Enregistrement…";
   return (
-    <span className="flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
-      {state === "saved" ? <Check className="size-3.5" /> : <Loader2 className="size-3.5 animate-spin" />}
-      {state === "saved" ? "Enregistré" : "Enregistrement…"}
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span role="status" aria-label={label} className="flex size-6 items-center justify-center">
+          <span className={cn("size-2 rounded-full transition-colors", saved ? "bg-success" : "animate-pulse bg-primary")} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -241,13 +249,14 @@ function Workspace({ carousel, initialDocument, onExit }: { carousel: Carousel; 
           <IconButton label="Retour aux carrousels" onClick={() => void exit()}>
             <ArrowLeft />
           </IconButton>
-          <input
+          {/* The app's field, as tall as the header's buttons. */}
+          <Input
             value={title}
             maxLength={CAROUSEL_TITLE_MAX_LENGTH}
             onChange={(event) => dispatch({ type: "rename", title: event.target.value })}
             onBlur={endGesture}
             aria-label="Titre du carrousel"
-            className="min-w-0 max-w-xs flex-1 truncate rounded-md bg-transparent px-2 py-1 font-display text-sm outline-none ring-primary/40 hover:bg-white/5 focus:bg-white/5 focus:ring-2 sm:text-base"
+            className="h-11 min-w-0 max-w-xs flex-1 truncate sm:h-9 md:h-9"
           />
           {/* On the right, the save state by the download. */}
           <div className="ml-auto flex items-center gap-3">
