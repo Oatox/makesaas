@@ -32,6 +32,14 @@ const eventFilter = (key: string, op: string, value: string): EventFilter => ({
   subprop_value: [value],
 });
 
+/**
+ * Amplitude answers a query it has already computed from its own cache, for up to 2 hours, even as new
+ * events arrive: the page stayed on the visitors of the morning. Each computation adds to the onboarding
+ * screen's event a filter that keeps all of them (no `step` label is that) but makes the query a new one,
+ * so that Amplitude computes it again. The cache above (CACHE_MS) still spares its rate limit.
+ */
+const freshnessFilter = (now: number) => eventFilter("step", "is not", `fresh-${now}`);
+
 /** The period's first and last days, as Amplitude takes them (YYYYMMDD, in the project's time zone, UTC). */
 export function periodRange(days: number, now = new Date()) {
   const ymd = (date: Date) => date.toISOString().slice(0, 10).replace(/-/g, "");
@@ -113,36 +121,45 @@ export function readScreens(body: unknown): OnboardingScreenStat[] {
   return Array.from(byNumber.values()).sort((a, b) => a.number - b.number);
 }
 
-async function computeStats(days: OnboardingStatsPeriod): Promise<AdminOnboardingStats> {
-  const { start, end } = periodRange(days);
+/** The two queries of the page: the funnel, and the visitors of each screen. */
+export function statsQueries(days: OnboardingStatsPeriod, now = new Date()) {
+  const { start, end } = periodRange(days, now);
+  const fresh = freshnessFilter(now.getTime());
 
   const funnelEvents: QueryEvent[] = ONBOARDING_FUNNEL.map((step, index) => ({
     event_type: step.event,
-    filters: index === 0 ? [eventFilter("step_number", "is", "1")] : [],
+    filters: index === 0 ? [eventFilter("step_number", "is", "1"), fresh] : [],
   }));
   const screensEvent: QueryEvent = {
     event_type: ANALYTICS_EVENTS.onboardingStepViewed,
-    filters: [eventFilter("step", "is not", "(none)")],
+    filters: [eventFilter("step", "is not", "(none)"), fresh],
     group_by: [{ type: "event", value: "step" }],
   };
 
+  const funnel: [string, string][] = [
+    ...funnelEvents.map((event): [string, string] => ["e", JSON.stringify(event)]),
+    ["start", start],
+    ["end", end],
+    ["mode", "ordered"],
+    ["n", "active"],
+    ["cs", String(CONVERSION_WINDOW_SECONDS)],
+  ];
+  const screens: [string, string][] = [
+    ["e", JSON.stringify(screensEvent)],
+    ["m", "uniques"],
+    ["start", start],
+    ["end", end],
+    ["i", "30"],
+    ["limit", "200"],
+  ];
+  return { funnel, screens };
+}
+
+async function computeStats(days: OnboardingStatsPeriod): Promise<AdminOnboardingStats> {
+  const queries = statsQueries(days);
   const [funnel, screens] = await Promise.all([
-    queryAmplitude("/funnels", [
-      ...funnelEvents.map((event): [string, string] => ["e", JSON.stringify(event)]),
-      ["start", start],
-      ["end", end],
-      ["mode", "ordered"],
-      ["n", "active"],
-      ["cs", String(CONVERSION_WINDOW_SECONDS)],
-    ]),
-    queryAmplitude("/events/segmentation", [
-      ["e", JSON.stringify(screensEvent)],
-      ["m", "uniques"],
-      ["start", start],
-      ["end", end],
-      ["i", "30"],
-      ["limit", "200"],
-    ]),
+    queryAmplitude("/funnels", queries.funnel),
+    queryAmplitude("/events/segmentation", queries.screens),
   ]);
 
   try {
