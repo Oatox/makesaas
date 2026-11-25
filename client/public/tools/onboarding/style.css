@@ -209,6 +209,9 @@ body::after {
   }
 }
 
+/* No blur in the moves played at each tap (the step leaving, every piece coming in): animating a
+   blur makes the browser filter the whole screen again on each frame, which stutters, worst in the
+   turned phone, enlarged. Fade and slide only (composited, smooth). */
 .step.leaving {
   animation: leave 0.2s ease forwards;
 }
@@ -217,11 +220,10 @@ body::after {
   to {
     opacity: 0;
     transform: translateX(-24px);
-    filter: blur(6px);
   }
 }
 
-/* Entrance shared by every piece: from a blur, slightly from below (delay in --d). */
+/* Entrance shared by every piece: fading in, slightly from below (delay in --d). */
 .appear {
   animation: appear 0.55s var(--ease-out) backwards;
   animation-delay: var(--d, 0ms);
@@ -231,7 +233,6 @@ body::after {
   from {
     opacity: 0;
     transform: translateY(14px);
-    filter: blur(8px);
   }
 }
 

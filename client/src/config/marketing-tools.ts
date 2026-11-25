@@ -1,4 +1,4 @@
-import { Disc3, Rocket, type LucideIcon } from "lucide-react";
+import { Disc3, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
 
 /**
  * Marketing tools of the admin (/admin/marketing): each one opens at /admin/marketing/<id>.
@@ -29,7 +29,15 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     description:
       "Passions, temps, banque et objectif, puis le site qui se crée sous tes yeux et les paiements qui tombent. À filmer : araignée sur l'écran (A), écran tourné comme un téléphone (T).",
     icon: Rocket,
-    src: "/tools/onboarding/index.html?v=10",
+    src: "/tools/onboarding/index.html?v=13",
+  },
+  {
+    id: "onboarding-potentiel",
+    title: "Le faux onboarding 2 : ton potentiel",
+    description:
+      "Objectif, paiements, échéance, sans te montrer, marketing, puis le potentiel chiffré et le site qui se crée sous tes yeux. Touches 1 à 4 pour répondre, idée suivante (I), araignée (A), écran tourné (T).",
+    icon: TrendingUp,
+    src: "/tools/onboarding-potentiel/index.html?v=2",
   },
 ];
 
