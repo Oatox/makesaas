@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
  *
  * On a computer the tool's fullscreen button uses the browser's fullscreen. On a phone or a tablet it
  * posts { type: "marketing-tool:fill" } instead: the tool then fills the whole page, over the app's
- * header and menu, while the browser's own bars stay in view; the same button gives the page back.
+ * header and menu, while the browser's own bars stay in view, until the page is reloaded (to film,
+ * nothing on screen brings the admin back).
  */
 export function MarketingToolPage({ toolId }: { toolId: string }) {
   const tool = getMarketingTool(toolId);
@@ -27,7 +28,7 @@ export function MarketingToolPage({ toolId }: { toolId: string }) {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frameRef.current?.contentWindow) return;
       if (event.data?.type === "marketing-tool:home") setLocation("/admin/marketing");
-      if (event.data?.type === "marketing-tool:fill") setFilling((value) => !value);
+      if (event.data?.type === "marketing-tool:fill") setFilling(true);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);

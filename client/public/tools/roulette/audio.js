@@ -30,6 +30,10 @@ const Sfx = (() => {
       const d = noiseBuf.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     }
+    // iPhone : par le canal média, pour que le bouton silencieux ne coupe pas les sons.
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = "playback";
+    } catch {}
     if (ctx.state === "suspended") ctx.resume();
     return ctx;
   }

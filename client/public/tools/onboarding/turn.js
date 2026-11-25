@@ -30,8 +30,8 @@
   const touchScreen = window.matchMedia?.("(hover: none) and (pointer: coarse)").matches ?? false;
 
   /**
-   * Computers: the browser's fullscreen. Phones and tablets (or a browser without it, as an iPhone):
-   * the admin page holding the tool gives it the whole page, and gives it back on the next press.
+   * Computers: the browser's fullscreen (F or Escape leave it). Phones and tablets (or a browser
+   * without it, as an iPhone): the tool fills the whole page until the page is reloaded (fillPage).
    */
   function toggleFullscreen() {
     const root = document.documentElement;
@@ -48,9 +48,17 @@
     }
   }
 
-  /** Asks the admin page holding the tool to let it fill the page, or to put it back (MarketingToolPage). */
+  /**
+   * Asks the admin page holding the tool to let it fill the page (MarketingToolPage), for good: to film,
+   * the buttons leave too and a tap no longer brings them back. Reloading the page is the way out.
+   */
+  let filled = false;
   function fillPage() {
+    if (filled) return;
+    filled = true;
     if (window.parent !== window) window.parent.postMessage({ type: "marketing-tool:fill" }, location.origin);
+    document.documentElement.classList.add("filming");
+    frame?.contentDocument?.documentElement.classList.add("filming");
   }
 
   /** Back to the admin's list of tools (when embedded there). */

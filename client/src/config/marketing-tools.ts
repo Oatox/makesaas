@@ -1,4 +1,4 @@
-import { Disc3, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
+import { Disc3, Lightbulb, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
 
 /**
  * Marketing tools of the admin (/admin/marketing): each one opens at /admin/marketing/<id>.
@@ -21,7 +21,7 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     title: "La roue du destin",
     description: "Une roue (ou un rouleau) à faire tourner en live ou en vidéo. Résultat imposable en secret.",
     icon: Disc3,
-    src: "/tools/roulette/index.html?mode=wheel&v=2",
+    src: "/tools/roulette/index.html?mode=wheel&v=3",
   },
   {
     id: "onboarding",
@@ -29,7 +29,7 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     description:
       "Passions, temps, banque et objectif, puis le site qui se crée sous tes yeux et les paiements qui tombent. À filmer : araignée sur l'écran (A), écran tourné comme un téléphone (T).",
     icon: Rocket,
-    src: "/tools/onboarding/index.html?v=14",
+    src: "/tools/onboarding/index.html?v=15",
   },
   {
     id: "onboarding-potentiel",
@@ -37,7 +37,15 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     description:
       "Objectif, paiements, échéance, sans te montrer, marketing, puis le potentiel chiffré et le site qui se crée sous tes yeux. Touches 1 à 4 pour répondre, idée suivante (I), araignée (A), écran tourné (T).",
     icon: TrendingUp,
-    src: "/tools/onboarding-potentiel/index.html?v=3",
+    src: "/tools/onboarding-potentiel/index.html?v=4",
+  },
+  {
+    id: "onboarding-idee",
+    title: "Le faux onboarding 3 : ton idée",
+    description:
+      "Ce que tu aimes, ton objectif, l'idée trouvée (les noms qui défilent, puis sa carte), son prompt, Base44 qui construit le site dans son chat, puis le site qui défile pendant que les paiements tombent. Entrée pour avancer, araignée (A), écran tourné (T).",
+    icon: Lightbulb,
+    src: "/tools/onboarding-idee/index.html?v=1",
   },
 ];
 

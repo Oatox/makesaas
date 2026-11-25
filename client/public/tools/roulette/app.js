@@ -633,7 +633,7 @@
   // ---------------------------------------------------------------------------
   // Ordinateur : le plein écran du navigateur. Téléphone ou tablette (ou navigateur sans plein écran,
   // comme sur iPhone) : la page admin qui contient l'outil lui laisse toute la page, les barres du
-  // navigateur restant visibles (MarketingToolPage), et la lui reprend à l'appui suivant.
+  // navigateur restant visibles (MarketingToolPage), jusqu'à ce qu'on recharge la page.
   const touchScreen = window.matchMedia?.("(hover: none) and (pointer: coarse)").matches ?? false;
   function fillPage() {
     if (window.parent !== window) window.parent.postMessage({ type: "marketing-tool:fill" }, location.origin);

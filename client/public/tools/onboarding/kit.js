@@ -124,10 +124,17 @@ window.FO_KIT = (() => {
     let unlocked = false;
     const unlock = () => {
       unlocked = true;
+      // iPhone: through the media channel, so that the ringer switch on silent does not mute the sounds.
+      try {
+        if (navigator.audioSession) navigator.audioSession.type = "playback";
+      } catch {}
       audio()?.resume();
     };
-    window.addEventListener("pointerdown", unlock, { capture: true });
-    window.addEventListener("keydown", unlock, { capture: true });
+    // With a mouse, pressing starts audio; on a touch screen only the end of the tap does (pointerup,
+    // touchend, click): a pointerdown alone left phones silent.
+    for (const type of ["pointerdown", "pointerup", "touchend", "click", "keydown"]) {
+      window.addEventListener(type, unlock, { capture: true });
+    }
     // Creating the audio context can hold the page a moment (the sound card wakes up): it is created
     // as soon as the mouse moves over the page, so the first tap does not wait for it. (It stays
     // silent until that tap; the previews of the admin list get no mouse, so none is created there.)
