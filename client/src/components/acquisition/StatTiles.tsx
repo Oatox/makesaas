@@ -1,64 +1,105 @@
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
-import { TrendingDown, TrendingUp } from "lucide-react";
-import type { TikTokAccountStat } from "@shared/schema";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import type { TikTokAccountStat, TikTokVideo } from "@shared/schema";
+import { KpiCard, Sparkline } from "@/components/KpiCard";
 import { formatCompact, formatInteger, formatRate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { dailySeries, periodChange, type DailyMetric, type Totals } from "./stats";
+import { dailySeries, engagementRate, periodChange, type DailyMetric, type Totals } from "./stats";
 
-/** Period of the change shown under each counter. */
+/** Period of the change shown by each counter. */
 const CHANGE_DAYS = 7;
+/** Days drawn by the mini charts of the running totals. */
+const SPARK_DAYS = 30;
+/** Latest videos drawn by the engagement's mini chart. */
+const SPARK_VIDEOS = 12;
 
-function Change({ stats, metric }: { stats: TikTokAccountStat[]; metric: DailyMetric }) {
+/** One color per figure; the followers keep the big chart's color. */
+const COLORS = {
+  followers: "hsl(var(--primary))",
+  views: "hsl(var(--foreground) / 0.75)",
+  likes: "hsl(var(--success))",
+  engagement: "hsl(var(--chart-4))",
+};
+
+/** Change over the last days as a chip, as on the Tableau de bord; none before a second day of data. */
+function ChangeChip({ stats, metric }: { stats: TikTokAccountStat[]; metric: DailyMetric }) {
   const change = periodChange(dailySeries(stats, metric), CHANGE_DAYS);
-  if (!change) return <p className="text-xs text-muted-foreground">Évolution visible dès demain</p>;
+  if (!change) return null;
 
   const period = change.fullPeriod
     ? `sur ${CHANGE_DAYS} jours`
     : `depuis le ${format(parseISO(change.since), "d MMM", { locale: fr })}`;
-  const Icon = change.value < 0 ? TrendingDown : TrendingUp;
+  const Icon = change.value < 0 ? ArrowDownRight : ArrowUpRight;
   return (
-    <p className="flex items-center gap-1 text-xs text-muted-foreground">
-      {change.value !== 0 && (
-        <Icon className={cn("size-3.5", change.value > 0 ? "text-success" : "text-destructive")} aria-hidden />
+    <span
+      title={`${change.value > 0 ? "+" : change.value < 0 ? "−" : ""}${formatInteger(Math.abs(change.value))} ${period}`}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums",
+        change.value === 0
+          ? "bg-secondary text-muted-foreground"
+          : change.value > 0
+            ? "bg-success/15 text-success"
+            : "bg-destructive/15 text-destructive",
       )}
-      <span className="tabular-nums text-foreground/85">
-        {change.value > 0 ? "+" : change.value < 0 ? "−" : ""}
-        {formatCompact(Math.abs(change.value))}
-      </span>
-      {period}
-    </p>
+    >
+      {change.value !== 0 && <Icon className="size-3.5" aria-hidden />}
+      {change.value > 0 ? "+" : change.value < 0 ? "−" : ""}
+      {formatCompact(Math.abs(change.value))}
+      <span className="sr-only"> {period}</span>
+    </span>
   );
 }
 
-function Tile({ label, value, title, children }: { label: string; value: string; title?: string; children?: React.ReactNode }) {
-  return (
-    <div className="card-3d space-y-1.5 p-4 sm:p-5">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="font-display text-2xl tabular-nums sm:text-3xl" title={title}>
-        {value}
-      </p>
-      {children}
-    </div>
-  );
+/** A running total day by day, over the last days. */
+function TotalSparkline({ stats, metric, color }: { stats: TikTokAccountStat[]; metric: DailyMetric; color: string }) {
+  const values = dailySeries(stats, metric)
+    .slice(-SPARK_DAYS)
+    .map((point) => point.value);
+  return <Sparkline values={values} color={color} kind="area" fit="range" />;
 }
 
-/** Headline counters of the selected accounts, with their change over the last days. */
-export function StatTiles({ totals, stats }: { totals: Totals; stats: TikTokAccountStat[] }) {
+/** Headline counters of the selected accounts, each with its change and its mini chart. */
+export function StatTiles({ totals, stats, videos }: { totals: Totals; stats: TikTokAccountStat[]; videos: TikTokVideo[] }) {
+  const latestVideos = [...videos]
+    .sort((a, b) => a.posted_at.localeCompare(b.posted_at))
+    .slice(-SPARK_VIDEOS);
+
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <Tile label="Abonnés" value={formatCompact(totals.followers)} title={formatInteger(totals.followers)}>
-        <Change stats={stats} metric="followers" />
-      </Tile>
-      <Tile label="Vues" value={formatCompact(totals.views)} title={`${formatInteger(totals.views)} vues sur les vidéos suivies`}>
-        <Change stats={stats} metric="views" />
-      </Tile>
-      <Tile label="Likes" value={formatCompact(totals.likes)} title={formatInteger(totals.likes)}>
-        <Change stats={stats} metric="likes" />
-      </Tile>
-      <Tile label="Engagement" value={totals.engagement === null ? "—" : formatRate(totals.engagement)}>
-        <p className="text-xs text-muted-foreground">(likes + commentaires + partages) / vues</p>
-      </Tile>
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <KpiCard
+        label="Abonnés"
+        value={formatCompact(totals.followers)}
+        valueTitle={formatInteger(totals.followers)}
+        change={<ChangeChip stats={stats} metric="followers" />}
+        chart={<TotalSparkline stats={stats} metric="followers" color={COLORS.followers} />}
+      />
+      <KpiCard
+        label="Vues"
+        value={formatCompact(totals.views)}
+        valueTitle={`${formatInteger(totals.views)} vues sur les vidéos suivies`}
+        change={<ChangeChip stats={stats} metric="views" />}
+        chart={<TotalSparkline stats={stats} metric="views" color={COLORS.views} />}
+      />
+      <KpiCard
+        label="Likes"
+        value={formatCompact(totals.likes)}
+        valueTitle={formatInteger(totals.likes)}
+        change={<ChangeChip stats={stats} metric="likes" />}
+        chart={<TotalSparkline stats={stats} metric="likes" color={COLORS.likes} />}
+      />
+      <KpiCard
+        label="Engagement"
+        value={totals.engagement === null ? "—" : formatRate(totals.engagement)}
+        valueTitle="(likes + commentaires + partages) / vues"
+        chart={
+          <Sparkline
+            values={latestVideos.map((video) => engagementRate(video) ?? 0)}
+            color={COLORS.engagement}
+            kind="bar"
+          />
+        }
+      />
     </div>
   );
 }

@@ -3,9 +3,9 @@ import { z } from "zod";
 import {
   acquisitionApi,
   normalizeTikTokHandle,
+  syncedToday,
   TIKTOK_FIRST_VIDEO_CHECK_MINUTES,
   TIKTOK_MAX_ACCOUNTS,
-  TIKTOK_SYNC_COOLDOWN_MINUTES,
 } from "@shared/acquisition";
 import type { TikTokAccount } from "@shared/schema";
 import { getUserId, requireSubscriber } from "../lib/auth";
@@ -167,7 +167,8 @@ export function registerAcquisitionRoutes(app: Express) {
     }),
   );
 
-  // Refreshes an account, at most once every TIKTOK_SYNC_COOLDOWN_MINUTES (failed attempts included).
+  // The day's analysis of an account, sent by the page itself: once a day, failed attempts included
+  // (syncedToday). No member can ask for more: each analysis costs credits.
   app.post(
     acquisitionApi.sync.route,
     requireSubscriber,
@@ -177,32 +178,39 @@ export function registerAcquisitionRoutes(app: Express) {
       const { id } = parseInput(accountParamsSchema, req.params);
       const db = supabaseAdmin!;
 
-      // Atomic claim of the refresh: concurrent requests (two tabs, double click) bill credits once.
-      const cooldownStart = new Date(Date.now() - TIKTOK_SYNC_COOLDOWN_MINUTES * MINUTE_MS).toISOString();
-      const { data: claimed, error } = await db
+      const { data: account, error: readError } = await db
+        .from("tiktok_accounts")
+        .select("sync_attempted_at")
+        .eq("id", id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (readError) {
+        logger.error({ err: readError }, "Failed to read a TikTok account to refresh");
+        throw new HttpError(500, "Impossible d'actualiser ce compte.");
+      }
+      if (!account) throw new HttpError(404, "Ce compte n'est plus suivi.");
+      if (syncedToday(account.sync_attempted_at)) {
+        throw new HttpError(429, "Ce compte a déjà été analysé aujourd'hui : il le sera de nouveau demain.");
+      }
+
+      // Atomic claim of the day's analysis: only the request that still finds the attempt read above
+      // wins, so concurrent requests (two tabs) bill credits once.
+      const claim = db
         .from("tiktok_accounts")
         .update({ sync_attempted_at: new Date().toISOString() })
         .eq("id", id)
-        .eq("user_id", userId)
-        .or(`sync_attempted_at.is.null,sync_attempted_at.lt."${cooldownStart}"`)
+        .eq("user_id", userId);
+      const { data: claimed, error } = await (account.sync_attempted_at === null
+        ? claim.is("sync_attempted_at", null)
+        : claim.eq("sync_attempted_at", account.sync_attempted_at)
+      )
         .select()
         .maybeSingle();
       if (error) {
         logger.error({ err: error }, "Failed to claim a TikTok account refresh");
         throw new HttpError(500, "Impossible d'actualiser ce compte.");
       }
-
-      if (!claimed) {
-        const { data: account } = await db
-          .from("tiktok_accounts")
-          .select("sync_attempted_at")
-          .eq("id", id)
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (!account) throw new HttpError(404, "Ce compte n'est plus suivi.");
-        const minutes = minutesUntil(account.sync_attempted_at, TIKTOK_SYNC_COOLDOWN_MINUTES);
-        throw new HttpError(429, `Ce compte vient d'être actualisé : réessaie dans ${minutes} min.`);
-      }
+      if (!claimed) throw new HttpError(429, "Ce compte est déjà en cours d'analyse.");
 
       try {
         res.json(await syncTikTokAccount(db, scraper, claimed as TikTokAccount));

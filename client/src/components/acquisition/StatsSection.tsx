@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
 import { SiTiktok } from "react-icons/si";
@@ -27,16 +27,46 @@ import { blurIn } from "@/lib/motion";
 
 const fadeIn = blurIn({ blur: 8, duration: 0.6 });
 
-function LoadingSkeleton() {
+/**
+ * The page's title (as the Tableau de bord's), and on its row, at its right, the accounts it shows
+ * (from sm; under it on phones).
+ */
+function StatsHeading({ saasName, children }: { saasName?: string; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
+      <motion.div initial="hidden" animate="visible" variants={fadeIn} className="min-w-0">
+        <h2 className="font-display text-2xl font-light sm:text-[32px]">Tes statistiques</h2>
+        <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+          Les abonnés, les vues et l'engagement des comptes TikTok de {saasName ?? "ton SaaS"}.
+        </p>
+      </motion.div>
+      {children && <div className="flex w-full min-w-0 sm:ml-auto sm:w-auto">{children}</div>}
+    </div>
+  );
+}
+
+/** A state under the title alone (loading, error, nothing to show yet). */
+function WithHeading({ saasName, children }: { saasName?: string; children: ReactNode }) {
   return (
     <div className="space-y-5">
-      <div className="flex gap-2">
-        <Skeleton className="h-10 w-40 rounded-full" />
-        <Skeleton className="h-10 w-40 rounded-full" />
-      </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatsHeading saasName={saasName} />
+      {children}
+    </div>
+  );
+}
+
+function LoadingSkeleton({ saasName }: { saasName?: string }) {
+  return (
+    <div className="space-y-5">
+      <StatsHeading saasName={saasName}>
+        <div className="flex gap-2">
+          <Skeleton className="h-10 w-40 rounded-full" />
+          <Skeleton className="h-10 w-40 rounded-full" />
+        </div>
+      </StatsHeading>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-[116px] rounded-[18px]" />
+          <Skeleton key={i} className="h-[152px] rounded-[18px] sm:h-[160px]" />
         ))}
       </div>
       <Skeleton className="h-[380px] rounded-[18px]" />
@@ -56,17 +86,21 @@ export function StatsSection() {
   const saas = useSaas();
   if (saas.isError) {
     return (
-      <ErrorState
-        title="Impossible de charger tes SaaS"
-        message="Vérifie ta connexion internet puis réessaie."
-        action={<Button onClick={saas.retry}>Réessayer</Button>}
-      />
+      <WithHeading>
+        <ErrorState
+          title="Impossible de charger tes SaaS"
+          message="Vérifie ta connexion internet puis réessaie."
+          action={<Button onClick={saas.retry}>Réessayer</Button>}
+        />
+      </WithHeading>
     );
   }
   if (!saas.currentSaas) return saas.isLoading ? (
       <LoadingSkeleton />
     ) : (
-      <NoSaasState description="Les comptes TikTok sont suivis pour un SaaS. Crée le tien, puis ajoute ses comptes." />
+      <WithHeading>
+        <NoSaasState description="Les comptes TikTok sont suivis pour un SaaS. Crée le tien, puis ajoute ses comptes." />
+      </WithHeading>
     );
   // Keyed by SaaS: switching SaaS starts from a fresh selection.
   return <SaasStats key={saas.currentSaas.id} saas={saas.currentSaas} />;
@@ -99,42 +133,52 @@ function SaasStats({ saas }: { saas: Saas }) {
   const error = accountsQuery.error ?? videosQuery.error ?? statsQuery.error;
   if (error) {
     return (
-      <ErrorState
-        title="Impossible de charger tes comptes TikTok"
-        message="Vérifie ta connexion internet puis réessaie."
-        action={
-          <Button
-            onClick={() => {
-              accountsQuery.refetch();
-              videosQuery.refetch();
-              statsQuery.refetch();
-            }}
-          >
-            Réessayer
-          </Button>
-        }
-      />
+      <WithHeading saasName={saas.name}>
+        <ErrorState
+          title="Impossible de charger tes comptes TikTok"
+          message="Vérifie ta connexion internet puis réessaie."
+          action={
+            <Button
+              onClick={() => {
+                accountsQuery.refetch();
+                videosQuery.refetch();
+                statsQuery.refetch();
+              }}
+            >
+              Réessayer
+            </Button>
+          }
+        />
+      </WithHeading>
     );
   }
 
-  if (!accounts || videosQuery.isPending || statsQuery.isPending) return <LoadingSkeleton />;
+  if (!accounts || videosQuery.isPending || statsQuery.isPending) return <LoadingSkeleton saasName={saas.name} />;
 
-  if (accounts.length === 0) return <NoAccountState saas={saas} />;
+  if (accounts.length === 0) {
+    return (
+      <WithHeading saasName={saas.name}>
+        <NoAccountState saas={saas} />
+      </WithHeading>
+    );
+  }
 
   return (
     <motion.div className="space-y-5" initial="hidden" animate="visible" transition={{ staggerChildren: 0.06 }}>
-      <motion.div variants={fadeIn}>
-        <AccountPicker accounts={accounts} selected={selected} onSelect={setPicked} />
-      </motion.div>
+      <StatsHeading saasName={saas.name}>
+        <motion.div variants={fadeIn} className="min-w-0 max-w-full">
+          <AccountPicker accounts={accounts} selected={selected} onSelect={setPicked} />
+        </motion.div>
+      </StatsHeading>
 
       {selectedAccount && (
         <motion.div variants={fadeIn}>
-          <AccountHeader account={selectedAccount} onRemoved={() => setPicked(ALL_ACCOUNTS)} />
+          <AccountHeader account={selectedAccount} />
         </motion.div>
       )}
 
       <motion.div variants={fadeIn}>
-        <StatTiles totals={view.totals} stats={view.stats} />
+        <StatTiles totals={view.totals} stats={view.stats} videos={view.videos} />
       </motion.div>
 
       <motion.div variants={fadeIn}>
@@ -142,7 +186,8 @@ function SaasStats({ saas }: { saas: Saas }) {
       </motion.div>
 
       <motion.div variants={fadeIn}>
-        <VideoList videos={view.videos} accountsById={view.accountsById} />
+        {/* Keyed by account: picking another one starts again from its first page. */}
+        <VideoList key={selected} videos={view.videos} accountsById={view.accountsById} />
       </motion.div>
     </motion.div>
   );

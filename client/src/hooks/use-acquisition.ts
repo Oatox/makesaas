@@ -3,8 +3,7 @@ import { useMutation, useMutationState, useQuery, useQueryClient } from "@tansta
 import { format, subDays } from "date-fns";
 import {
   acquisitionApi,
-  TIKTOK_AUTO_SYNC_HOURS,
-  TIKTOK_SYNC_COOLDOWN_MINUTES,
+  syncedToday,
   type AddTikTokAccountRequest,
   type CheckFirstVideoRequest,
 } from "@shared/acquisition";
@@ -110,17 +109,17 @@ export function useAddTikTokAccount(forSaasId?: string) {
   });
 }
 
-type SyncVariables = { id: string; silent?: boolean };
+type SyncVariables = { id: string };
 
-/** Refreshes an account. `silent`: no toast on failure (automatic refreshes). */
-export function useSyncTikTokAccount() {
+/**
+ * The day's analysis of an account, sent by the page itself (useAutoSyncTikTokAccounts): no toast,
+ * a failure shows on the account (sync_error, recorded by the server).
+ */
+function useSyncTikTokAccount() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationKey: SYNC_MUTATION_KEY,
     mutationFn: ({ id }: SyncVariables) => apiRequest<TikTokAccount>(acquisitionApi.sync.path(id), { method: "POST" }),
-    onError: (error, { silent }) => {
-      if (!silent) toast({ variant: "destructive", ...translateSupabaseError(error, "Actualisation impossible") });
-    },
     // The server also records failures on the account (sync_error): reload in every case.
     onSettled: () => queryClient.invalidateQueries({ queryKey: acquisitionKeys.all }),
   });
@@ -167,14 +166,10 @@ export function useDeleteTikTokAccount() {
   });
 }
 
-const minutesSince = (iso: string | null) => (iso ? (Date.now() - new Date(iso).getTime()) / 60_000 : Infinity);
-
-/** Whether the server would accept a refresh of the account now (see TIKTOK_SYNC_COOLDOWN_MINUTES). */
-export const canSyncNow = (account: TikTokAccount) => minutesSince(account.sync_attempted_at) >= TIKTOK_SYNC_COOLDOWN_MINUTES;
-
 /**
- * Refreshes, once per visit, the accounts whose stats are older than TIKTOK_AUTO_SYNC_HOURS: the
- * stats stay fresh without a background job, and only for the members who look at them.
+ * The day's analysis: the first opening of the page on a day refreshes the accounts not refreshed
+ * yet that day (syncedToday), once per visit. No background job, no button: the stats stay fresh
+ * for the members who look at them, at one analysis per account and day.
  */
 export function useAutoSyncTikTokAccounts(accounts: TikTokAccount[] | undefined) {
   const sync = useSyncTikTokAccount();
@@ -182,10 +177,9 @@ export function useAutoSyncTikTokAccounts(accounts: TikTokAccount[] | undefined)
 
   useEffect(() => {
     for (const account of accounts ?? []) {
-      const stale = minutesSince(account.synced_at) >= TIKTOK_AUTO_SYNC_HOURS * 60;
-      if (!stale || !canSyncNow(account) || attempted.current.has(account.id)) continue;
+      if (syncedToday(account.sync_attempted_at) || attempted.current.has(account.id)) continue;
       attempted.current.add(account.id);
-      sync.mutate({ id: account.id, silent: true });
+      sync.mutate({ id: account.id });
     }
     // sync.mutate is stable; re-run only when the accounts change.
     // eslint-disable-next-line react-hooks/exhaustive-deps

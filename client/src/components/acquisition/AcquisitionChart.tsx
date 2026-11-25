@@ -17,8 +17,8 @@ const MODES = [
 
 const DESCRIPTIONS: Record<ChartMode, string> = {
   videos: "Vues de tes 20 dernières vidéos, de la plus ancienne à la plus récente.",
-  views: "Total des vues de tes vidéos, mesuré à chaque actualisation (une mesure par jour).",
-  followers: "Nombre d'abonnés, mesuré à chaque actualisation (une mesure par jour).",
+  views: "Total des vues de tes vidéos, mesuré une fois par jour.",
+  followers: "Nombre d'abonnés, mesuré une fois par jour.",
 };
 
 /** Videos shown in the bar chart. */

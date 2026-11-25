@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { tiktokSyncDay } from "@shared/acquisition";
 import type { TikTokAccount } from "@shared/schema";
 import type { ScrapeCreatorsClient, TikTokProfile } from "./scrapecreators";
 
@@ -7,11 +8,6 @@ import type { ScrapeCreatorsClient, TikTokProfile } from "./scrapecreators";
  * stats of the last refresh that returned them.
  */
 const VIDEO_PAGES_PER_SYNC = 3;
-
-/** Calendar day in Paris (YYYY-MM-DD), the key of the daily snapshot. */
-function parisDay(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(date);
-}
 
 type SyncTarget = Pick<TikTokAccount, "id" | "user_id" | "saas_id" | "handle" | "tiktok_user_id">;
 
@@ -67,7 +63,7 @@ export async function syncTikTokAccount(
       account_id: account.id,
       user_id: account.user_id,
       saas_id: account.saas_id,
-      day: parisDay(now),
+      day: tiktokSyncDay(now),
       followers: profile.followers,
       likes: profile.likes,
       views: totalViews,

@@ -70,12 +70,12 @@ export function AccountPicker({
         type="button"
         onClick={() => setAdding(true)}
         disabled={isFull}
-        title={isFull ? `${TIKTOK_MAX_ACCOUNTS} comptes maximum : retires-en un pour en ajouter un autre.` : undefined}
-        className={cn(pillClass, idleClass, "border-dashed disabled:cursor-not-allowed disabled:opacity-50")}
+        aria-label="Ajouter un compte"
+        title={isFull ? `${TIKTOK_MAX_ACCOUNTS} comptes maximum : retires-en un pour en ajouter un autre.` : "Ajouter un compte"}
+        className={cn(pillClass, idleClass, "w-10 justify-center border-dashed px-0 disabled:cursor-not-allowed disabled:opacity-50")}
         data-testid="button-open-add-tiktok-account"
       >
         <Plus className="size-4" aria-hidden />
-        Ajouter un compte
       </button>
 
       <Dialog open={adding} onOpenChange={setAdding}>

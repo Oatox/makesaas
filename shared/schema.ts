@@ -115,7 +115,7 @@ export const tiktokAccounts = pgTable("tiktok_accounts", {
   video_count: integer("video_count").default(0).notNull(),
   /** Last successful refresh. */
   synced_at: ts("synced_at"),
-  /** Last refresh attempt: refreshes are limited by TIKTOK_SYNC_COOLDOWN_MINUTES from it. */
+  /** Last refresh attempt (the add included): one a day at most, see syncedToday in shared/acquisition.ts. */
   sync_attempted_at: ts("sync_attempted_at"),
   /** Why the last refresh failed (French), null once a refresh succeeds. */
   sync_error: text("sync_error"),
