@@ -2,14 +2,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRoute } from "wouter";
 import { navigate } from "wouter/use-browser-location";
 import {
-  CalendarCheck,
-  Lightbulb,
+  Clapperboard,
+  Compass,
   Loader2,
   MoreHorizontal,
   Pencil,
-  Tag,
   Trash2,
   Users,
+  WandSparkles,
   type LucideIcon,
 } from "lucide-react";
 import { COACH_NAME, CoachAvatar } from "@/components/brand/Coach";
@@ -40,10 +40,10 @@ import { queryClient } from "@/lib/queryClient";
 
 /** First questions offered on a new discussion: a click sends them. */
 const SUGGESTIONS: { icon: LucideIcon; text: string }[] = [
-  { icon: Lightbulb, text: "Aide-moi à trouver une idée de SaaS rentable" },
-  { icon: Users, text: "Comment trouver mes 10 premiers clients ?" },
-  { icon: Tag, text: "À quel prix vendre mon offre ?" },
-  { icon: CalendarCheck, text: "Par quoi je commence cette semaine ?" },
+  { icon: Compass, text: "Où j'en suis, et quelle est la suite ?" },
+  { icon: Clapperboard, text: "Donne-moi 5 idées de vidéos TikTok pour mon app" },
+  { icon: WandSparkles, text: "Écris-moi un prompt Base44 pour améliorer mon app" },
+  { icon: Users, text: "Comment décrocher mon premier client ?" },
 ];
 
 /** Sends a message (or a retry, `content: null`) and reports failures; false: refused, give the text back. */
