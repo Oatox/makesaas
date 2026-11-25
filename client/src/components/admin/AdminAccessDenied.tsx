@@ -8,7 +8,7 @@ export function AdminAccessDenied({ setLocation }: { setLocation: (path: string)
       <div className="w-16 h-16 bg-destructive/10 text-destructive rounded-full flex items-center justify-center">
         <ShieldAlert className="w-8 h-8" />
       </div>
-      <h1 className="text-2xl font-light">Accès Refusé</h1>
+      <h1 className="font-display text-2xl font-light">Accès Refusé</h1>
       <p className="text-muted-foreground max-w-md">
         Vous n'avez pas les permissions nécessaires pour voir cette page. Cette zone est réservée aux administrateurs.
       </p>

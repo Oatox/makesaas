@@ -9,6 +9,8 @@
 :root {
   --font-sans: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Unbounded', var(--font-sans);
+  /* Prompts and code: the device's own monospace font, nothing to download. */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
   /* Brand palette: single source of truth (HSL channels). Change colors here only. */
   --forest: 160 95% 9%;    /* #012B1D Forest Green */
@@ -96,8 +98,11 @@
     font-family: var(--font-sans);
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
+  /* Two fonts: Figtree for all the text, Unbounded (font-display, loaded from 300 to 500) for the big
+     titles only, light and a little tight. A heading is never in Unbounded by default: one without
+     font-display (a card's or a section's label) stays in Figtree. :where keeps this rule at the
+     specificity of one class, so a heading's own weight or tracking wins. */
+  :where(h1, h2, h3, h4, h5, h6).font-display {
     font-weight: 300;
     letter-spacing: -0.035em;
   }

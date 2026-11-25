@@ -33,7 +33,7 @@ export function LegalPage({ title, children }: { title: string; children: ReactN
 export function LegalSection({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
     <section id={id} className="scroll-mt-24 space-y-3">
-      <h2 className="text-xl font-normal text-foreground">{title}</h2>
+      <h2 className="font-display text-xl font-normal text-foreground">{title}</h2>
       {children}
     </section>
   );

@@ -45,7 +45,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             </div>
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-light tracking-tight">Une erreur est survenue</h1>
+            <h1 className="font-display text-2xl font-light tracking-tight">Une erreur est survenue</h1>
             <p className="text-muted-foreground">
               La page n'a pas pu s'afficher. Recharger suffit souvent, surtout après une mise à jour du site.
             </p>

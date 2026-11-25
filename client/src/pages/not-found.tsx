@@ -12,7 +12,7 @@ export default function NotFound() {
             <FileQuestion className="w-6 h-6 text-primary" />
           </div>
           <CardTitle className="text-3xl font-display font-light">404</CardTitle>
-          <h2 className="text-xl font-normal">Page introuvable</h2>
+          <h2 className="font-display text-xl font-normal">Page introuvable</h2>
         </CardHeader>
         <CardContent className="text-center space-y-6">
           <p className="text-muted-foreground">

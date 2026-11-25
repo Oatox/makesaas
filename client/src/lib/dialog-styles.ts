@@ -25,6 +25,7 @@ export const dialogHeaderClass = "flex flex-col gap-1.5 pr-8 text-left"
 export const dialogFooterClass =
   "flex flex-col-reverse gap-2 pt-1 [&>*]:w-full sm:flex-row sm:justify-end sm:[&>*]:w-auto"
 
-export const dialogTitleClass = "font-display text-xl font-semibold leading-tight tracking-tight"
+// Unbounded is only loaded from 300 to 500: a bolder title would be faked by the browser.
+export const dialogTitleClass = "font-display text-xl font-normal leading-tight tracking-tight"
 
 export const dialogDescriptionClass = "text-sm leading-relaxed text-muted-foreground"

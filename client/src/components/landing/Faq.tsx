@@ -20,7 +20,7 @@ export function Faq() {
           <AccordionPrimitive.Root type="single" collapsible defaultValue="faq-0" className="border-t border-white/[0.08]">
             {FAQS.map(({ q, a }, i) => (
               <AccordionPrimitive.Item key={q} value={`faq-${i}`} className="group border-b border-white/[0.08]">
-                <AccordionPrimitive.Header>
+                <AccordionPrimitive.Header className="font-display">
                   <AccordionPrimitive.Trigger className="flex w-full items-center justify-between gap-6 py-5 text-left text-[15px] text-foreground transition-colors hover:text-foreground/80 md:text-base">
                     {q}
                     {/* The "+": its vertical bar folds away when open, leaving a "−" on an orange disc. */}
