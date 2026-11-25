@@ -631,9 +631,18 @@
   // ---------------------------------------------------------------------------
   // Boutons du haut
   // ---------------------------------------------------------------------------
+  // Ordinateur : le plein écran du navigateur. Téléphone ou tablette (ou navigateur sans plein écran,
+  // comme sur iPhone) : la page admin qui contient l'outil lui laisse toute la page, les barres du
+  // navigateur restant visibles (MarketingToolPage), et la lui reprend à l'appui suivant.
+  const touchScreen = window.matchMedia?.("(hover: none) and (pointer: coarse)").matches ?? false;
+  function fillPage() {
+    if (window.parent !== window) window.parent.postMessage({ type: "marketing-tool:fill" }, location.origin);
+  }
   function toggleFullscreen() {
+    const root = document.documentElement;
+    if (touchScreen || !root.requestFullscreen) return fillPage();
     if (document.fullscreenElement) document.exitFullscreen();
-    else document.documentElement.requestFullscreen?.();
+    else root.requestFullscreen().catch(fillPage);
   }
   function setMuted(m) {
     state.muted = m;

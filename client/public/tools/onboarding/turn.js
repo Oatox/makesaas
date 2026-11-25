@@ -26,9 +26,31 @@
   /** Pixels per CSS pixel for the canvases: more inside the phone, shown enlarged, so they stay sharp. */
   const pixelRatio = () => Math.min(window.devicePixelRatio || 1, 2) * (Number(window.frameElement?.dataset.zoom) || 1);
 
+  /** Phones and tablets: "fullscreen" fills the page instead, the browser's own bars staying in view. */
+  const touchScreen = window.matchMedia?.("(hover: none) and (pointer: coarse)").matches ?? false;
+
+  /**
+   * Computers: the browser's fullscreen. Phones and tablets (or a browser without it, as an iPhone):
+   * the admin page holding the tool gives it the whole page, and gives it back on the next press.
+   */
   function toggleFullscreen() {
-    if (document.fullscreenElement) document.exitFullscreen?.();
-    else document.documentElement.requestFullscreen?.().catch(() => {});
+    const root = document.documentElement;
+    const request = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (touchScreen || !request) return fillPage();
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+      return;
+    }
+    try {
+      Promise.resolve(request.call(root)).catch(fillPage);
+    } catch {
+      fillPage();
+    }
+  }
+
+  /** Asks the admin page holding the tool to let it fill the page, or to put it back (MarketingToolPage). */
+  function fillPage() {
+    if (window.parent !== window) window.parent.postMessage({ type: "marketing-tool:fill" }, location.origin);
   }
 
   /** Back to the admin's list of tools (when embedded there). */

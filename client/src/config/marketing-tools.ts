@@ -21,7 +21,7 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     title: "La roue du destin",
     description: "Une roue (ou un rouleau) à faire tourner en live ou en vidéo. Résultat imposable en secret.",
     icon: Disc3,
-    src: "/tools/roulette/index.html?mode=wheel&v=1",
+    src: "/tools/roulette/index.html?mode=wheel&v=2",
   },
   {
     id: "onboarding",
@@ -29,7 +29,7 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     description:
       "Passions, temps, banque et objectif, puis le site qui se crée sous tes yeux et les paiements qui tombent. À filmer : araignée sur l'écran (A), écran tourné comme un téléphone (T).",
     icon: Rocket,
-    src: "/tools/onboarding/index.html?v=13",
+    src: "/tools/onboarding/index.html?v=14",
   },
   {
     id: "onboarding-potentiel",
@@ -37,7 +37,7 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     description:
       "Objectif, paiements, échéance, sans te montrer, marketing, puis le potentiel chiffré et le site qui se crée sous tes yeux. Touches 1 à 4 pour répondre, idée suivante (I), araignée (A), écran tourné (T).",
     icon: TrendingUp,
-    src: "/tools/onboarding-potentiel/index.html?v=2",
+    src: "/tools/onboarding-potentiel/index.html?v=3",
   },
 ];
 
