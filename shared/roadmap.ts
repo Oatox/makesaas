@@ -82,7 +82,9 @@ export type StepAction =
   /** The field where the member pastes the Whop payment link of their app. */
   | { kind: "payment_link" }
   /** Reads the connected payment account again now, to see the payment test (its task gets checked). */
-  | { kind: "test_payment" };
+  | { kind: "test_payment" }
+  /** Reads the SaaS's TikTok accounts again now, to see its first video (its task gets checked). */
+  | { kind: "first_video" };
 
 /**
  * One step of a mission: a short sentence starting with a verb (Gus's Markdown: **bold**,

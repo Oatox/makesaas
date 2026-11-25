@@ -353,7 +353,10 @@ const BASE_STAGES: RoadmapStage[] = [
         title: "Poste-la",
         why: "La première est la plus dure. Ensuite, ça devient une habitude.",
         minutes: 5,
-        steps: [{ text: "Publie ta vidéo sur ton compte TikTok." }],
+        steps: [
+          { text: "Publie ta vidéo sur le compte TikTok que tu as ajouté à MakeSaaS." },
+          { text: "Vérifie que MakeSaaS la voit : la tâche se coche toute seule.", action: { kind: "first_video" } },
+        ],
         check: { kind: "videos", min: 1 },
       },
     ],
@@ -688,7 +691,7 @@ export function missionCheckText(check: RoadmapMission["check"]): string {
     case "videos":
       return check.min > 1
         ? `Se coche dès que tes comptes TikTok ont ${check.min} vidéos.`
-        : "Se coche dès que ta vidéo apparaît dans tes statistiques.";
+        : "Se coche dès que MakeSaaS voit ta vidéo sur ton compte TikTok suivi.";
     case "first_payment":
       return "Se coche au premier paiement sur ton compte connecté (hors compte de test).";
     case "mrr":

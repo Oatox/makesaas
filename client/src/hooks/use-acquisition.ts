@@ -6,6 +6,7 @@ import {
   TIKTOK_AUTO_SYNC_HOURS,
   TIKTOK_SYNC_COOLDOWN_MINUTES,
   type AddTikTokAccountRequest,
+  type CheckFirstVideoRequest,
 } from "@shared/acquisition";
 import type { TikTokAccount, TikTokAccountStat, TikTokVideo } from "@shared/schema";
 import { supabase } from "@/lib/supabase";
@@ -121,6 +122,21 @@ export function useSyncTikTokAccount() {
       if (!silent) toast({ variant: "destructive", ...translateSupabaseError(error, "Actualisation impossible") });
     },
     // The server also records failures on the account (sync_error): reload in every case.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: acquisitionKeys.all }),
+  });
+}
+
+/**
+ * "Vérifier ma vidéo" (the first video's task): refreshes every TikTok account of the SaaS now, and
+ * answers them (sync_error on those that failed). The caller reads the roadmap again.
+ */
+export function useCheckFirstVideo(saasId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => {
+      const body: CheckFirstVideoRequest = { saasId };
+      return apiRequest<TikTokAccount[]>(acquisitionApi.firstVideo.path, { method: "POST", body });
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: acquisitionKeys.all }),
   });
 }

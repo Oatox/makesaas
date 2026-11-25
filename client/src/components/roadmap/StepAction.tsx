@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Check, ChevronDown, Copy, ExternalLink, ImagePlus, Loader2, MessageCircle, RefreshCw, SquareTerminal } from "lucide-react";
+import { TIKTOK_FIRST_VIDEO_CHECK_MINUTES } from "@shared/acquisition";
 import { APP_URL_MAX_LENGTH, PAYMENT_LINK_MAX_LENGTH, type RoadmapState, type StepAction as Action } from "@shared/roadmap";
 import type { RevenueProvider } from "@shared/revenue";
 import { roadmapStagesFor } from "@shared/roadmap-missions";
@@ -13,7 +14,7 @@ import { SaasAvatar } from "@/components/saas/SaasAvatar";
 import { ConnectDialog, ProviderButton } from "@/components/revenue/ConnectDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTikTokAccounts } from "@/hooks/use-acquisition";
+import { useCheckFirstVideo, useTikTokAccounts } from "@/hooks/use-acquisition";
 import { useAskGus } from "@/hooks/use-ask-gus";
 import { useRefreshRevenue } from "@/hooks/use-revenue";
 import { roadmapKeys, useSaveAppUrl, useSetPaymentLink } from "@/hooks/use-roadmap";
@@ -315,6 +316,55 @@ function TestPaymentCheck({ saasId, quiet }: { saasId: string; quiet: boolean })
 }
 
 /**
+ * The first video, checked right in its task: reads the SaaS's TikTok accounts again now, then the
+ * roadmap, whose task gets checked once a video is seen on them. Until then, says what is missing (a
+ * private account, a failed read, or a video TikTok does not show yet).
+ */
+function FirstVideoCheck({ saasId }: { saasId: string }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const checkVideo = useCheckFirstVideo(saasId);
+  const [busy, setBusy] = useState(false);
+
+  const check = async () => {
+    setBusy(true);
+    try {
+      const accounts = await checkVideo.mutateAsync();
+      await queryClient.refetchQueries({ queryKey: roadmapKeys.state(saasId) });
+      const state = queryClient.getQueryData<RoadmapState>(roadmapKeys.state(saasId));
+      if (state && state.progress.videos > 0) return;
+      const failure = accounts.find((account) => account.sync_error)?.sync_error;
+      const hidden = accounts.find((account) => account.is_private);
+      const handles = accounts.map((account) => `@${account.handle}`).join(", ");
+      toast({
+        variant: "destructive",
+        title: "Pas encore de vidéo",
+        description:
+          failure ??
+          (hidden
+            ? `@${hidden.handle} est privé : MakeSaaS ne voit pas ses vidéos. Passe-le en public dans TikTok, puis réessaie.`
+            : `MakeSaaS ne voit encore aucune vidéo sur ${handles}. TikTok met parfois quelques minutes à la montrer : réessaie dans ${TIKTOK_FIRST_VIDEO_CHECK_MINUTES} min.`),
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Vérification impossible",
+        description: error instanceof ApiError ? error.message : "Réessaie dans un instant.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button className="w-full" onClick={check} disabled={busy}>
+      {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+      Vérifier ma vidéo
+    </Button>
+  );
+}
+
+/**
  * The SaaS's logo, right in its task: an image dropped on the zone, or picked by clicking it (the same
  * upload as the SaaS's settings: resized in the browser, stored by the server). Once saved, the
  * roadmap is read again: its task is checked from the logo.
@@ -449,5 +499,16 @@ export function StepActionButton({ action, saas, state, quiet = false }: { actio
       return <PaymentLinkForm saasId={saas.id} paymentLink={state.project.paymentLink ?? null} />;
     case "test_payment":
       return <TestPaymentCheck saasId={saas.id} quiet={quiet} />;
+    case "first_video":
+      // Once seen, nothing left to check: the video's figures are on the Statistiques page.
+      return quiet ? (
+        <Button asChild variant="secondary" className="w-full">
+          <Link href="/acquisition">
+            Voir mes statistiques <ArrowRight />
+          </Link>
+        </Button>
+      ) : (
+        <FirstVideoCheck saasId={saas.id} />
+      );
   }
 }
