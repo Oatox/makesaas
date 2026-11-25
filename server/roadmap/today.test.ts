@@ -8,7 +8,9 @@ import {
   doneTasks,
   launchTasks,
   milestoneCounter,
+  milestoneShare,
   milestoneTasks,
+  objectiveShare,
   objectivesOf,
   taskBlocker,
   todayPlan,
@@ -132,7 +134,7 @@ describe("the milestones", () => {
     expect(milestones.every((milestone) => milestone.check.kind !== "manual")).toBe(true);
   });
 
-  test("the tasks that lead to each: its stage's, without the other milestones and the outcomes", () => {
+  test("the tasks that lead to each: its stage's since the milestone before it (the last one takes the rest), without the outcomes", () => {
     const keys = (key: string) => milestoneTasks(STAGES, milestones, key).map((task) => task.key);
     expect(keys("build:domain")).toEqual([
       "build:claude",
@@ -146,9 +148,26 @@ describe("the milestones", () => {
       "build:domain",
     ]);
     expect(keys("payment:connect")).toEqual(["payment:whop", "payment:in_app", "payment:webhook", "payment:connect", "payment:test"]);
-    expect(keys("video:posted")).toEqual(["video:account", "video:prepare", "video:posted"]);
+    // A task leads to a single step.
+    expect(keys("video:track")).toEqual(["video:account", "video:track"]);
+    expect(keys("video:posted")).toEqual(["video:prepare", "video:posted"]);
+    expect(keys("customer:7_videos")).toEqual([]);
+    expect(keys("customer:first_payment")).toEqual(["customer:comments"]);
     expect(keys("mrr_100:reached")).toEqual(["mrr_100:format", "mrr_100:paywall"]);
     expect(keys("idea:chosen")).toEqual([]);
+  });
+
+  test("how far a step is: its figure for a count to reach, else its tasks done, itself counted when only the data reaches it", () => {
+    const progress = { videos: 3, tiktokAccounts: 1, mrr: null };
+    const step = (key: string) => milestones.find((milestone) => milestone.key === key)!;
+    const share = (key: string, done: Record<string, MissionDone>) => milestoneShare(STAGES, milestones, step(key), done, progress);
+    expect(share("video:track", doneAt(BEFORE, ["video:account"]))).toBe(0.5);
+    expect(share("video:track", doneAt(BEFORE, ["video:track"]))).toBe(1);
+    expect(share("customer:7_videos", {})).toBeCloseTo(3 / 7);
+    // Its tasks all done, a payment still to come: not full.
+    expect(share("customer:first_payment", doneAt(BEFORE, ["customer:comments"]))).toBe(0.5);
+    const firstVideo = objectivesOf(milestones).find((objective) => objective.key === "first_video")!;
+    expect(objectiveShare(STAGES, milestones, firstVideo, doneAt(BEFORE, ["video:account"]), progress)).toBe(0.25);
   });
 
   test("the one in progress, with its figure", () => {

@@ -171,19 +171,55 @@ export function milestoneCounter(
 
 /**
  * The tasks that lead to a milestone: the missions of its stage that the member does (its own when it
- * is one), without the other milestones and the outcomes only the data reaches (a payment, an MRR, a
- * number of videos).
+ * is one), from just after the stage's milestone before it up to it (the stage's last milestone takes
+ * the missions after it too), so that a task leads to a single step; without the outcomes only the
+ * data reaches (a payment, an MRR, a number of videos).
  */
 export function milestoneTasks(stages: RoadmapStage[], milestones: Milestone[], key: string): RoadmapMission[] {
   const stage = stages.find((item) => item.missions.some((mission) => mission.key === key));
   if (!stage) return [];
-  const others = new Set(milestones.map((milestone) => milestone.key).filter((other) => other !== key));
-  return stage.missions.filter((mission) => {
-    if (others.has(mission.key)) return false;
+  const isMilestone = (mission: RoadmapMission) => mission.key !== key && milestones.some((milestone) => milestone.key === mission.key);
+  const index = stage.missions.findIndex((mission) => mission.key === key);
+  const start = stage.missions.slice(0, index).findLastIndex(isMilestone) + 1;
+  const end = stage.missions.slice(index + 1).some(isMilestone) ? index + 1 : stage.missions.length;
+  return stage.missions.slice(start, end).filter((mission) => {
     const check = mission.check;
     if (check.kind === "saas" || check.kind === "first_payment" || check.kind === "mrr") return false;
     return !(check.kind === "videos" && check.min > 1);
   });
+}
+
+/**
+ * How far a step is, from 0 to 1: reached; else by its figure, for a count to reach (7 videos, an
+ * MRR); else by its tasks done, the step itself counted last when only the data reaches it (its tasks
+ * all done do not fill it).
+ */
+export function milestoneShare(
+  stages: RoadmapStage[],
+  milestones: Milestone[],
+  milestone: Milestone,
+  done: Record<string, MissionDone>,
+  progress: RoadmapProgress | undefined,
+): number {
+  if (done[milestone.key]) return 1;
+  const counter = milestoneCounter(milestone, progress);
+  if (counter && counter.target > 1) return Math.min(1, counter.value / counter.target);
+  const tasks = milestoneTasks(stages, milestones, milestone.key);
+  const total = tasks.some((task) => task.key === milestone.key) ? tasks.length : tasks.length + 1;
+  return tasks.filter((task) => done[task.key]).length / total;
+}
+
+/** How far an objective is, from 0 to 1: the mean of its steps' (milestoneShare), so the tasks done show. */
+export function objectiveShare(
+  stages: RoadmapStage[],
+  milestones: Milestone[],
+  objective: Objective,
+  done: Record<string, MissionDone>,
+  progress: RoadmapProgress | undefined,
+): number {
+  if (!objective.milestones.length) return 0;
+  const total = objective.milestones.reduce((sum, milestone) => sum + milestoneShare(stages, milestones, milestone, done, progress), 0);
+  return total / objective.milestones.length;
 }
 
 /**
@@ -195,17 +231,20 @@ export type Objective = {
   key: string;
   /** "Lancer ton SaaS", "100 € par mois". */
   title: string;
+  /** What reaching it means, in one line (the Roadmap's drawer). */
+  detail: string;
   milestones: Milestone[];
 };
 
 /** The objective of the milestones before the revenue ones, by their stage (the start of their key). */
+const LAUNCH = { key: "launch", title: "Lancer ton SaaS", detail: "De ton idée à une app en ligne, à ton nom, qui sait encaisser." };
 const OBJECTIVE_OF_STAGE: Record<string, Omit<Objective, "milestones">> = {
-  idea: { key: "launch", title: "Lancer ton SaaS" },
-  brand: { key: "launch", title: "Lancer ton SaaS" },
-  build: { key: "launch", title: "Lancer ton SaaS" },
-  payment: { key: "launch", title: "Lancer ton SaaS" },
-  video: { key: "first_video", title: "Première vidéo" },
-  customer: { key: "first_customer", title: "Premier client" },
+  idea: LAUNCH,
+  brand: LAUNCH,
+  build: LAUNCH,
+  payment: LAUNCH,
+  video: { key: "first_video", title: "Première vidéo", detail: "Ton compte TikTok est suivi, et ta première vidéo fait découvrir ton app." },
+  customer: { key: "first_customer", title: "Premier client", detail: "Un inconnu paie pour ton app : la preuve qu'elle vaut quelque chose." },
 };
 
 /**
@@ -217,8 +256,8 @@ export function objectivesOf(milestones: Milestone[]): Objective[] {
   const objectives: Objective[] = [];
   for (const milestone of milestones) {
     const group = milestone.mrr
-      ? { key: `mrr_${milestone.mrr}`, title: `${euros.format(milestone.mrr)} par mois` }
-      : (OBJECTIVE_OF_STAGE[milestone.key.split(":")[0]] ?? { key: "growth", title: "Faire grandir ton SaaS" });
+      ? { key: `mrr_${milestone.mrr}`, title: `${euros.format(milestone.mrr)} par mois`, detail: milestone.detail }
+      : (OBJECTIVE_OF_STAGE[milestone.key.split(":")[0]] ?? { key: "growth", title: "Faire grandir ton SaaS", detail: "Ton SaaS grandit, mois après mois." });
     const last = objectives.at(-1);
     if (last?.key === group.key) last.milestones.push(milestone);
     else objectives.push({ ...group, milestones: [milestone] });

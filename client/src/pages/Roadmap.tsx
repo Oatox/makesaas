@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { BadgeCheck, Clapperboard, Flag, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
+import { Clapperboard, HandCoins, Rocket, TrendingUp, Trophy, type LucideIcon } from "lucide-react";
 import { milestonesFor, roadmapStagesFor } from "@shared/roadmap-missions";
-import { currentObjective, milestoneTasks, objectiveProgress, objectivesOf, type Objective } from "@shared/today";
+import { currentObjective, milestoneTasks, objectiveProgress, objectiveShare, objectivesOf, type Objective } from "@shared/today";
 import { ObjectiveDetail } from "@/components/roadmap/ObjectiveDetail";
 import { RoadmapBackdrop } from "@/components/roadmap/RoadmapBackdrop";
 import { MILESTONE_PANEL_ID, RoadmapPath, type PathNode } from "@/components/roadmap/RoadmapPath";
@@ -17,15 +17,20 @@ import { useSaas } from "@/hooks/use-saas";
 import { blurIn } from "@/lib/motion";
 
 const fadeIn = blurIn({ blur: 8, duration: 0.6 });
-/** On phones, the objective's drawer rises from the bottom, up to near the top, over the dimmed page. */
-const MOBILE_DRAWER = "max-h-[88dvh] overflow-y-auto rounded-t-[22px] border-x-0 border-[hsl(var(--line))] bg-card px-5 pt-7";
+/**
+ * On phones, the objective's drawer rises from the bottom, up to near the top, over the dimmed page.
+ * Its content scrolls, its buttons stay at the bottom (ObjectiveDetail).
+ */
+const MOBILE_DRAWER =
+  "flex max-h-[88dvh] flex-col gap-0 overflow-hidden rounded-t-[22px] border-x-0 border-[hsl(var(--line))] bg-card p-0 sm:p-0";
+const DESKTOP_DRAWER = "flex flex-col gap-0 p-0 sm:max-w-lg";
 const MOBILE_OVERLAY =
   "bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
 const dayFormatter = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
 
-/** The launch has its rocket, the first video and customer theirs, the amounts share a curve, the last one its flag. */
-const ICONS: Record<string, LucideIcon> = { launch: Rocket, first_video: Clapperboard, first_customer: BadgeCheck };
-const iconOf = (objective: Objective, isLast: boolean): LucideIcon => (isLast ? Flag : (ICONS[objective.key] ?? TrendingUp));
+/** The launch has its rocket, the first video and customer theirs, the amounts share a curve, the last one its trophy. */
+const ICONS: Record<string, LucideIcon> = { launch: Rocket, first_video: Clapperboard, first_customer: HandCoins };
+const iconOf = (objective: Objective, isLast: boolean): LucideIcon => (isLast ? Trophy : (ICONS[objective.key] ?? TrendingUp));
 
 /**
  * /roadmap: the active SaaS's objectives (objectivesOf: "Lancer ton SaaS", "Première vidéo", "Premier
@@ -80,7 +85,8 @@ export default function Roadmap() {
                 : `${progress.reached} / ${progress.total} étapes`
               : "À venir",
           done: progress.complete,
-          progress: tasks.length ? tasksDone / tasks.length : progress.share,
+          // The steps passed, and those in progress by their figure or their tasks done: as in the drawer.
+          progress: objectiveShare(stages, milestones, objective, state.done, state.progress),
           icon: iconOf(objective, isLast),
           ...(isLast ? { isGoal: true } : {}),
         };
@@ -136,7 +142,7 @@ export default function Roadmap() {
           id={MILESTONE_PANEL_ID}
           side={isMobile ? "bottom" : "right"}
           overlayClassName={isMobile ? MOBILE_OVERLAY : undefined}
-          className={isMobile ? MOBILE_DRAWER : "overflow-y-auto p-5 sm:max-w-lg sm:p-7"}
+          className={isMobile ? MOBILE_DRAWER : DESKTOP_DRAWER}
         >
           {open !== null && objectives[open] && state && currentSaas && (
             <>
@@ -150,6 +156,7 @@ export default function Roadmap() {
                 milestones={milestones}
                 stages={stages}
                 isCurrent={open === current}
+                icon={iconOf(objectives[open], open === objectives.length - 1)}
                 state={state}
                 saas={currentSaas}
               />
