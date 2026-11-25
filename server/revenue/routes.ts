@@ -14,7 +14,7 @@ import { RevenueService } from "./service";
 export function registerRevenueRoutes(app: Express) {
   const box = loadSecretBox();
   const service = box && supabaseAdmin ? new RevenueService(supabaseAdmin, box) : null;
-  if (!service) logger.warn("Revenue dashboard disabled: no encryption key (REVENUE_ENCRYPTION_KEY or SUPABASE_SECRET_KEY)");
+  if (!service) logger.warn("Revenue dashboard disabled: SUPABASE_SECRET_KEY is not set (it also derives the encryption key)");
 
   const requireService = () => {
     if (!service) throw new HttpError(503, "Le suivi des revenus n'est pas configuré sur ce serveur.");
