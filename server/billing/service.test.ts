@@ -54,6 +54,7 @@ function setup(catalog: WhopCatalog = { kind: "product", productId: PRODUCT_ID }
   const subscriptions = new Map<string, SubscriptionRow>();
   const profiles = new Set([USER_ID]);
   const checkouts: { variant_id: string }[] = [];
+  const canceled: string[] = [];
 
   const whop = {
     environment: "sandbox",
@@ -70,6 +71,14 @@ function setup(catalog: WhopCatalog = { kind: "product", productId: PRODUCT_ID }
           const found = memberships.get(id);
           if (whopDown || !found) throw new Error("Whop unreachable");
           found.cancel_at_period_end = cancel_at_period_end;
+          return found;
+        },
+        // Without cancel_at_period_end, Whop ends the membership at once.
+        cancel: async ({ id }: { id: string }) => {
+          const found = memberships.get(id);
+          if (whopDown || !found) throw new Error("Whop unreachable");
+          found.status = "canceled";
+          canceled.push(id);
           return found;
         },
       },
@@ -123,7 +132,7 @@ function setup(catalog: WhopCatalog = { kind: "product", productId: PRODUCT_ID }
     },
   } as unknown as SupabaseClient;
 
-  return { billing: new BillingService(whop, db), memberships, subscriptions, checkouts };
+  return { billing: new BillingService(whop, db), memberships, subscriptions, checkouts, canceled };
 }
 
 describe("BillingService.syncMembership", () => {
@@ -264,6 +273,49 @@ describe("BillingService.setCancelAtPeriodEnd", () => {
     env.subscriptions.set(USER_ID, { user_id: USER_ID, status: "active", whop_membership_id: "mem_1", cancel_at_period_end: false });
     await expect(env.billing.setCancelAtPeriodEnd(USER_ID, true)).rejects.toMatchObject({ status: 502 });
     expect(env.subscriptions.get(USER_ID)).toMatchObject({ cancel_at_period_end: false });
+  });
+});
+
+describe("BillingService.cancelMembershipNow", () => {
+  test("ends a running Whop membership at once", async () => {
+    const env = setup();
+    env.memberships.set("mem_1", membership("mem_1", "active"));
+    await env.billing.syncMembership("mem_1");
+
+    expect(await env.billing.cancelMembershipNow(USER_ID, "test")).toBe(true);
+    expect(env.canceled).toEqual(["mem_1"]);
+    expect(env.memberships.get("mem_1")?.status).toBe("canceled");
+  });
+
+  test("ends a membership whose renewal was already stopped, as it still grants access", async () => {
+    const env = setup();
+    env.memberships.set("mem_1", membership("mem_1", "active", { cancel_at_period_end: true }));
+    await env.billing.syncMembership("mem_1");
+
+    expect(await env.billing.cancelMembershipNow(USER_ID, "test")).toBe(true);
+    expect(env.canceled).toEqual(["mem_1"]);
+  });
+
+  test("has nothing to do for a manual grant or a membership already ended on Whop", async () => {
+    const manual = setup();
+    manual.subscriptions.set(USER_ID, { user_id: USER_ID, status: "active", provider: "manual", whop_membership_id: null });
+    expect(await manual.billing.cancelMembershipNow(USER_ID, "test")).toBe(false);
+
+    const ended = setup();
+    ended.memberships.set("mem_1", membership("mem_1", "canceled"));
+    // A stale row still says active: Whop itself is checked.
+    ended.subscriptions.set(USER_ID, { user_id: USER_ID, status: "active", whop_membership_id: "mem_1" });
+    expect(await ended.billing.cancelMembershipNow(USER_ID, "test")).toBe(false);
+    expect(ended.canceled).toEqual([]);
+  });
+
+  test("Whop unreachable fails, so that the caller changes nothing", async () => {
+    const env = setup(undefined, { whopDown: true });
+    env.memberships.set("mem_1", membership("mem_1", "active"));
+    env.subscriptions.set(USER_ID, { user_id: USER_ID, status: "active", whop_membership_id: "mem_1" });
+    // retrieve still answers in the fake: cancel is the call that fails.
+    await expect(env.billing.cancelMembershipNow(USER_ID, "test")).rejects.toMatchObject({ status: 502 });
+    expect(env.memberships.get("mem_1")?.status).toBe("active");
   });
 });
 

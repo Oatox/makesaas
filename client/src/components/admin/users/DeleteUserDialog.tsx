@@ -27,6 +27,8 @@ export function DeleteUserDialog({ profile, onDelete }: { profile: Pick<Profile,
           <AlertDialogTitle>Êtes-vous absolument sûr ?</AlertDialogTitle>
           <AlertDialogDescription>
             Cette action est irréversible. Le compte de {profile.email} et toutes ses données seront définitivement supprimés.
+            S'il a un abonnement Whop en cours, il est d'abord annulé sur Whop, sans remboursement ; si Whop ne répond pas, rien
+            n'est supprimé.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

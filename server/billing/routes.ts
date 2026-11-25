@@ -8,7 +8,7 @@ import { asyncRoute, HttpError } from "../lib/http";
 import { logger } from "../lib/logger";
 import { supabaseAdmin } from "../lib/supabase-admin";
 import { getIdeasService } from "../ideas/service";
-import { loadWhopConfig } from "./config";
+import { loadWhopConfig, type WhopConfig } from "./config";
 import { BillingService } from "./service";
 
 const BILLING_UNAVAILABLE = "Les abonnements ne sont pas encore disponibles.";
@@ -55,9 +55,24 @@ function checkoutRedirectUrl(req: Request): string | undefined {
   return undefined;
 }
 
+let loaded: { whop: WhopConfig | null; service: BillingService | null } | undefined;
+
+/** The Whop configuration and billing service, read once (null when Whop or Supabase is not configured). */
+function loadBilling() {
+  if (!loaded) {
+    const whop = loadWhopConfig();
+    loaded = { whop, service: whop && supabaseAdmin ? new BillingService(whop, supabaseAdmin) : null };
+  }
+  return loaded;
+}
+
+/** The billing service for other routes (the admin cancels a member's Whop subscription), null without Whop. */
+export function getBillingService(): BillingService | null {
+  return loadBilling().service;
+}
+
 export function registerBillingRoutes(app: Express) {
-  const whop = loadWhopConfig();
-  const billing = whop && supabaseAdmin ? new BillingService(whop, supabaseAdmin) : null;
+  const { whop, service: billing } = loadBilling();
 
   const requireBilling = () => {
     if (!billing) throw new HttpError(503, BILLING_UNAVAILABLE);

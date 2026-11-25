@@ -150,6 +150,29 @@ export class BillingService {
   }
 
   /**
+   * Ends the user's Whop membership now, its access and any renewal (no refund), before an admin deletes
+   * them or removes their access. Nothing to do without a Whop membership, or once it no longer grants
+   * access, checked on Whop itself (the row may be stale). Throws when Whop cannot be reached or refuses:
+   * the caller then changes nothing. Returns whether a membership was canceled.
+   */
+  async cancelMembershipNow(userId: string, reason: string): Promise<boolean> {
+    const membershipId = (await this.getSubscription(userId))?.whop_membership_id;
+    if (!membershipId) return false;
+
+    try {
+      const membership = await this.whop.client.memberships.retrieve({ id: membershipId });
+      if (!grantsAccess(membership.status)) return false;
+      // Without cancel_at_period_end, Whop revokes the membership at once.
+      await this.whop.client.memberships.cancel({ id: membershipId, reason });
+    } catch (err) {
+      logger.error({ err, userId, membershipId }, "Failed to cancel the Whop membership");
+      throw new HttpError(502, "Impossible d'annuler son abonnement sur Whop pour le moment : rien n'a été modifié, réessaie dans un instant.");
+    }
+    logger.info({ userId, membershipId, reason }, "Whop membership canceled");
+    return true;
+  }
+
+  /**
    * Applies a membership to the user's subscription row. The membership is re-read from Whop rather than trusted
    * from the webhook payload, so late or replayed events always apply the current state.
    * Returns the user whose subscription it just activated (a new membership granting access), null otherwise.

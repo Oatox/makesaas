@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AlertTriangle, CreditCard, Loader2 } from "lucide-react";
-import { grantsAccess, renewsBilling, subscriptionStateOf, type SubscriptionState } from "@shared/billing";
+import { grantsAccess, subscriptionStateOf, type SubscriptionState } from "@shared/billing";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +41,10 @@ function detailOf(subscription: Profile["subscription"], state: SubscriptionStat
   }
 }
 
-/** The member's access to the app: their subscription at a glance, and an admin's grant or removal (no billing involved). */
+/**
+ * The member's access to the app: their subscription at a glance, and an admin's grant or removal. A
+ * removal first ends their Whop subscription, if one runs (the server refuses the removal when Whop fails).
+ */
 export function BillingCard({ profile }: { profile: Profile }) {
   const updateUser = useUpdateAdminUser();
   const [confirming, setConfirming] = useState(false);
@@ -49,7 +52,7 @@ export function BillingCard({ profile }: { profile: Profile }) {
   const subscribed = grantsAccess(subscription?.status);
   const state = subscriptionStateOf(subscription);
   const detail = detailOf(subscription, state, profile.role === "admin");
-  const stillBilled = renewsBilling(subscription);
+  const paidOnWhop = subscription?.provider === "whop" && subscribed;
 
   const confirm = () => updateUser.mutate({ id: profile.id, updates: { subscribed: !subscribed } });
 
@@ -90,10 +93,11 @@ export function BillingCard({ profile }: { profile: Profile }) {
                 : `${profile.email || "Ce membre"} aura accès à toute l'app, sans payer, jusqu'à ce qu'un admin le retire.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {subscribed && stillBilled && (
+          {paidOnWhop && (
             <p className="flex gap-2.5 rounded-lg border border-primary/30 bg-primary/[0.07] p-3 text-sm">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-primary" />
-              Son abonnement Whop se renouvelle : Whop continuera de le facturer. Annule d'abord le renouvellement sur Whop.
+              Son abonnement Whop sera annulé tout de suite : plus aucun prélèvement, et pas de remboursement de la période en
+              cours. Si Whop ne répond pas, rien n'est modifié.
             </p>
           )}
           <AlertDialogFooter>

@@ -1,7 +1,8 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { adminApi, isOnboardingStatsPeriod } from "@shared/admin";
-import { SUBSCRIPTION_SUMMARY_COLUMNS, renewsBilling, type SubscriptionSummary } from "@shared/billing";
+import { SUBSCRIPTION_SUMMARY_COLUMNS, grantsAccess, renewsBilling, type SubscriptionSummary } from "@shared/billing";
+import { getBillingService } from "../billing/routes";
 import { getUserId, requireAdmin } from "../lib/auth";
 import { asyncRoute, HttpError, parseInput } from "../lib/http";
 import { logger } from "../lib/logger";
@@ -20,8 +21,8 @@ const onboardingQuerySchema = z.object({ days: z.coerce.number().int().refine(is
 const updateUserBodySchema = z
   .object({
     role: z.enum(["user", "admin"]).optional(),
-    // Manual grant (true) or removal (false) of the subscription. Does not touch the Whop billing:
-    // a later webhook of a paying member applies their membership again.
+    // Manual grant (true) or removal (false) of the subscription. A removal first ends the member's
+    // Whop membership (cancelWhopSubscription), so that Whop stops billing and no webhook brings it back.
     subscribed: z.boolean().optional(),
   })
   .strict()
@@ -32,11 +33,39 @@ const updateUserBodySchema = z
 const PROFILE_COLUMNS = `id,email,full_name,avatar_url,role,created_at,last_active_at,signup_source,${JOURNEY_PROFILE_COLUMNS}`;
 
 /**
+ * Ends the member's Whop subscription now, before an admin removes their access or deletes them.
+ * Throws when it cannot be done (Whop unreachable, or not configured while the member has a Whop
+ * membership): the caller then changes nothing.
+ */
+async function cancelWhopSubscription(userId: string, reason: string) {
+  const billing = getBillingService();
+  if (billing) {
+    await billing.cancelMembershipNow(userId, reason);
+    return;
+  }
+
+  const { data, error } = await supabaseAdmin!
+    .from("subscriptions")
+    .select("status, whop_membership_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    logger.error({ err: error, userId }, "Failed to read the subscription of a member");
+    throw new HttpError(500, "Impossible de lire son abonnement.");
+  }
+  if (data?.whop_membership_id && grantsAccess(data.status)) {
+    throw new HttpError(503, "Whop n'est pas configuré sur ce serveur : impossible d'annuler son abonnement, rien n'a été modifié.");
+  }
+}
+
+/**
  * Admin access change: a grant activates the existing row (a Whop one keeps its billing data) or
- * creates a manual one; a removal deletes the row.
+ * creates a manual one; a removal first ends the Whop subscription, then deletes the row.
  */
 async function setManualSubscription(userId: string, subscribed: boolean) {
   const db = supabaseAdmin!;
+  if (!subscribed) await cancelWhopSubscription(userId, "Accès retiré par un admin");
+
   const { error } = subscribed
     ? await db
         .from("subscriptions")
@@ -173,7 +202,7 @@ export function registerAdminRoutes(app: Express) {
     }),
   );
 
-  // Deleting the auth user cascades to the profile and all their data (refused while their Whop subscription renews).
+  // Deleting the auth user cascades to the profile and all their data, once their Whop subscription is ended.
   app.delete(
     "/api/admin/users/:id",
     requireAdmin,
@@ -225,27 +254,30 @@ export function registerAdminRoutes(app: Express) {
 /** Who deletes an account: its member (from the settings) or an admin. */
 type DeletedBy = "member" | "admin";
 
-const RENEWING_SUBSCRIPTION_MESSAGES: Record<DeletedBy, string> = {
-  member: "Votre abonnement se renouvelle encore : résiliez-le d'abord depuis vos paramètres, puis supprimez votre compte.",
-  admin: "Ce membre a un abonnement Whop qui se renouvelle : annulez-le d'abord sur Whop, sinon il continuerait d'être prélevé.",
-};
+const RENEWING_SUBSCRIPTION_MESSAGE =
+  "Votre abonnement se renouvelle encore : résiliez-le d'abord depuis vos paramètres, puis supprimez votre compte.";
 
 /**
  * Removes the auth user; the profile and every table of theirs follow through ON DELETE CASCADE, and their
- * files in the R2 bucket are removed in the background. Refused (409) while their Whop subscription renews:
- * Whop would keep billing them, and the webhook ignores a deleted user.
+ * files in the R2 bucket are removed in the background. Whop must not keep billing a deleted user (the
+ * webhook ignores them): an admin's deletion first ends their Whop subscription, and is refused when that
+ * fails; a member's own is refused (409) while their subscription renews.
  */
 export async function deleteAuthUser(userId: string, by: DeletedBy): Promise<void> {
-  const { data: subscription, error: readError } = await supabaseAdmin!
-    .from("subscriptions")
-    .select("provider, status, cancel_at_period_end")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (readError) {
-    logger.error({ err: readError, userId }, "Failed to read the subscription of a user to delete");
-    throw new HttpError(500, "Impossible de supprimer le compte.");
+  if (by === "admin") {
+    await cancelWhopSubscription(userId, "Compte supprimé par un admin");
+  } else {
+    const { data: subscription, error: readError } = await supabaseAdmin!
+      .from("subscriptions")
+      .select("provider, status, cancel_at_period_end")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (readError) {
+      logger.error({ err: readError, userId }, "Failed to read the subscription of a user to delete");
+      throw new HttpError(500, "Impossible de supprimer le compte.");
+    }
+    if (renewsBilling(subscription)) throw new HttpError(409, RENEWING_SUBSCRIPTION_MESSAGE);
   }
-  if (renewsBilling(subscription)) throw new HttpError(409, RENEWING_SUBSCRIPTION_MESSAGES[by]);
 
   const { error } = await supabaseAdmin!.auth.admin.deleteUser(userId);
   if (!error) {
