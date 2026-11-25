@@ -1,10 +1,10 @@
 import { useLocation } from "wouter";
-import { grantsAccess } from "@shared/billing";
-import { ChevronLeft, ChevronRight, Clock, Filter, Mail, Search } from "lucide-react";
+import { grantsAccess, SUBSCRIPTION_STATES, subscriptionStateOf } from "@shared/billing";
+import { ChevronLeft, ChevronRight, Clock, CreditCard, Filter, Mail, Search } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -13,9 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { AdminProfileRow } from "@/hooks/use-admin-profiles";
-import { formatDate, getInitials } from "@/lib/format";
+import type { AdminProfileRow, SubscriptionFilter } from "@/hooks/use-admin-profiles";
+import { formatDate, formatInteger, getInitials } from "@/lib/format";
 import { ConfirmRoleChangeDialog } from "./ConfirmRoleChangeDialog";
+import { SUBSCRIPTION_STATE_INFO, SubscriptionDot, subscriptionLabel } from "./subscription-state";
 import { UserActionsDropdown } from "./UserActionsDropdown";
 
 type UserManagementTableProps = {
@@ -23,6 +24,13 @@ type UserManagementTableProps = {
   setSearchQuery: (value: string) => void;
   roleFilter: string;
   setRoleFilter: (value: string) => void;
+  subscriptionFilter: SubscriptionFilter;
+  setSubscriptionFilter: (value: SubscriptionFilter) => void;
+  /** Users the filters keep (undefined while loading), out of every user. */
+  total: number | undefined;
+  overallTotal: number | undefined;
+  isFiltered: boolean;
+  onClearFilters: () => void;
   profiles: AdminProfileRow[];
   onToggleRole: (id: string, currentRole: AdminProfileRow["role"]) => void;
   onToggleSubscriber: (id: string, current: boolean) => void;
@@ -40,7 +48,13 @@ const ROLE_FILTERS = [
   { value: "all", label: "Tous les rôles" },
   { value: "user", label: "Utilisateurs" },
   { value: "admin", label: "Administrateurs" },
-  { value: "subscriber", label: "Abonnés" },
+];
+
+/** "Avec accès" gathers the states granting access (the first four). */
+const SUBSCRIPTION_FILTERS: { value: SubscriptionFilter; label: string }[] = [
+  { value: "all", label: "Tous les abonnements" },
+  { value: "access", label: "Avec accès" },
+  ...SUBSCRIPTION_STATES.map((state) => ({ value: state, label: SUBSCRIPTION_STATE_INFO[state].label })),
 ];
 
 // Pieces shared by the desktop table and the mobile cards.
@@ -65,9 +79,14 @@ function UserIdentity({ profile }: { profile: AdminProfileRow }) {
   );
 }
 
-function SubscriberBadge({ profile }: { profile: AdminProfileRow }) {
-  const subscribed = grantsAccess(profile.subscription?.status);
-  return <Badge variant={subscribed ? "default" : "secondary"}>{subscribed ? "Oui" : "Non"}</Badge>;
+/** Where the member stands with their subscription, as on their page. */
+function SubscriptionStatus({ profile }: { profile: AdminProfileRow }) {
+  return (
+    <span className="flex items-center gap-2 text-sm">
+      <SubscriptionDot state={subscriptionStateOf(profile.subscription)} />
+      <span className="truncate">{subscriptionLabel(profile.subscription)}</span>
+    </span>
+  );
 }
 
 function JoinDate({ profile }: { profile: AdminProfileRow }) {
@@ -79,6 +98,21 @@ function JoinDate({ profile }: { profile: AdminProfileRow }) {
   );
 }
 
+/** "22 utilisateurs", or with filters "3 sur 22 utilisateurs". */
+function UserCount({ total, overallTotal, isFiltered }: { total: number | undefined; overallTotal: number | undefined; isFiltered: boolean }) {
+  if (total === undefined) return <Skeleton className="h-8 w-40" />;
+  const outOf = isFiltered && overallTotal !== undefined;
+  const label = outOf
+    ? `sur ${formatInteger(overallTotal)} utilisateur${overallTotal > 1 ? "s" : ""}`
+    : `utilisateur${total > 1 ? "s" : ""}`;
+  return (
+    <p className="text-sm text-muted-foreground">
+      <span className="mr-1.5 font-display text-2xl font-light tabular-nums text-foreground">{formatInteger(total)}</span>
+      {label}
+    </p>
+  );
+}
+
 const stopRowClick = (e: React.MouseEvent) => e.stopPropagation();
 
 export function UserManagementTable({
@@ -86,6 +120,12 @@ export function UserManagementTable({
   setSearchQuery,
   roleFilter,
   setRoleFilter,
+  subscriptionFilter,
+  setSubscriptionFilter,
+  total,
+  overallTotal,
+  isFiltered,
+  onClearFilters,
   profiles,
   onToggleRole,
   onToggleSubscriber,
@@ -113,34 +153,69 @@ export function UserManagementTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex w-full flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-        <div className="relative w-full flex-1">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Rechercher nom ou email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex items-baseline gap-4">
+          <UserCount total={total} overallTotal={overallTotal} isFiltered={isFiltered} />
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={onClearFilters}
+              className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+            >
+              Effacer les filtres
+            </button>
+          )}
         </div>
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="sm:w-[210px]">
-            {/* A div, not a span: SelectTrigger line-clamps its direct spans, which would stack the icon over the label. */}
-            <div className="flex min-w-0 items-center gap-2.5">
-              <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="truncate">
-                <SelectValue placeholder="Tous les rôles" />
-              </span>
-            </div>
-          </SelectTrigger>
-          <SelectContent align="end" className="min-w-[210px]">
-            {ROLE_FILTERS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
+        <div className="grid gap-2 sm:grid-cols-2 md:flex md:items-center">
+          <div className="relative sm:col-span-2 md:w-64 md:min-w-0 md:shrink">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher nom ou email…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 md:h-9"
+            />
+          </div>
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="md:h-9 md:w-44 md:shrink-0">
+              {/* A div, not a span: SelectTrigger line-clamps its direct spans, which would stack the icon over the label. */}
+              <div className="flex min-w-0 items-center gap-2">
+                <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">
+                  <SelectValue placeholder="Tous les rôles" />
+                </span>
+              </div>
+            </SelectTrigger>
+            <SelectContent align="end" className="min-w-44">
+              {ROLE_FILTERS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={subscriptionFilter} onValueChange={(value) => setSubscriptionFilter(value as SubscriptionFilter)}>
+            <SelectTrigger className="md:h-9 md:w-56 md:shrink-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <CreditCard className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">
+                  <SelectValue placeholder="Tous les abonnements" />
+                </span>
+              </div>
+            </SelectTrigger>
+            <SelectContent align="end" className="min-w-56">
+              {SUBSCRIPTION_FILTERS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  <span className="flex items-center gap-2.5">
+                    {option.value !== "all" && option.value !== "access" && <SubscriptionDot state={option.value} />}
+                    {option.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Desktop: table */}
@@ -150,7 +225,7 @@ export function UserManagementTable({
             <TableRow className="border-b border-border/70 hover:bg-transparent">
               <TableHead>Utilisateur</TableHead>
               <TableHead>Rôle</TableHead>
-              <TableHead>Abonné</TableHead>
+              <TableHead>Abonnement</TableHead>
               <TableHead>Inscription</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -171,7 +246,7 @@ export function UserManagementTable({
                     <ConfirmRoleChangeDialog profile={profile} onConfirm={() => onToggleRole(profile.id, profile.role)} />
                   </TableCell>
                   <TableCell>
-                    <SubscriberBadge profile={profile} />
+                    <SubscriptionStatus profile={profile} />
                   </TableCell>
                   <TableCell>
                     <JoinDate profile={profile} />
@@ -222,9 +297,7 @@ export function UserManagementTable({
                 <div onClick={stopRowClick}>
                   <ConfirmRoleChangeDialog profile={profile} onConfirm={() => onToggleRole(profile.id, profile.role)} />
                 </div>
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  Abonné <SubscriberBadge profile={profile} />
-                </div>
+                <SubscriptionStatus profile={profile} />
                 <div className="ml-auto">
                   <JoinDate profile={profile} />
                 </div>

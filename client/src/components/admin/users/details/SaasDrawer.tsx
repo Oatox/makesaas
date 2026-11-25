@@ -118,7 +118,7 @@ function SaasDrawerBody({ userId, saas, isCurrent }: { userId: string; saas: Adm
   );
 }
 
-function Section({ title, children, sectionRef }: { title: string; children: ReactNode; sectionRef?: Ref<HTMLElement> }) {
+export function Section({ title, children, sectionRef }: { title: string; children: ReactNode; sectionRef?: Ref<HTMLElement> }) {
   return (
     <section ref={sectionRef} className="scroll-mt-4">
       <h3 className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
@@ -128,7 +128,7 @@ function Section({ title, children, sectionRef }: { title: string; children: Rea
 }
 
 /** Label → value rows, in one block. */
-function InfoRows({ rows }: { rows: { label: string; value: ReactNode }[] }) {
+export function InfoRows({ rows }: { rows: { label: string; value: ReactNode }[] }) {
   return (
     <dl className="divide-y divide-border/60 rounded-xl border border-border/60">
       {rows.map((row) => (

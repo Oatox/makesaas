@@ -76,6 +76,26 @@ export function renewsBilling(
   return subscription?.provider === "whop" && grantsAccess(subscription.status) && !subscription.cancel_at_period_end;
 }
 
+/**
+ * Where a member stands with their subscription, as admins see and filter them (the member page, the
+ * users list). With access: "active" (paid on Whop, renewing), "manual" (granted by an admin),
+ * "ending" (renewal cancelled, access until the paid period ends), "past_due" (Whop retrying the
+ * payment). Without: "ended" (a subscription that no longer grants access), "none" (never had one).
+ */
+export const SUBSCRIPTION_STATES = ["active", "manual", "ending", "past_due", "ended", "none"] as const;
+export type SubscriptionState = (typeof SUBSCRIPTION_STATES)[number];
+
+export function subscriptionStateOf(
+  subscription: Pick<SubscriptionSummary, "provider" | "status" | "cancel_at_period_end"> | null | undefined,
+): SubscriptionState {
+  if (!subscription) return "none";
+  if (!grantsAccess(subscription.status)) return "ended";
+  if (subscription.provider === "manual") return "manual";
+  if (subscription.status === "past_due") return "past_due";
+  if (subscription.cancel_at_period_end || subscription.status === "canceling") return "ending";
+  return "active";
+}
+
 export const billingApi = {
   /** Public: the offers shown on the paywall, with their prices read from Whop. */
   plan: { path: "/api/billing/plan" },

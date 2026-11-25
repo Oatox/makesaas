@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Profile, SignupSource } from "@shared/schema";
 import { adminApi, type AdminDiscussion, type AdminMemberJourney, type AdminSaasDetail } from "@shared/admin";
-import { ACCESS_STATUSES, type SubscriptionSummary } from "@shared/billing";
+import { ACCESS_STATUSES, type SubscriptionState, type SubscriptionSummary } from "@shared/billing";
 import { profileKeys, useAuth } from "./use-auth";
 import { toast } from "./use-toast";
 import { supabase } from "@/lib/supabase";
@@ -13,6 +13,7 @@ export const adminKeys = {
   all: ["admin"] as const,
   metrics: ["admin", "metrics"] as const,
   growth: ["admin", "growth"] as const,
+  usersTotal: ["admin", "users-total"] as const,
   profilesPage: (params: UsePaginatedProfilesParams) => ["admin", "profiles", params] as const,
   userDetails: (userId: string | undefined) => ["admin", "user-details", userId] as const,
   saas: (userId: string, saasId: string | undefined) => ["admin", "user-saas", userId, saasId] as const,
@@ -54,12 +55,20 @@ export type AdminUserDetailsResponse = {
 /** Columns shown in the users table. */
 const PROFILE_ROW_COLUMNS = "id, email, full_name, avatar_url, role, created_at";
 /** Embedded subscription (one row per user); "!inner" keeps only users having one. */
-const subscriptionEmbed = (inner: boolean) => `subscription:subscriptions${inner ? "!inner" : ""}(status)`;
+const subscriptionEmbed = (inner: boolean) =>
+  `subscription:subscriptions${inner ? "!inner" : ""}(status, provider, cancel_at_period_end, current_period_end)`;
 
 export type AdminProfileRow = Pick<Profile, "id" | "email" | "full_name" | "avatar_url" | "role"> & {
   created_at: string | null;
-  subscription: Pick<SubscriptionSummary, "status"> | null;
+  subscription: Pick<SubscriptionSummary, "status" | "provider" | "cancel_at_period_end" | "current_period_end"> | null;
 };
+
+/** Users list filter on the subscription: every state of subscriptionStateOf, or all those with access. */
+export type SubscriptionFilter = "all" | "access" | SubscriptionState;
+
+/** Access statuses outside Whop's payment retries. */
+const RUNNING_STATUSES = ACCESS_STATUSES.filter((status) => status !== "past_due");
+const inList = (values: readonly string[]) => `(${values.join(",")})`;
 
 export type PaginatedProfilesResponse = {
   profiles: AdminProfileRow[];
@@ -74,11 +83,12 @@ type UsePaginatedProfilesParams = {
   pageSize: number;
   searchQuery: string;
   roleFilter: string;
+  subscriptionFilter: SubscriptionFilter;
 };
 
 export function usePaginatedProfiles(params: UsePaginatedProfilesParams) {
   const { isAdmin } = useAuth();
-  const { page, pageSize, searchQuery, roleFilter } = params;
+  const { page, pageSize, searchQuery, roleFilter, subscriptionFilter } = params;
 
   return useQuery<PaginatedProfilesResponse>({
     queryKey: adminKeys.profilesPage(params),
@@ -87,16 +97,44 @@ export function usePaginatedProfiles(params: UsePaginatedProfilesParams) {
       const to = from + pageSize - 1;
       const normalizedSearch = searchQuery.trim().replace(/[^\w@.\-\s]/g, "");
 
-      const subscribersOnly = roleFilter === "subscriber";
+      // Every filter but "all" and "none" needs a subscription: inner join, then conditions on it
+      // (the same rules as subscriptionStateOf in shared/billing.ts).
+      const hasSubscription = subscriptionFilter !== "all" && subscriptionFilter !== "none";
       let query = supabase
         .from("profiles")
-        .select(`${PROFILE_ROW_COLUMNS}, ${subscriptionEmbed(subscribersOnly)}`, { count: "exact" })
+        .select(`${PROFILE_ROW_COLUMNS}, ${subscriptionEmbed(hasSubscription)}`, { count: "exact" })
         .order("created_at", { ascending: false });
 
-      if (subscribersOnly) {
-        query = query.in("subscription.status", [...ACCESS_STATUSES]);
-      } else if (roleFilter !== "all") {
-        query = query.eq("role", roleFilter);
+      if (roleFilter !== "all") query = query.eq("role", roleFilter);
+
+      switch (subscriptionFilter) {
+        case "none":
+          query = query.is("subscription", null);
+          break;
+        case "access":
+          query = query.in("subscription.status", [...ACCESS_STATUSES]);
+          break;
+        case "manual":
+          query = query.eq("subscription.provider", "manual").in("subscription.status", [...ACCESS_STATUSES]);
+          break;
+        case "past_due":
+          query = query.eq("subscription.provider", "whop").eq("subscription.status", "past_due");
+          break;
+        case "ending":
+          query = query
+            .eq("subscription.provider", "whop")
+            .in("subscription.status", RUNNING_STATUSES)
+            .or("cancel_at_period_end.is.true,status.eq.canceling", { referencedTable: "subscription" });
+          break;
+        case "active":
+          query = query
+            .eq("subscription.provider", "whop")
+            .in("subscription.status", RUNNING_STATUSES.filter((status) => status !== "canceling"))
+            .eq("subscription.cancel_at_period_end", false);
+          break;
+        case "ended":
+          query = query.not("subscription.status", "in", inList(ACCESS_STATUSES));
+          break;
       }
 
       if (normalizedSearch) {
@@ -117,6 +155,21 @@ export function usePaginatedProfiles(params: UsePaginatedProfilesParams) {
     },
     enabled: isAdmin,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** How many users there are, whatever the filters (the users list says how many its filters keep). */
+export function useAdminUsersTotal() {
+  const { isAdmin } = useAuth();
+
+  return useQuery({
+    queryKey: adminKeys.usersTotal,
+    queryFn: async () => {
+      const { count, error } = await supabase.from("profiles").select("id", { count: "exact", head: true });
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: isAdmin,
   });
 }
 

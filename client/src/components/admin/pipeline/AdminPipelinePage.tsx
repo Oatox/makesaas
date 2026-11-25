@@ -308,7 +308,7 @@ function PipelineEditor({ pipeline, config }: { pipeline: AiPipeline; config: Pi
                 <FormItem className="space-y-0">
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
-                      <SelectTrigger aria-label="Modèle" className="h-9 w-52 gap-2 font-mono text-[13px] md:h-9">
+                      <SelectTrigger aria-label="Modèle" className="h-9 w-60 gap-2 font-mono text-[13px] md:h-9">
                         <SelectValue />
                       </SelectTrigger>
                     </FormControl>

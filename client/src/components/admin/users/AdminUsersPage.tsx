@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { useDeleteAdminUser, usePaginatedProfiles, useUpdateAdminUser } from "@/hooks/use-admin-profiles";
+import {
+  useAdminUsersTotal,
+  useDeleteAdminUser,
+  usePaginatedProfiles,
+  useUpdateAdminUser,
+  type SubscriptionFilter,
+} from "@/hooks/use-admin-profiles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserManagementTable } from "./UserManagementTable";
 
@@ -12,13 +18,24 @@ export function AdminUsersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [subscriptionFilter, setSubscriptionFilter] = useState<SubscriptionFilter>("all");
 
   const { data, isLoading, isFetching, isPlaceholderData } = usePaginatedProfiles({
     page,
     pageSize,
     searchQuery,
     roleFilter,
+    subscriptionFilter,
   });
+
+  const { data: overallTotal } = useAdminUsersTotal();
+  const isFiltered = !!searchQuery || roleFilter !== "all" || subscriptionFilter !== "all";
+  const clearFilters = () => {
+    setSearchInput("");
+    setSearchQuery("");
+    setRoleFilter("all");
+    setSubscriptionFilter("all");
+  };
 
   const profiles = data?.profiles || [];
   const totalPages = data?.totalPages || 1;
@@ -34,7 +51,7 @@ export function AdminUsersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [roleFilter]);
+  }, [roleFilter, subscriptionFilter]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -70,6 +87,12 @@ export function AdminUsersPage() {
           setSearchQuery={setSearchInput}
           roleFilter={roleFilter}
           setRoleFilter={setRoleFilter}
+          subscriptionFilter={subscriptionFilter}
+          setSubscriptionFilter={setSubscriptionFilter}
+          total={data?.total}
+          overallTotal={overallTotal}
+          isFiltered={isFiltered}
+          onClearFilters={clearFilters}
           profiles={profiles}
           onToggleRole={handleToggleRole}
           onToggleSubscriber={handleToggleSubscriber}

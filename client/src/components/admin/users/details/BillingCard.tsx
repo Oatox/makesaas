@@ -1,52 +1,109 @@
-import { CreditCard, Loader2 } from "lucide-react";
-import { grantsAccess } from "@shared/billing";
-import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { AlertTriangle, CreditCard, Loader2 } from "lucide-react";
+import { grantsAccess, renewsBilling, subscriptionStateOf, type SubscriptionState } from "@shared/billing";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUpdateAdminUser, type AdminUserDetailsResponse } from "@/hooks/use-admin-profiles";
 import { formatDate } from "@/lib/format";
+import { SubscriptionDot, subscriptionLabel } from "../subscription-state";
 
-function describe(subscription: AdminUserDetailsResponse["profile"]["subscription"]) {
-  if (!subscription) return "Aucun abonnement.";
-  if (subscription.provider === "manual") return `Abonnement offert manuellement (${subscription.status}), sans facturation.`;
+type Profile = AdminUserDetailsResponse["profile"];
 
-  const period = subscription.current_period_end
-    ? `, ${subscription.cancel_at_period_end ? "se termine le" : "renouvelé le"} ${formatDate(subscription.current_period_end)}`
-    : "";
-  return `Abonnement Whop (${subscription.status})${period}. Le retirer ici n'arrête pas la facturation Whop.`;
+/** Where the member stands, in one line under the state's label. */
+function detailOf(subscription: Profile["subscription"], state: SubscriptionState, isAdmin: boolean): string {
+  const end = subscription?.current_period_end ? formatDate(subscription.current_period_end) : null;
+  switch (state) {
+    case "none":
+      return isAdmin ? "A quand même accès à l'app, en tant qu'admin." : "N'a pas accès à l'app.";
+    case "manual":
+      return "Accès offert par un admin, sans facturation.";
+    case "past_due":
+      return "Whop retente le paiement ; l'accès reste ouvert en attendant.";
+    case "ending":
+      return "Whop · renouvellement annulé.";
+    case "ended":
+      if (subscription?.provider === "manual") return "Accès offert par un admin, terminé.";
+      return end ? `Whop · terminé le ${end}` : "Whop · n'a plus accès à l'app.";
+    case "active":
+      if (!end) return "Whop";
+      if (subscription?.status === "completed") return `Whop · sans renouvellement, accès jusqu'au ${end}`;
+      return `Whop · ${subscription?.status === "trialing" ? "premier paiement" : "renouvelé"} le ${end}`;
+  }
 }
 
-/** The user's subscription, with a manual grant or removal (no billing involved). */
-export function BillingCard({ profile }: { profile: AdminUserDetailsResponse["profile"] }) {
+/** The member's access to the app: their subscription at a glance, and an admin's grant or removal (no billing involved). */
+export function BillingCard({ profile }: { profile: Profile }) {
   const updateUser = useUpdateAdminUser();
-  const subscribed = grantsAccess(profile.subscription?.status);
-  const toggle = () => updateUser.mutate({ id: profile.id, updates: { subscribed: !subscribed } });
+  const [confirming, setConfirming] = useState(false);
+  const subscription = profile.subscription;
+  const subscribed = grantsAccess(subscription?.status);
+  const state = subscriptionStateOf(subscription);
+  const detail = detailOf(subscription, state, profile.role === "admin");
+  const stillBilled = renewsBilling(subscription);
+
+  const confirm = () => updateUser.mutate({ id: profile.id, updates: { subscribed: !subscribed } });
 
   return (
     <Card className="border-border/60">
-      <CardHeader className="pb-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <CreditCard className="h-5 w-5 text-muted-foreground" />
-              Abonnement
-            </CardTitle>
-            <CardDescription>{describe(profile.subscription)}</CardDescription>
-          </div>
-          <Badge variant={subscribed ? "default" : "secondary"}>{subscribed ? "Abonné" : "Sans abonnement"}</Badge>
+      <CardHeader className="flex-row flex-wrap items-center justify-between gap-x-6 gap-y-3 space-y-0">
+        <div className="min-w-0 space-y-1.5">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <CreditCard className="h-5 w-5 text-muted-foreground" />
+            Abonnement
+          </CardTitle>
+          <CardDescription className="flex items-start gap-2">
+            <SubscriptionDot state={state} className="mt-1.5" />
+            <span>
+              <span className="font-medium text-foreground">{subscriptionLabel(subscription)}</span> · {detail}
+            </span>
+          </CardDescription>
         </div>
-      </CardHeader>
-      <CardContent className="flex pt-0 sm:justify-end">
         <Button
-          variant={subscribed ? "secondary" : "default"}
-          className="w-full sm:w-auto sm:min-w-36"
-          onClick={toggle}
+          size="sm"
+          variant={subscribed ? "outline" : "default"}
+          className="shrink-0"
+          onClick={() => setConfirming(true)}
           disabled={updateUser.isPending}
         >
-          {updateUser.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-          {subscribed ? "Retirer l'abonnement" : "Offrir l'abonnement"}
+          {updateUser.isPending && <Loader2 className="animate-spin" />}
+          {subscribed ? "Retirer l'accès" : "Offrir l'accès"}
         </Button>
-      </CardContent>
+      </CardHeader>
+
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{subscribed ? "Retirer son accès à l'app ?" : "Offrir l'accès à l'app ?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {subscribed
+                ? `${profile.email || "Ce membre"} perd tout de suite l'accès à l'app.`
+                : `${profile.email || "Ce membre"} aura accès à toute l'app, sans payer, jusqu'à ce qu'un admin le retire.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {subscribed && stillBilled && (
+            <p className="flex gap-2.5 rounded-lg border border-primary/30 bg-primary/[0.07] p-3 text-sm">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-primary" />
+              Son abonnement Whop se renouvelle : Whop continuera de le facturer. Annule d'abord le renouvellement sur Whop.
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction variant={subscribed ? "destructive" : "default"} onClick={confirm}>
+              {subscribed ? "Retirer l'accès" : "Offrir l'accès"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
