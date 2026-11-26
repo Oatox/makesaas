@@ -89,15 +89,28 @@ export const isOnboardingStatsPeriod = (days: number): days is OnboardingStatsPe
 export type OnboardingFunnelStep = { label: string; users: number };
 
 /**
- * One position in the onboarding (its Nth screen) and the visitors who reached it. The screens a
- * position shows can differ with the answers (the branches after "experience"): `stepIds` lists them.
+ * The kinds of device the Onboarding page splits visitors by (from Amplitude's device type and
+ * browser, server/admin/onboarding.ts): `in-app` is the browser inside an app (TikTok, Instagram,
+ * Google...), whatever the device; `mobile` the phone's own browser.
  */
-export type OnboardingScreenStat = { number: number; stepIds: string[]; users: number };
+export const DEVICE_KINDS = ["desktop", "tablet", "in-app", "mobile"] as const;
+export type DeviceKind = (typeof DEVICE_KINDS)[number];
+/** Visitors per kind of device (a visitor seen on two kinds counts in both). */
+export type DeviceCounts = Record<DeviceKind, number>;
+
+/**
+ * One position in the onboarding (its Nth screen) and the visitors who reached it, in all and per
+ * kind of device. The screens a position shows can differ with the answers (the branches after
+ * "experience"): `stepIds` lists them.
+ */
+export type OnboardingScreenStat = { number: number; stepIds: string[]; users: number; devices: DeviceCounts };
 
 /** GET adminApi.onboarding?days=: the onboarding's funnel and screens over the period, from Amplitude. */
 export type AdminOnboardingStats = {
   days: OnboardingStatsPeriod;
   funnel: OnboardingFunnelStep[];
+  /** The landing page's visitors (the funnel's first step), per kind of device. */
+  landing: { users: number; devices: DeviceCounts };
   screens: OnboardingScreenStat[];
   /** When Amplitude computed these figures (they are kept a few minutes). */
   computedAt: string;

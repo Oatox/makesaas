@@ -28,12 +28,31 @@ export const ANALYTICS_EVENTS = {
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS];
 
+/** The page views of the SDK's autocapture, and their path ("/" for the landing page). */
+export const PAGE_VIEWED_EVENT = "[Amplitude] Page Viewed";
+export const PAGE_PATH_PROPERTY = "[Amplitude] Page Path";
+
+export type FunnelStep = {
+  /** An event of the app, or autocapture's page view. */
+  event: AnalyticsEvent | typeof PAGE_VIEWED_EVENT;
+  label: string;
+  /** Only the events whose property has this value. */
+  where?: { property: string; value: string };
+};
+
+/** The landing page's views: the first step of the admin's funnel, counted apart from the others. */
+export const LANDING_STEP: FunnelStep = { event: PAGE_VIEWED_EVENT, label: "Landing vue", where: { property: PAGE_PATH_PROPERTY, value: "/" } };
+
 /**
  * The funnel of the admin's Onboarding page (/admin/onboarding, read from Amplitude by
- * server/admin/onboarding.ts), in order. Its first step is the onboarding's first screen.
+ * server/admin/onboarding.ts), in order: the landing page's views, then from the onboarding's first
+ * screen to the subscription. The landing page is counted on its own: the steps after it count every
+ * visitor who started the onboarding, also those who came straight to /onboarding (a link to it,
+ * "S'inscrire"), whom a funnel starting at the landing page would leave out of every step.
  */
-export const ONBOARDING_FUNNEL: { event: AnalyticsEvent; label: string }[] = [
-  { event: ANALYTICS_EVENTS.onboardingStepViewed, label: "Début de l'onboarding" },
+export const ONBOARDING_FUNNEL: FunnelStep[] = [
+  LANDING_STEP,
+  { event: ANALYTICS_EVENTS.onboardingStepViewed, label: "Début de l'onboarding", where: { property: "step_number", value: "1" } },
   { event: ANALYTICS_EVENTS.accountCreated, label: "Compte créé" },
   { event: ANALYTICS_EVENTS.onboardingCompleted, label: "Onboarding terminé" },
   { event: ANALYTICS_EVENTS.paywallViewed, label: "Paywall vu" },

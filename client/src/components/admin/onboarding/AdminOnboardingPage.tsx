@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Filter } from "lucide-react";
 import type { AdminOnboardingStats, OnboardingStatsPeriod } from "@shared/admin";
+import { ANALYTICS_EVENTS, ONBOARDING_FUNNEL } from "@shared/analytics";
 import { EmptyState, ErrorState } from "@/components/StateCard";
 import { formatCount, formatRate } from "@/components/revenue/stats";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminOnboarding } from "@/hooks/use-admin-onboarding";
 import { OnboardingFunnel } from "./OnboardingFunnel";
-import { ScreenDropoff } from "./ScreenDropoff";
+import { OnboardingSteps } from "./OnboardingSteps";
 
 const PERIODS = [
   { value: "7", label: "7 jours" },
@@ -18,13 +19,15 @@ const PERIODS = [
 
 type PeriodValue = (typeof PERIODS)[number]["value"];
 
-/** The three figures at the top: the visitors who started, the accounts and the subscribers among them. */
+const ACCOUNT_STEP = ONBOARDING_FUNNEL.findIndex((step) => step.event === ANALYTICS_EVENTS.accountCreated);
+
+/** The three figures at the top: the visitors of the landing page, the accounts and the subscribers among them. */
 function Figures({ stats }: { stats: AdminOnboardingStats }) {
   const start = stats.funnel[0]?.users ?? 0;
-  const accounts = stats.funnel[1]?.users ?? 0;
+  const accounts = stats.funnel[ACCOUNT_STEP]?.users ?? 0;
   const subscribers = stats.funnel[stats.funnel.length - 1]?.users ?? 0;
   const figures = [
-    { label: "Visiteurs", value: start, note: "ont vu le premier écran" },
+    { label: "Visiteurs", value: start, note: "ont vu la landing" },
     { label: "Comptes créés", value: accounts, note: start ? `${formatRate(accounts / start)} des visiteurs` : "—" },
     { label: "Abonnés", value: subscribers, note: start ? `${formatRate(subscribers / start)} des visiteurs` : "—" },
   ];
@@ -52,6 +55,7 @@ function OnboardingSkeleton() {
       </div>
       <Skeleton className="h-[440px] rounded-[18px]" />
       <Skeleton className="h-[320px] rounded-[18px]" />
+      <Skeleton className="h-[220px] rounded-[18px]" />
     </div>
   );
 }
@@ -59,7 +63,7 @@ function OnboardingSkeleton() {
 const computedAt = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
 /**
- * /admin/onboarding: where visitors leave between the onboarding's first screen and the subscription,
+ * /admin/onboarding: where visitors leave between the landing page and the subscription,
  * over 7, 30 or 90 days, from the events sent to Amplitude (server/admin/onboarding.ts).
  */
 export function AdminOnboardingPage() {
@@ -72,7 +76,7 @@ export function AdminOnboardingPage() {
     <div className="space-y-4 sm:space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
-          Le parcours des visiteurs, du premier écran de l'onboarding à l'abonnement.
+          Le parcours des visiteurs, de la landing à l'abonnement.
           {stats && <span className="whitespace-nowrap"> Chiffres d'Amplitude, calculés à {computedAt(stats.computedAt)}.</span>}
         </p>
         <SegmentedControl options={PERIODS} value={period} onValueChange={setPeriod} label="Période" className="self-start sm:self-auto" />
@@ -95,13 +99,13 @@ export function AdminOnboardingPage() {
           icon={Filter}
           size="large"
           title="Pas encore de visiteurs"
-          description="Personne n'a commencé l'onboarding sur cette période. Les chiffres arrivent dès que le suivi tourne en production."
+          description="Personne n'a vu la landing ni commencé l'onboarding sur cette période. Les chiffres arrivent dès que le suivi tourne en production."
         />
       ) : stats ? (
         <div className={query.isPlaceholderData ? "space-y-4 opacity-60 transition-opacity sm:space-y-5" : "space-y-4 sm:space-y-5"}>
           <Figures stats={stats} />
           <OnboardingFunnel steps={stats.funnel} />
-          <ScreenDropoff screens={stats.screens} />
+          <OnboardingSteps landing={stats.landing} screens={stats.screens} />
         </div>
       ) : null}
     </div>
