@@ -2,9 +2,12 @@
  * Third fake onboarding (marketing tool, to film): what you love → the monthly goal → the idea found
  * (names rolling, then its card) → its prompt → Claude building the site in its chat → the site,
  * scrolling, while the payments land. Nothing is saved or sent anywhere.
- * Keys: 1-6 tick a passion, Enter continues (in the builder: paste, send, open the site), V pastes,
- * R restart, M sound, A spider (spider.js), T turned screen (turn.js), F fullscreen, Escape back to
- * the list.
+ * Its variant with the marketing (index.html?marketing) ends instead with the site's button "Lancer
+ * mon marketing" → the idea's TikTok account, its videos made one after the other, then published:
+ * their views climb.
+ * Keys: 1-6 tick a passion, Enter continues (in the builder: paste, send, open the site; then publish
+ * the videos), V pastes, R restart, M sound, A spider (spider.js), T turned screen (turn.js),
+ * F fullscreen, Escape back to the list.
  */
 (() => {
   "use strict";
@@ -12,7 +15,8 @@
   const turned = window.FO_TURN;
   if (turned.holder) return; // this page only holds the onboarding, turned (turn.js)
 
-  const { PASSIONS, IDEAS, DECOYS, GOAL, BUILD_STEPS, PAYERS, WHOP_MARK, CLAUDE_MARK } = window.FO3_DATA;
+  const { PASSIONS, IDEAS, DECOYS, GOAL, BUILD_STEPS, PAYERS, MAKING, VIEWS, TIKTOK_MARK, WHOP_MARK, CLAUDE_MARK } =
+    window.FO3_DATA;
   const spider = window.FO_SPIDER;
   const {
     ARROW,
@@ -21,6 +25,7 @@
     eur0,
     html,
     esc,
+    clamp,
     slug,
     icon,
     replay,
@@ -44,6 +49,12 @@
   const EXTERNAL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>';
   const COPY = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
   const SEND = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+  const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>';
+  const HEART =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>';
+
+  /** The variant with the marketing (index.html?marketing): after the site, its TikTok videos. */
+  const MARKETING = new URLSearchParams(location.search).has("marketing");
 
   const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
   const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -60,8 +71,9 @@
   /* ---- Navigation ---------------------------------------------------------- */
 
   const STEPS = [stepPassions, stepGoal, stepFind, stepIdea, stepPrompt, stepBuilder, stepSite];
-  /** Screens laid out wider on a computer: the builder's chat and the site. */
-  const WIDE = [stepBuilder, stepSite];
+  if (MARKETING) STEPS.push(stepMarketing);
+  /** Screens laid out wider on a computer: the builder's chat, the site and the videos. */
+  const WIDE = [stepBuilder, stepSite, stepMarketing];
 
   const setProgress = (value) => {
     progressFill.style.width = `${Math.max(value, 0.04) * 100}%`;
@@ -563,6 +575,7 @@
 
   /* ---- 7. The site, scrolling, while the payments land ------------------------- */
 
+  /** In the variant, no payments: once the page has scrolled, its button leads to the marketing. */
   function stepSite() {
     const idea = ideaOf();
     const domain = domainOf(idea);
@@ -618,14 +631,34 @@
           </div>
           <div class="pays" aria-live="polite"></div>
         </div>
+        ${
+          MARKETING
+            ? `<div class="continue site-next"><button type="button" class="btn btn-primary" disabled>Lancer mon marketing ${ARROW}</button></div>`
+            : ""
+        }
       </section>`);
 
     const view = step.querySelector(".br-view");
     const pays = step.querySelector(".pays");
 
+    // The variant's button: there from the start (the browser keeps its size), shown once the page has
+    // scrolled, or as soon as a wheel or a touch takes over.
+    const onward = step.querySelector(".site-next");
+    const offerMarketing = () => {
+      const button = onward.querySelector(".btn");
+      if (!button.disabled) return;
+      button.disabled = false;
+      onward.classList.add("in");
+      sound.pop();
+    };
+    onward?.querySelector(".btn").addEventListener("click", proceed);
+
     // The page scrolls down by itself (a wheel or a touch takes over).
     let held = false;
-    const hold = () => (held = true);
+    const hold = () => {
+      held = true;
+      if (onward) offerMarketing();
+    };
     view.addEventListener("wheel", hold, { passive: true });
     view.addEventListener("touchstart", hold, { passive: true });
 
@@ -656,6 +689,11 @@
     async function run() {
       await sleep(700);
       scrollThrough(6500);
+      if (onward) {
+        await sleep(6700);
+        offerMarketing();
+        return;
+      }
       await sleep(1800);
       for (const [i, payer] of PAYERS.slice(0, 6).entries()) {
         pay(payer);
@@ -666,6 +704,189 @@
     }
 
     later(run, 100);
+    return step;
+  }
+
+  /* ---- 8. The marketing (variant): the TikTok videos made, published, then their views ---------- */
+
+  /** Counts written as TikTok does: 812, 96,4 K, 2,4 M. */
+  const compact = (n) => {
+    if (n < 1000) return String(Math.round(n));
+    const [value, unit] = n < 1e6 ? [n / 1e3, "K"] : [n / 1e6, "M"];
+    return `${value.toLocaleString("fr-FR", { maximumFractionDigits: value < 100 ? 1 : 0 })}\u202f${unit}`;
+  };
+
+  /** No line break between a number and its word, nor before French's spaced punctuation. */
+  const unbreakable = (text) => text.replace(/(\d) /g, "$1\u00a0").replace(/ ([:;!?»])/g, "\u00a0$1");
+
+  /**
+   * The idea's TikTok account, empty, and its videos being made side by side (each with its percent
+   * and what it is doing), then their thumbnails. "Publier sur TikTok" (Enter): each one's views
+   * climb, the account's figures with them, and hearts fly up.
+   */
+  function stepMarketing() {
+    const idea = ideaOf();
+    const videos = idea.videos;
+    // Each video's picture: the idea's icon, then its features', in turn.
+    const pictures = [idea.icon, ...idea.features.map(([name]) => name)];
+
+    const step = html(`
+      <section class="step mk-step" style="--accent:${idea.accent}">
+        <p class="kicker3 appear">${TIKTOK_MARK}<span class="mk-kicker">Ton marketing</span></p>
+        <h1 class="title"></h1>
+        <div class="mk-profile appear" style="--d:150ms">
+          <span class="mk-avatar">${icon(idea.icon)}</span>
+          <div class="mk-who">
+            <p class="mk-name"><b>${esc(idea.name)}</b><small>@${esc(slug(idea.name))}</small></p>
+            <p class="mk-stats">
+              <span><b data-stat="followers">0</b> Abonnés</span>
+              <span><b data-stat="likes">0</b> J'aime</span>
+              <span><b data-stat="views">0</b> Vues</span>
+            </p>
+          </div>
+        </div>
+        <div class="mk-grid appear" style="--d:300ms">
+          ${videos
+            .map(
+              ([format, hook], i) => `
+            <article class="mk-vid wait">
+              <div class="mk-thumb">
+                <span class="mk-art">${icon(pictures[i % pictures.length])}</span>
+                <span class="mk-format">${esc(format)}</span>
+                <p class="mk-hook look${i % 3}"><span>${esc(unbreakable(hook))}</span></p>
+                <span class="mk-views">${PLAY}<b>0</b></span>
+                <span class="mk-time">0:${String(14 + ((i * 17) % 42)).padStart(2, "0")}</span>
+              </div>
+              <div class="mk-gen">
+                <b class="mk-pct">0 %</b>
+                <small class="mk-stage">En attente</small>
+                <i class="mk-bar"><span></span></i>
+              </div>
+            </article>`,
+            )
+            .join("")}
+        </div>
+        <div class="continue mk-foot appear" style="--d:450ms">
+          <div class="mk-status"><i class="b-spin"></i><span>Je crée tes vidéos TikTok…</span><b>0 / ${videos.length}</b></div>
+        </div>
+      </section>`);
+
+    header(step, "Je crée tes vidéos.");
+
+    const $ = (selector) => step.querySelector(selector);
+    const tiles = Array.from(step.querySelectorAll(".mk-vid"));
+    const foot = $(".mk-foot");
+    const stats = Object.fromEntries(Array.from(step.querySelectorAll("[data-stat]"), (el) => [el.dataset.stat, el]));
+    let ready = 0;
+
+    /** One video made: its percent climbing through what it is doing, then its thumbnail. */
+    const make = (tile, ms) =>
+      new Promise((resolve) => {
+        const pct = tile.querySelector(".mk-pct");
+        const stage = tile.querySelector(".mk-stage");
+        const bar = tile.querySelector(".mk-bar span");
+        tile.classList.replace("wait", "make");
+        const began = performance.now();
+        let shown = -1;
+        let doing = -1;
+        loop((now) => {
+          const t = Math.min(1, (now - began) / ms);
+          const value = Math.round(100 * (0.7 * t + 0.3 * easeOutQuart(t)));
+          if (value !== shown) {
+            pct.textContent = `${value} %`;
+            bar.style.transform = `scaleX(${value / 100})`;
+            shown = value;
+          }
+          const at = Math.min(MAKING.length - 1, Math.floor(t * MAKING.length));
+          if (at !== doing) {
+            stage.textContent = MAKING[at];
+            doing = at;
+            sound.tick(0.35);
+          }
+          if (t < 1) return true;
+          resolve();
+          return false;
+        });
+      });
+
+    /** A video ready: its thumbnail shows, a note one step higher than the one before. */
+    const done = (tile) => {
+      tile.classList.replace("make", "ready");
+      sound.select(ready);
+      ready += 1;
+      $(".mk-status b").textContent = `${ready} / ${tiles.length}`;
+    };
+
+    async function generate() {
+      await sleep(900);
+      // Several at once, each started a moment after the one before.
+      await Promise.all(
+        tiles.map(async (tile, i) => {
+          await sleep(i * 520);
+          await make(tile, 1900 + (i % 3) * 380);
+          done(tile);
+        }),
+      );
+      await sleep(350);
+      foot.innerHTML = `<button type="button" class="btn btn-primary mk-publish appear">${TIKTOK_MARK}Publier sur TikTok</button>`;
+      foot.querySelector(".btn").addEventListener("click", publish, { once: true });
+      sound.pop();
+    }
+
+    /** A heart flying up from a video. */
+    const heart = (tile) => {
+      const x = Math.round(Math.random() * 40 - 20);
+      const r = Math.round(Math.random() * 40 - 20);
+      const el = html(`<span class="mk-heart" style="--x:${x}px;--r:${r}deg">${HEART}</span>`);
+      el.addEventListener("animationend", () => el.remove());
+      tile.append(el);
+    };
+
+    /** Each video's views climb (one after the other), the account's figures with them. */
+    function countViews() {
+      const counts = tiles.map((tile) => tile.querySelector(".mk-views b"));
+      const shown = [];
+      const began = performance.now();
+      let nextHeart = began + 300;
+      loop((now) => {
+        let total = 0;
+        let climbing = false;
+        tiles.forEach((tile, i) => {
+          const t = clamp((now - began - i * 180) / 5200, 0, 1);
+          if (t < 1) climbing = true;
+          const value = VIEWS[i % VIEWS.length] * easeInOutCubic(t);
+          total += value;
+          const text = compact(value);
+          if (shown[i] !== text) counts[i].textContent = shown[i] = text;
+        });
+        stats.views.textContent = compact(total);
+        stats.likes.textContent = compact(total * 0.093);
+        stats.followers.textContent = compact(total * 0.016);
+        if (climbing && now >= nextHeart) {
+          heart(tiles[Math.floor(Math.random() * tiles.length)]);
+          nextHeart = now + 180 + Math.random() * 220;
+        }
+        return climbing;
+      });
+    }
+
+    /** Published: the views climb, and confetti once they take off. */
+    async function publish() {
+      sound.confirm();
+      foot.innerHTML = `<div class="mk-status live"><i class="mk-dot"></i><span>En ligne sur TikTok</span><b>${tiles.length} vidéos</b></div>`;
+      const kicker = $(".mk-kicker");
+      kicker.textContent = "Tes vidéos sont en ligne";
+      replay(kicker.parentElement, "swap");
+      typewrite($(".title"), "Elles cartonnent.", { delay: 250 });
+      tiles.forEach((tile, i) => later(() => tile.classList.replace("ready", "live"), i * 120));
+      countViews();
+
+      await sleep(1500);
+      burstOver($(".mk-grid"), { count: 120, colors: [idea.accent, "#FE2C55", "#25F4EE"] });
+      sound.launch();
+    }
+
+    later(generate, 100);
     return step;
   }
 

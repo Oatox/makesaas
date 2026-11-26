@@ -1,4 +1,4 @@
-import { Disc3, Lightbulb, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
+import { Clapperboard, Disc3, Lightbulb, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
 
 /**
  * Marketing tools of the admin (/admin/marketing): each one opens at /admin/marketing/<id>.
@@ -45,7 +45,15 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     description:
       "Ce que tu aimes, ton objectif, l'idée trouvée (les noms qui défilent, puis sa carte), son prompt, Claude qui construit le site dans son chat, puis le site qui défile pendant que les paiements tombent. Entrée pour avancer, araignée (A), écran tourné (T).",
     icon: Lightbulb,
-    src: "/tools/onboarding-idee/index.html?v=7",
+    src: "/tools/onboarding-idee/index.html?v=9",
+  },
+  {
+    id: "onboarding-marketing",
+    title: "Le faux onboarding 3 bis : ton marketing",
+    description:
+      "Le 3, puis ton marketing qui se génère : les vidéos TikTok de ton idée qui se créent sur son compte, puis, publiées, leurs vues qui s'envolent. Entrée pour avancer, araignée (A), écran tourné (T).",
+    icon: Clapperboard,
+    src: "/tools/onboarding-idee/index.html?marketing&v=9",
   },
 ];
 
