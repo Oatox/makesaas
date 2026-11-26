@@ -4,15 +4,20 @@ import { setUserProperties, track } from "@/lib/analytics";
 import type { OnboardingAnswers } from "@/lib/onboarding-storage";
 import { ONBOARDING_STEPS, type OnboardingStep } from "./steps";
 
-// The answers sent to Amplitude: those picked among options (and the quick questions of the loading
-// screens), numbers for the sliders and wheels. Written answers (first name, the member's sentence,
-// the "Autre" fields) never leave.
-const SENT_ANSWERS = new Map<string, "option" | "number">();
-for (const step of ONBOARDING_STEPS) {
-  if (step.type === "single-choice" || step.type === "multi-choice") SENT_ANSWERS.set(step.id, "option");
-  if (step.type === "slider" || step.type === "wheel") SENT_ANSWERS.set(step.id, "number");
-  if ("questions" in step) for (const question of step.questions) SENT_ANSWERS.set(question.id, "option");
+/**
+ * The answers of a screen sent to Amplitude (user properties `onboarding_<id>`), by id: those picked
+ * among options (and the quick questions of the loading screens), numbers for the sliders and wheels.
+ * Written answers (first name, the member's sentence, the "Autre" fields) never leave. The admin's
+ * Onboarding page reads them back (client/src/components/admin/onboarding/screen-questions.ts).
+ */
+export function sentAnswers(step: OnboardingStep): [string, "option" | "number"][] {
+  if (step.type === "single-choice" || step.type === "multi-choice") return [[step.id, "option"]];
+  if (step.type === "slider" || step.type === "wheel") return [[step.id, "number"]];
+  if ("questions" in step) return step.questions.map((question): [string, "option"] => [question.id, "option"]);
+  return [];
 }
+
+const SENT_ANSWERS = new Map<string, "option" | "number">(ONBOARDING_STEPS.flatMap(sentAnswers));
 
 /**
  * The onboarding in Amplitude: each screen shown (the funnel, in the order of the screens), its end,

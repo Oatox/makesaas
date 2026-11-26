@@ -20,6 +20,7 @@ const PERIODS = [
 type PeriodValue = (typeof PERIODS)[number]["value"];
 
 const ACCOUNT_STEP = ONBOARDING_FUNNEL.findIndex((step) => step.event === ANALYTICS_EVENTS.accountCreated);
+const COMPLETED_STEP = ONBOARDING_FUNNEL.findIndex((step) => step.event === ANALYTICS_EVENTS.onboardingCompleted);
 
 /** The three figures at the top: the visitors of the landing page, the accounts and the subscribers among them. */
 function Figures({ stats }: { stats: AdminOnboardingStats }) {
@@ -55,7 +56,6 @@ function OnboardingSkeleton() {
       </div>
       <Skeleton className="h-[440px] rounded-[18px]" />
       <Skeleton className="h-[320px] rounded-[18px]" />
-      <Skeleton className="h-[220px] rounded-[18px]" />
     </div>
   );
 }
@@ -105,7 +105,12 @@ export function AdminOnboardingPage() {
         <div className={query.isPlaceholderData ? "space-y-4 opacity-60 transition-opacity sm:space-y-5" : "space-y-4 sm:space-y-5"}>
           <Figures stats={stats} />
           <OnboardingFunnel steps={stats.funnel} />
-          <OnboardingSteps landing={stats.landing} screens={stats.screens} />
+          <OnboardingSteps
+            days={stats.days}
+            landing={stats.landing}
+            screens={stats.screens}
+            completed={stats.funnel[COMPLETED_STEP]?.users ?? 0}
+          />
         </div>
       ) : null}
     </div>

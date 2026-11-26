@@ -13,9 +13,10 @@ const DEVICES: Record<DeviceKind, { label: string; hint?: string }> = {
 type DeviceLine = { kind: DeviceKind; users: number; rate: number | null };
 
 /**
- * A step of the list per kind of device: the visitors who reached it and the share of those of the
- * step before who did, a tick at the share over all devices; the device far below it is flagged. For
- * the landing page, which has no step before, the share of its visitors each kind of device brings.
+ * A step of the list per kind of device (in its drawer, StepDrawer): the visitors who reached it and
+ * the share of those of the step before who did, a tick at the share over all devices; the device far
+ * below it is flagged. For the landing page, which has no step before, the share of its visitors each
+ * kind of device brings.
  */
 export function DeviceBreakdown({ row, previous }: { row: StepRow; previous?: StepRow }) {
   const total = DEVICE_KINDS.reduce((sum, kind) => sum + row.devices[kind], 0);
@@ -32,20 +33,17 @@ export function DeviceBreakdown({ row, previous }: { row: StepRow; previous?: St
   const gap = average !== null && compared.length > 1 && lowest && lowest.rate! < average ? lowest.kind : null;
 
   return (
-    <section className="card-3d p-5 sm:p-6" aria-labelledby="onboarding-devices-title">
-      <h2 id="onboarding-devices-title" className="text-base font-semibold">
-        Par appareil · <span className="text-muted-foreground">{row.names[0]}</span>
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
+    <div>
+      <p className="text-sm text-muted-foreground">
         {previous
           ? "Les visiteurs arrivés à cette étape, et la part de ceux de l'étape d'avant qui y sont arrivés. Le trait orange marque la part sur tous les appareils."
           : "Les visiteurs de la landing, et la part de chaque appareil."}
       </p>
 
       {lines.length === 0 ? (
-        <p className="mt-4 text-sm text-muted-foreground">Pas de chiffres par appareil pour cette étape.</p>
+        <p className="mt-3 text-sm text-muted-foreground">Pas de chiffres par appareil pour cette étape.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-border/50">
+        <ul className="mt-2 divide-y divide-border/50">
           {lines.map((line) => {
             const device = DEVICES[line.kind];
             const isGap = line.kind === gap;
@@ -92,6 +90,6 @@ export function DeviceBreakdown({ row, previous }: { row: StepRow; previous?: St
           })}
         </ul>
       )}
-    </section>
+    </div>
   );
 }

@@ -98,12 +98,15 @@ export type DeviceKind = (typeof DEVICE_KINDS)[number];
 /** Visitors per kind of device (a visitor seen on two kinds counts in both). */
 export type DeviceCounts = Record<DeviceKind, number>;
 
+/** A screen shown at a position of the onboarding (its step id) and the visitors who saw it. */
+export type OnboardingScreenVariant = { stepId: string; users: number };
+
 /**
  * One position in the onboarding (its Nth screen) and the visitors who reached it, in all and per
  * kind of device. The screens a position shows can differ with the answers (the branches after
- * "experience"): `stepIds` lists them.
+ * "experience"): `variants` lists them, each with its visitors.
  */
-export type OnboardingScreenStat = { number: number; stepIds: string[]; users: number; devices: DeviceCounts };
+export type OnboardingScreenStat = { number: number; variants: OnboardingScreenVariant[]; users: number; devices: DeviceCounts };
 
 /** GET adminApi.onboarding?days=: the onboarding's funnel and screens over the period, from Amplitude. */
 export type AdminOnboardingStats = {
@@ -116,8 +119,31 @@ export type AdminOnboardingStats = {
   computedAt: string;
 };
 
+/** The answer ids one request can ask for (a screen's branches, or its quick questions). */
+export const MAX_ANSWER_KEYS = 12;
+
+/**
+ * The answers given to one question of the onboarding (the `onboarding_<key>` user property) by the
+ * visitors of the period: each value picked and its visitors (a multiple choice counts a visitor once
+ * per option picked), and the visitors who answered at all.
+ */
+export type OnboardingAnswerStat = { key: string; respondents: number; values: { value: string; users: number }[] };
+
+/**
+ * GET adminApi.onboardingScreen?days=&number=&last=&keys=: one screen of the onboarding over the period
+ * (`number` 0: the landing page), opened from the admin's list.
+ */
+export type AdminOnboardingScreen = {
+  /** Median time from the screen's view to the next screen's (the onboarding's end after the last one), in seconds; null when nobody went on. */
+  medianSeconds: number | null;
+  /** The answers to its questions, in the order of the `keys` asked. */
+  answers: OnboardingAnswerStat[];
+  computedAt: string;
+};
+
 export const adminApi = {
   onboarding: "/api/admin/onboarding",
+  onboardingScreen: "/api/admin/onboarding/screen",
   userDetails: (userId: string) => `/api/admin/users/${userId}/details`,
   saas: (userId: string, saasId: string) => `/api/admin/users/${userId}/saas/${saasId}`,
   discussion: (userId: string, conversationId: string) => `/api/admin/users/${userId}/discussions/${conversationId}`,

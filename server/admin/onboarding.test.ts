@@ -2,13 +2,17 @@ import { describe, expect, test } from "bun:test";
 import { ANALYTICS_EVENTS, LANDING_STEP, ONBOARDING_FUNNEL, PAGE_PATH_PROPERTY, PAGE_VIEWED_EVENT } from "@shared/analytics";
 import type { DeviceCounts } from "@shared/admin";
 import {
+  answersQuery,
   deviceKind,
   IN_APP_BROWSERS,
   periodRange,
+  readAnswers,
   readFunnel,
   readLandingDevices,
   readScreens,
+  readStepTimes,
   readVisitors,
+  screenTimeQuery,
   statsQueries,
 } from "./onboarding";
 
@@ -74,15 +78,23 @@ describe("readScreens", () => {
       none,
     );
     expect(screens).toEqual([
-      { number: 1, stepIds: ["age"], users: 100, devices: devices({}) },
-      { number: 6, stepIds: ["pq-jamais", "pq-vendu"], users: 42, devices: devices({}) },
-      { number: 10, stepIds: ["analyse"], users: 40, devices: devices({}) },
+      { number: 1, variants: [{ stepId: "age", users: 100 }], users: 100, devices: devices({}) },
+      {
+        number: 6,
+        variants: [
+          { stepId: "pq-jamais", users: 30 },
+          { stepId: "pq-vendu", users: 12 },
+        ],
+        users: 42,
+        devices: devices({}),
+      },
+      { number: 10, variants: [{ stepId: "analyse", users: 40 }], users: 40, devices: devices({}) },
     ]);
   });
 
   test("reads plain labels and leaves out events without the label", () => {
     const screens = readScreens(answer([["(none)", 9], ["02 profil", 7]]), none, none);
-    expect(screens).toEqual([{ number: 2, stepIds: ["profil"], users: 7, devices: devices({}) }]);
+    expect(screens).toEqual([{ number: 2, variants: [{ stepId: "profil", users: 7 }], users: 7, devices: devices({}) }]);
   });
 
   test("counts each position's visitors per kind of device, the branches added up", () => {
@@ -109,6 +121,88 @@ describe("readScreens", () => {
       devices({ desktop: 4, mobile: 3, tablet: 1, "in-app": 2 }),
       devices({ mobile: 3, "in-app": 2 }),
     ]);
+  });
+});
+
+describe("readStepTimes", () => {
+  test("gives the time from each step to the next in seconds, without the whole funnel's", () => {
+    const times = readStepTimes({ data: [{ medianTransTimes: [8000, 3500, 4000], cumulativeRaw: [11, 10, 10] }] });
+    expect(times).toEqual([3.5, 4]);
+  });
+
+  test("has no time where nobody went on", () => {
+    expect(readStepTimes({ data: [{ medianTransTimes: [-1, 2500, -1] }] })).toEqual([2.5, null]);
+    expect(readStepTimes({ data: [] })).toEqual([]);
+  });
+});
+
+describe("readAnswers", () => {
+  test("reads each value picked and the visitors who answered, from the last series", () => {
+    const stat = readAnswers(
+      "frustrations",
+      answer([
+        [[0, "(none)"], 11],
+        [[0, "e_avance"], 4],
+        [[0, "e_argent"], 7],
+        [0, 10],
+      ]),
+    );
+    expect(stat).toEqual({
+      key: "frustrations",
+      respondents: 10,
+      values: [
+        { value: "e_argent", users: 7 },
+        { value: "e_avance", users: 4 },
+      ],
+    });
+  });
+
+  test("has no answers when nobody answered", () => {
+    expect(readAnswers("action", answer([[[0, "(none)"], 7], [0, 0]]))).toEqual({ key: "action", respondents: 0, values: [] });
+    expect(readAnswers("action", answer([[0, 0]]))).toEqual({ key: "action", respondents: 0, values: [] });
+  });
+});
+
+describe("answersQuery", () => {
+  test("groups every onboarding event by the answer's user property, then counts those who have one", () => {
+    const query = answersQuery(30, "profil", new Date("2026-11-25T09:07:00Z"));
+    const first = JSON.parse(query.find(([key]) => key === "e")![1]);
+    const second = JSON.parse(query.find(([key]) => key === "e2")![1]);
+
+    // The screens and the end of the onboarding: an answer to the last screens only reaches the end.
+    expect(first.event_type).toBe("_all");
+    expect(first.filters[0]).toMatchObject({ subprop_key: "step_count", subprop_op: "greater" });
+    expect(first.group_by).toEqual([{ type: "user", value: "gp:onboarding_profil" }]);
+    expect(second.group_by).toBeUndefined();
+    expect(second.filters.at(-1)).toEqual({
+      subprop_type: "user",
+      subprop_key: "gp:onboarding_profil",
+      subprop_op: "is not",
+      subprop_value: ["(none)"],
+    });
+  });
+});
+
+describe("screenTimeQuery", () => {
+  const events = (query: [string, string][]) => query.filter(([key]) => key === "e").map(([, value]) => JSON.parse(value));
+
+  test("follows a screen to the next position, in order", () => {
+    const query = screenTimeQuery(7, 6, false, new Date("2026-11-25T09:07:00Z"));
+    const [screen, next] = events(query);
+    expect([screen.event_type, next.event_type]).toEqual([ANALYTICS_EVENTS.onboardingStepViewed, ANALYTICS_EVENTS.onboardingStepViewed]);
+    expect([screen.filters[0].subprop_value[0], next.filters[0].subprop_value[0]]).toEqual(["6", "7"]);
+    expect(query).toContainEqual(["mode", "ordered"]);
+  });
+
+  test("follows the last screen to the end of the onboarding, the landing page to its first screen", () => {
+    expect(events(screenTimeQuery(7, 34, true)).map((event) => event.event_type)).toEqual([
+      ANALYTICS_EVENTS.onboardingStepViewed,
+      ANALYTICS_EVENTS.onboardingCompleted,
+    ]);
+    const [landing, first] = events(screenTimeQuery(7, 0, false));
+    expect(landing.event_type).toBe(PAGE_VIEWED_EVENT);
+    expect(landing.filters[0]).toMatchObject({ subprop_key: PAGE_PATH_PROPERTY, subprop_value: ["/"] });
+    expect(first.filters[0].subprop_value).toEqual(["1"]);
   });
 });
 

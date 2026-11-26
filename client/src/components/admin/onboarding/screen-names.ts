@@ -21,8 +21,35 @@ const NAMES_BY_TYPE: Partial<Record<OnboardingStep["type"], string>> = {
   build: "Construction du plan",
 };
 
-/** A step's title as plain text: no `**bold**`, no line breaks, the visitor's answers as "…". */
-const plainTitle = (title: string) =>
+/** What kind of screen a step is, for the admin. */
+const KINDS_BY_TYPE: Record<OnboardingStep["type"], string> = {
+  "single-choice": "Question à un choix",
+  "multi-choice": "Question à plusieurs choix",
+  slider: "Curseur",
+  wheel: "Roue",
+  text: "Réponse écrite",
+  loading: "Chargement avec questions",
+  build: "Plan avec questions",
+  message: "Écran d'explication",
+  chat: "Échange avec Gus",
+  statement: "Phrase seule",
+  features: "Présentation de l'app",
+  "social-proof": "Écran sans question",
+  account: "Création du compte",
+  "founder-profile": "Écran sans question",
+  potential: "Écran sans question",
+  method: "Écran sans question",
+  future: "Écran sans question",
+  stories: "Écran sans question",
+  curve: "Écran sans question",
+  "one-thing": "Écran sans question",
+  pact: "Écran sans question",
+  "coach-chat": "Échange avec Gus",
+  projection: "Écran sans question",
+};
+
+/** A title as plain text: no `**bold**`, no line breaks, the visitor's answers as "…". */
+export const plainTitle = (title: string) =>
   title
     .replace(/\*\*/g, "")
     .replace(/\{\w+\}/g, "…")
@@ -35,4 +62,10 @@ export function screenName(stepId: string): string {
   if (!step) return stepId;
   if ("title" in step && typeof step.title === "string") return plainTitle(step.title);
   return NAMES_BY_TYPE[step.type] ?? stepId;
+}
+
+/** What kind of screen it is ("Question à un choix", "Écran sans question"); null for a step no longer in the onboarding. */
+export function screenKind(stepId: string): string | null {
+  const step = STEPS_BY_ID.get(stepId);
+  return step ? KINDS_BY_TYPE[step.type] : null;
 }

@@ -1,27 +1,38 @@
 import { useState } from "react";
-import type { AdminOnboardingStats, DeviceCounts } from "@shared/admin";
+import type { AdminOnboardingStats, DeviceCounts, OnboardingStatsPeriod } from "@shared/admin";
 import { formatCount, formatRate } from "@/components/revenue/stats";
 import { cn } from "@/lib/utils";
-import { DeviceBreakdown } from "./DeviceBreakdown";
 import { screenName } from "./screen-names";
+import { StepDrawer } from "./StepDrawer";
 
 /** How many of the biggest drops are flagged, among those losing at least MIN_FLAGGED_LOSS of the step before. */
 const FLAGGED_DROPS = 3;
 const MIN_FLAGGED_LOSS = 0.1;
 
-/** A row of the list: the landing page, then each position of the onboarding. */
-export type StepRow = { key: string; number: number | null; names: string[]; users: number; devices: DeviceCounts };
+/** A row of the list: the landing page, then each position of the onboarding (its screens: one, or its branches). */
+export type StepRow = {
+  key: string;
+  number: number | null;
+  names: string[];
+  users: number;
+  devices: DeviceCounts;
+  variants: { stepId: string; name: string; users: number }[];
+};
 
 function stepRows({ landing, screens }: Pick<AdminOnboardingStats, "landing" | "screens">): StepRow[] {
   return [
-    { key: "landing", number: null, names: ["Landing"], users: landing.users, devices: landing.devices },
-    ...screens.map((screen) => ({
-      key: `screen-${screen.number}`,
-      number: screen.number,
-      names: screen.stepIds.map(screenName),
-      users: screen.users,
-      devices: screen.devices,
-    })),
+    { key: "landing", number: null, names: ["Landing"], users: landing.users, devices: landing.devices, variants: [] },
+    ...screens.map((screen) => {
+      const variants = screen.variants.map((variant) => ({ ...variant, name: screenName(variant.stepId) }));
+      return {
+        key: `screen-${screen.number}`,
+        number: screen.number,
+        names: variants.map((variant) => variant.name),
+        users: screen.users,
+        devices: screen.devices,
+        variants,
+      };
+    }),
   ];
 }
 
@@ -58,17 +69,24 @@ function StepLabel({ row }: { row: StepRow }) {
 /**
  * The landing page and every screen of the onboarding in order: the visitors who reached it (a bar
  * against the landing page's) and the share of the step before who did; the biggest drops in red. A
- * click on a step opens its figures per kind of device below (on the biggest drop at first).
+ * click on a step opens it in a drawer (StepDrawer): who left there, the time spent on it, its answers,
+ * its figures per kind of device.
  */
-export function OnboardingSteps(props: Pick<AdminOnboardingStats, "landing" | "screens">) {
+export function OnboardingSteps({
+  days,
+  completed,
+  ...props
+}: Pick<AdminOnboardingStats, "landing" | "screens"> & {
+  days: OnboardingStatsPeriod;
+  /** The visitors who finished the onboarding (the funnel's step): what comes after the last screen. */
+  completed: number;
+}) {
   const rows = stepRows(props);
   const drops = biggestDrops(rows);
   const first = rows[0].users || Math.max(...rows.map((row) => row.users), 0);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
-
-  const worst = Array.from(drops).find(([, rank]) => rank === 1)?.[0];
-  const found = rows.findIndex((row) => row.key === selectedKey);
-  const selected = found >= 0 ? found : (worst ?? Math.min(1, rows.length - 1));
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const found = rows.findIndex((row) => row.key === openKey);
+  const open = found >= 0 ? found : null;
 
   return (
     <>
@@ -78,7 +96,7 @@ export function OnboardingSteps(props: Pick<AdminOnboardingStats, "landing" | "s
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Les visiteurs arrivés à chaque étape, et la part de ceux de l'étape d'avant. Les plus grosses chutes sont en
-          rouge. Clique sur une étape pour la voir par appareil.
+          rouge. Clique sur une étape pour voir son détail : le temps passé, les réponses, les appareils.
         </p>
 
         {props.screens.length === 0 && rows[0].users === 0 ? (
@@ -87,15 +105,15 @@ export function OnboardingSteps(props: Pick<AdminOnboardingStats, "landing" | "s
           <ol className="mt-4 space-y-0.5">
             {rows.map((row, index) => {
               const previous = rows[index - 1];
-              const isSelected = index === selected;
+              const isSelected = index === open;
               const flagged = drops.has(index);
 
               return (
                 <li key={row.key}>
                   <button
                     type="button"
-                    onClick={() => setSelectedKey(row.key)}
-                    aria-pressed={isSelected}
+                    onClick={() => setOpenKey(row.key)}
+                    aria-haspopup="dialog"
                     className={cn(
                       "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 rounded-lg px-2 py-2 text-left transition-colors",
                       "sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_5rem] sm:py-2.5",
@@ -136,7 +154,14 @@ export function OnboardingSteps(props: Pick<AdminOnboardingStats, "landing" | "s
         )}
       </section>
 
-      {rows[selected] && <DeviceBreakdown row={rows[selected]} previous={rows[selected - 1]} />}
+      <StepDrawer
+        days={days}
+        rows={rows}
+        index={open}
+        completed={completed}
+        drops={drops}
+        onIndexChange={(index) => setOpenKey(index === null ? null : rows[index].key)}
+      />
     </>
   );
 }

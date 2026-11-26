@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { z } from "zod";
-import { adminApi, isOnboardingStatsPeriod } from "@shared/admin";
+import { adminApi, isOnboardingStatsPeriod, MAX_ANSWER_KEYS } from "@shared/admin";
 import { SUBSCRIPTION_SUMMARY_COLUMNS, grantsAccess, renewsBilling, type SubscriptionSummary } from "@shared/billing";
 import { getBillingService } from "../billing/routes";
 import { getUserId, requireAdmin } from "../lib/auth";
@@ -10,13 +10,25 @@ import { supabaseAdmin } from "../lib/supabase-admin";
 import { removeUserFiles } from "../storage/files";
 import { mapProviders, mapSessionRow, type AdminSessionPayload } from "./mappers";
 import { JOURNEY_PROFILE_COLUMNS, readDiscussion, readJourney, readSaasDetail } from "./member";
-import { readOnboardingStats } from "./onboarding";
+import { readOnboardingScreen, readOnboardingStats } from "./onboarding";
 
 const userParamsSchema = z.object({ id: z.string().uuid() });
 const sessionParamsSchema = userParamsSchema.extend({ sessionId: z.string().uuid() });
 const saasParamsSchema = userParamsSchema.extend({ saasId: z.string().uuid() });
 const discussionParamsSchema = userParamsSchema.extend({ conversationId: z.string().uuid() });
 const onboardingQuerySchema = z.object({ days: z.coerce.number().int().refine(isOnboardingStatsPeriod) });
+const onboardingScreenQuerySchema = onboardingQuerySchema.extend({
+  // 0: the landing page, then the onboarding's positions.
+  number: z.coerce.number().int().min(0).max(200),
+  // The onboarding's last screen: what comes after it is its end.
+  last: z.enum(["0", "1"]).default("0").transform((last) => last === "1"),
+  // The ids of the answers asked for, comma-separated (the onboarding's step and question ids); none for a screen without questions.
+  keys: z
+    .string()
+    .default("")
+    .transform((keys) => Array.from(new Set(keys.split(",").filter(Boolean))))
+    .pipe(z.array(z.string().regex(/^[a-z0-9_-]{1,40}$/i)).max(MAX_ANSWER_KEYS)),
+});
 
 const updateUserBodySchema = z
   .object({
@@ -159,6 +171,16 @@ export function registerAdminRoutes(app: Express) {
     asyncRoute(async (req, res) => {
       const { days } = parseInput(onboardingQuerySchema, req.query);
       res.json(await readOnboardingStats(days));
+    }),
+  );
+
+  // One screen of the onboarding opened from the list: the time spent on it and the answers to its questions (./onboarding.ts).
+  app.get(
+    adminApi.onboardingScreen,
+    requireAdmin,
+    asyncRoute(async (req, res) => {
+      const { days, number, last, keys } = parseInput(onboardingScreenQuerySchema, req.query);
+      res.json(await readOnboardingScreen(days, number, last, keys));
     }),
   );
 
