@@ -29,7 +29,7 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     description:
       "Passions, temps, banque et objectif, puis le site qui se crée sous tes yeux et les paiements qui tombent. À filmer : araignée sur l'écran (A), écran tourné comme un téléphone (T).",
     icon: Rocket,
-    src: "/tools/onboarding/index.html?v=15",
+    src: "/tools/onboarding/index.html?v=17",
   },
   {
     id: "onboarding-potentiel",
@@ -37,7 +37,7 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     description:
       "Objectif, paiements, échéance, sans te montrer, marketing, puis le potentiel chiffré et le site qui se crée sous tes yeux. Touches 1 à 4 pour répondre, idée suivante (I), araignée (A), écran tourné (T).",
     icon: TrendingUp,
-    src: "/tools/onboarding-potentiel/index.html?v=4",
+    src: "/tools/onboarding-potentiel/index.html?v=6",
   },
   {
     id: "onboarding-idee",
@@ -45,7 +45,7 @@ export const MARKETING_TOOLS: MarketingTool[] = [
     description:
       "Ce que tu aimes, ton objectif, l'idée trouvée (les noms qui défilent, puis sa carte), son prompt, Claude qui construit le site dans son chat, puis le site qui défile pendant que les paiements tombent. Entrée pour avancer, araignée (A), écran tourné (T).",
     icon: Lightbulb,
-    src: "/tools/onboarding-idee/index.html?v=3",
+    src: "/tools/onboarding-idee/index.html?v=7",
   },
 ];
 

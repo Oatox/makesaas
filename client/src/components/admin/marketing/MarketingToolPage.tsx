@@ -11,10 +11,13 @@ import { cn } from "@/lib/utils";
  * tool brings the admin back to the list by posting { type: "marketing-tool:home" } (on Escape).
  * "Recommencer" reloads it, so every answer picked in it is gone, outside the filmed area.
  *
- * On a computer the tool's fullscreen button uses the browser's fullscreen. On a phone or a tablet it
- * posts { type: "marketing-tool:fill" } instead: the tool then fills the whole page, over the app's
- * header and menu, while the browser's own bars stay in view, until the page is reloaded (to film,
- * nothing on screen brings the admin back).
+ * A tool's fullscreen button may post { type: "marketing-tool:fill" }: the tool then fills the whole
+ * page, over the app's header and menu, while the browser's own bars stay in view (filmed, the fake
+ * onboardings look like the real one in a browser). On a computer, the onboardings post
+ * { type: "marketing-tool:unfill" } to give the page back (F, Escape or the button again, and as each
+ * page of theirs starts: turning one with T reloads it); turned like a phone, they use the browser's
+ * own fullscreen, as the roulette does. On a phone or a tablet the tool fills the page until it is
+ * reloaded (to film, nothing on screen brings the admin back).
  */
 export function MarketingToolPage({ toolId }: { toolId: string }) {
   const tool = getMarketingTool(toolId);
@@ -29,6 +32,7 @@ export function MarketingToolPage({ toolId }: { toolId: string }) {
       if (event.source !== frameRef.current?.contentWindow) return;
       if (event.data?.type === "marketing-tool:home") setLocation("/admin/marketing");
       if (event.data?.type === "marketing-tool:fill") setFilling(true);
+      if (event.data?.type === "marketing-tool:unfill") setFilling(false);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);

@@ -28,15 +28,21 @@
 
   /** Phones and tablets: "fullscreen" fills the page instead, the browser's own bars staying in view. */
   const touchScreen = window.matchMedia?.("(hover: none) and (pointer: coarse)").matches ?? false;
+  /** In the admin (MarketingToolPage), which can give the tool the whole page. */
+  const embedded = window.parent !== window;
 
   /**
-   * Computers: the browser's fullscreen (F or Escape leave it). Phones and tablets (or a browser
-   * without it, as an iPhone): the tool fills the whole page until the page is reloaded (fillPage).
+   * Computers, upright: the tool fills the browser's window (fillWindow), its tabs and address bar in
+   * view, as the real onboarding would; F, Escape or the button give the page back. Turned, and outside
+   * the admin: the browser's fullscreen (F or Escape leave it), the browser's bars would give the phone
+   * away. Phones and tablets (or a browser without it, as an iPhone): the tool fills the whole page
+   * until the page is reloaded (fillPage).
    */
   function toggleFullscreen() {
     const root = document.documentElement;
     const request = root.requestFullscreen || root.webkitRequestFullscreen;
     if (touchScreen || !request) return fillPage();
+    if (embedded && !holder) return fillWindow(!windowFilled);
     if (document.fullscreenElement || document.webkitFullscreenElement) {
       (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
       return;
@@ -56,14 +62,30 @@
   function fillPage() {
     if (filled) return;
     filled = true;
-    if (window.parent !== window) window.parent.postMessage({ type: "marketing-tool:fill" }, location.origin);
+    if (embedded) window.parent.postMessage({ type: "marketing-tool:fill" }, location.origin);
     document.documentElement.classList.add("filming");
     frame?.contentDocument?.documentElement.classList.add("filming");
   }
 
+  /**
+   * Computers: the tool fills the browser's window, over the admin's header and menu, or gives it back.
+   * Its buttons stay in their corner, shown while the mouse is there (kit.js).
+   */
+  let windowFilled = false;
+  function fillWindow(on) {
+    windowFilled = on;
+    window.parent.postMessage({ type: on ? "marketing-tool:fill" : "marketing-tool:unfill" }, location.origin);
+  }
+
   /** Back to the admin's list of tools (when embedded there). */
   function home() {
-    if (window.parent !== window) window.parent.postMessage({ type: "marketing-tool:home" }, location.origin);
+    if (embedded) window.parent.postMessage({ type: "marketing-tool:home" }, location.origin);
+  }
+
+  /** Escape: gives the window back first, then the list of tools (the browser's fullscreen leaves by itself). */
+  function escape() {
+    if (windowFilled) return fillWindow(false);
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) home();
   }
 
   /** The next way: into or out of the phone, the page starts again; from one side to the other, it just turns. */
@@ -101,12 +123,14 @@
       pixelRatio,
       next: () => (outer ? outer.next() : next()),
       fullscreen: () => (outer ? outer.fullscreen() : toggleFullscreen()),
-      home: () => (outer ? outer.home() : home()),
+      escape: () => (outer ? outer.escape() : escape()),
     };
     return;
   }
 
-  window.FO_TURN = { holder, pixelRatio, next, fullscreen: toggleFullscreen, home };
+  window.FO_TURN = { holder, pixelRatio, next, fullscreen: toggleFullscreen, escape };
+  // A new page starts in the admin's frame: the one before may have filled the window, then reloaded (T).
+  if (embedded) window.parent.postMessage({ type: "marketing-tool:unfill" }, location.origin);
   if (!holder) return;
 
   // Holding the phone: the page's own onboarding is hidden (style.css) and never started.
@@ -135,8 +159,7 @@
     const key = event.key.toLowerCase();
     if (key === "t") next();
     else if (key === "f") toggleFullscreen();
-    else if (event.key === "Escape") {
-      if (!document.fullscreenElement) home();
-    } else frame?.contentWindow?.dispatchEvent(new KeyboardEvent("keydown", { key: event.key }));
+    else if (event.key === "Escape") escape();
+    else frame?.contentWindow?.dispatchEvent(new KeyboardEvent("keydown", { key: event.key }));
   });
 })();

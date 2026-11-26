@@ -437,22 +437,53 @@ window.FO_KIT = (() => {
 
   /* ---- Tool controls ------------------------------------------------------- */
 
+  /** How far around the buttons the mouse shows them, in px. */
+  const CONTROLS_REACH = 48;
+
   /**
-   * The buttons in the corner (fading out while the mouse rests, so they stay out of the video) and
-   * the keys: R restart, M sound, A spider (spider.js), T turned screen (turn.js), F fullscreen,
-   * Escape back to the list. `onKey` gets the other keys pressed without a modifier.
+   * The buttons in the corner and the keys: R restart, M sound, A spider (spider.js), T turned screen
+   * (turn.js), F fullscreen, Escape out of it or back to the list. `onKey` gets the other keys pressed
+   * without a modifier.
+   *
+   * Out of the video: shown a moment when the page opens, then only while the mouse is in their corner
+   * (clicking the onboarding never brings them). On a touch screen, a tap shows them a moment.
    */
   function controls({ restart, onKey = () => {} }) {
     const bar = document.getElementById("controls");
     const spider = window.FO_SPIDER;
     let idleTimer = 0;
+    let near = false;
+    const show = (visible) => bar.classList.toggle("idle", !visible);
     const wake = () => {
-      bar.classList.remove("idle");
+      show(true);
       clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => bar.classList.add("idle"), 2200);
+      idleTimer = setTimeout(() => {
+        idleTimer = 0;
+        show(near);
+      }, 2200);
     };
-    window.addEventListener("pointermove", wake);
-    window.addEventListener("pointerdown", wake);
+    const inCorner = (event) => {
+      const box = bar.getBoundingClientRect();
+      return event.clientX >= box.left - CONTROLS_REACH && event.clientY <= box.bottom + CONTROLS_REACH;
+    };
+    window.addEventListener("pointermove", (event) => {
+      if (event.pointerType !== "mouse") return;
+      near = inCorner(event);
+      if (near) {
+        clearTimeout(idleTimer);
+        idleTimer = 0;
+        show(true);
+      } else if (!idleTimer) show(false);
+    });
+    // Out of the page (to the browser's bars, say): no move tells it, the buttons leave with the mouse.
+    window.addEventListener("pointerout", (event) => {
+      if (event.pointerType !== "mouse" || event.relatedTarget) return;
+      near = false;
+      if (!idleTimer) show(false);
+    });
+    window.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "mouse") wake();
+    });
     wake();
 
     document.getElementById("btnRestart").addEventListener("click", restart);
@@ -469,9 +500,8 @@ window.FO_KIT = (() => {
       else if (key === "a") spider.toggle();
       else if (key === "t") turned.next();
       else if (key === "f") turned.fullscreen();
-      else if (event.key === "Escape") {
-        if (!document.fullscreenElement) turned.home();
-      } else onKey(event);
+      else if (event.key === "Escape") turned.escape();
+      else onKey(event);
     });
   }
 

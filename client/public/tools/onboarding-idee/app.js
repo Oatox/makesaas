@@ -350,29 +350,19 @@
 
   /* ---- 5. Its prompt, to send to Claude ----------------------------------------- */
 
-  /** The prompt Claude gets: the idea, the goal, the pages, the style, the address. */
+  /** The prompt Claude gets: just a landing page, with the idea and its style. */
   function promptText(idea) {
     return [
-      `Tu es un développeur front-end senior et un designer produit. Construis l'app de ma startup, ${idea.name}, et mets-la en ligne.`,
+      `Fais-moi une landing page pour ma startup, ${idea.name}.`,
       "",
-      "## Le produit",
       `${idea.name} est ${idea.what}. ${idea.pitch}`,
       `Cible : ${lowerFirst(idea.audience)}`,
       `Accroche : « ${idea.hook} »`,
       `Fonctionnalités : ${idea.features.map(([, label]) => label).join(" · ")}.`,
-      `Mon objectif : ${eur0.format(state.goal)} / mois. Vise une V1 propre et simple, qu'on peut lancer cette semaine, avec un abonnement à ${eur2.format(idea.price)} par mois.`,
+      `Prix : ${eur2.format(idea.price)} par mois.`,
       "",
-      "## Les pages",
-      "- Accueil : l'accroche, le problème, 3 bénéfices, comment ça marche, le prix.",
-      "- Inscription et connexion, puis l'espace membre.",
-      "- Paiement avec Whop : l'accès Pro débloqué juste après.",
-      "- Mentions légales et CGV.",
-      "",
-      "## Le style",
-      `Sombre et élégant, grands titres en serif, ${idea.accent} en couleur d'accent. Animations douces au scroll, parfait sur mobile.`,
-      "",
-      "## Mise en ligne",
-      `Publie l'app et branche le domaine ${domainOf(idea)}. Commence par la page d'accueil, puis enchaîne jusqu'à la mise en ligne sans t'arrêter.`,
+      "Les sections : l'accroche, le problème, 3 bénéfices, comment ça marche, le prix.",
+      `Le style : sombre et élégant, grands titres en serif, ${idea.accent} en couleur d'accent, animations douces au scroll, parfaite sur mobile.`,
     ].join("\n");
   }
 
